@@ -390,14 +390,6 @@ export default function Header({ onToggleSidebar }) {
             CompanySwitcher, which holds that rule so this bar does not. */}
         <CompanySwitcher />
 
-        {/* "Add Ledger", and the two modals it opens. Here rather than on the
-            Ledger page so a ledger can be added from wherever the user is,
-            and because the header is mounted once by AppLayout, that is also
-            what keeps it to ONE copy of each modal for the whole app.
-            Which options it offers, and everything that happens after one is
-            chosen, are its own - see LedgerActions. */}
-        <LedgerActions />
-
         {/* Refresh is for everybody. It asks the backend to re-read the
             company the user is working in, which every ERP has - and an
             Intelligere user, the one who can actually pick a company, needs
@@ -413,15 +405,23 @@ export default function Header({ onToggleSidebar }) {
         )}
 
         {isTally &&
-        <IconAction
-          label="Refresh Company"
-          icon={RefreshCw}
-          onClick={handleRefresh}
-          disabled={refreshing || preparing || Boolean(recentCompanies)}
-          // `animate-spin` is added only while a refresh is in progress.
-          className={cn((refreshing || preparing) && '[&_svg]:animate-spin')}
-        />
+          <IconAction
+            label="Refresh Company"
+            icon={RefreshCw}
+            onClick={handleRefresh}
+            disabled={refreshing || preparing || Boolean(recentCompanies)}
+            // `animate-spin` is added only while a refresh is in progress.
+            className={cn((refreshing || preparing) && '[&_svg]:animate-spin')}
+          />
         }
+
+        {/* "Add Ledger", and the two modals it opens. Here rather than on the
+            Ledger page so a ledger can be added from wherever the user is,
+            and because the header is mounted once by AppLayout, that is also
+            what keeps it to ONE copy of each modal for the whole app.
+            Which options it offers, and everything that happens after one is
+            chosen, are its own - see LedgerActions. */}
+        <LedgerActions />
 
         {/* Tally Gold only: opened after Refresh's fetch when recent companies exist.
             Mounted only while open, so each opening starts unticked. */}

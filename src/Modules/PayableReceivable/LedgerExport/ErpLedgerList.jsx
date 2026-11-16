@@ -7,20 +7,25 @@ import { Panel } from '@/Components/Common/Panel'
 import { DataTable, DateRangeFilter, PlainHead, TableFilters, TablePager } from '@/Components/Common/TableTools'
 import { Button } from '@/Components/ui/button'
 import { TableCell, TableRow } from '@/Components/ui/table'
-import { MASTER_DATA_STALE_MS, QUERY } from '@/Constants/queryKeys'
+import { QUERY } from '@/Constants/queryKeys'
 import { useListView } from '@/Hooks/useListView'
 import { useQuery } from '@/Library/queryCache'
 import { toast } from '@/Library/toast'
 import { BankEntryModal, EditEntryModal } from '@/Modules/PayableReceivable/LedgerExport/ErpEntryModals'
 import {
+  ENTRY_PAGER,
+  LEDGER_PAGER,
   balanceText,
   currentFinancialYear,
   erpLedgersCsv,
   filterErpRows,
   financialYearOptions,
   isFixedRow,
+  isBalanceRow,
+  isOpeningDeleteType,
   readErpLedgers,
   rowDetails,
+  showsPager,
 } from '@/Modules/PayableReceivable/LedgerExport/ledgerExport'
 import OpeningBalanceModal from '@/Modules/PayableReceivable/Components/OpeningBalanceModal'
 import { ExpandButton } from '@/Modules/SalesInvoice/History/InventorySalesOrderHistory'
@@ -37,12 +42,16 @@ import { downloadTextFile } from '@/Utils/fileDownload'
  *   per ledger    Show All Details, Opening Balance, Bank Entry
  *   per row       Edit (moves it to another ledger; not for a bank entry),
  *                 Delete (asked in a popover)
+ *   OPENING / CLOSING BALANCE   Edit and Delete, as the old screen - the same
+ *                 PUT and DELETE, with the row as it came
  *   Download      the filtered ledgers as CSV
- *   Paging        the ledgers, and each ledger's rows - in the browser, as the
- *                 API sends the whole year at once. A filter changed goes back
- *                 to page 1 of both.
+ *   Paging        the ledgers (LEDGER_PAGER), and each ledger's rows on their
+ *                 own (ENTRY_PAGER) - in the browser, as the API sends the whole
+ *                 year at once, and neither drawn while it fits on one page. A
+ *                 filter changed goes back to page 1 of both.
  *
- * After any change the list is read again.
+ * Read on every open (no stale time; PayableReceivableScreen asks again when
+ * the view comes back to it), and again after any change.
  */
 
 const NO_LEDGERS = []
@@ -148,14 +157,32 @@ function LedgerRows({ ledgerName, rows, showDetails, onEdit, onDelete, deleting 
               <TableRow>
                 <TableCell>{row.date}</TableCell>
                 <TableCell title={String(row.voucher_no ?? '')}>{row.voucher_no}</TableCell>
-                <TableCell>{row.vouchertype}</TableCell>
+                <TableCell title={String(row.vouchertype ?? '')}>{row.vouchertype ?? ''}</TableCell>
                 <TableCell title={row.narration}>{row.narration}</TableCell>
                 <TableCell title={row.particular}>{row.particular}</TableCell>
                 <TableCell className="text-right tabular-nums">{toAmount(row.debit)}</TableCell>
                 <TableCell className="text-right tabular-nums">{toAmount(row.credit)}</TableCell>
                 <TableCell className="text-right tabular-nums">{balanceText(row.balance)}</TableCell>
                 <TableCell>
-                  {isFixedRow(row) ? null : (
+                  {isBalanceRow(row) ? (
+                    // As the old screen: Edit (move) and Delete, with the row sent as it came.
+                    <RowActions
+                      label={`${row.particular.toLowerCase()} of ${ledgerName}`}
+                      onEdit={() => onEdit(ledgerName, row)}
+                      deleteConfirm={{
+                        open: confirming === index,
+                        onOpenChange: (next) => setConfirming(next ? index : null),
+                        title: `Delete ${row.particular.toLowerCase()}?`,
+                        // As the backend has it now: either row clears the saved opening balances of all ledgers.
+                        description: `Delete the ${row.particular.toLowerCase()} of ${ledgerName}? This also removes the opening balances saved for every other ledger.`,
+                        confirmLabel: 'Delete',
+                        busy: deleting,
+                        onConfirm: async () => {
+                          if (await onDelete(ledgerName, row)) setConfirming(null)
+                        },
+                      }}
+                    />
+                  ) : isFixedRow(row) ? null : (
                     <RowActions
                       label={`${row.particular || row.narration || 'entry'} of ${row.date}`}
                       // A bank entry is not moved from here; Delete stays.
@@ -187,7 +214,7 @@ function LedgerRows({ ledgerName, rows, showDetails, onEdit, onDelete, deleting 
           )
         })}
       </DataTable>
-      <TablePager view={view} />
+      {showsPager(view) ? <TablePager view={view} {...ENTRY_PAGER} /> : null}
     </>
   )
 }
@@ -197,8 +224,8 @@ export default function ErpLedgerList({ companyName, companyId, companyAddress }
 
   const erp = useQuery({
     key: [QUERY.ERP_LEDGER, companyName, financialYear, companyId],
+    // No stale time: opening Ledger Export always asks for the latest (a request already on its way is shared).
     fetch: () => getErpLedgers(financialYear, companyId).then(readErpLedgers),
-    staleTime: MASTER_DATA_STALE_MS,
   })
   const ledgers = erp.data?.ledgers ?? NO_LEDGERS
   const ledgerNames = useMemo(() => ledgers.map((ledger) => ledger.name).sort((a, b) => a.localeCompare(b)), [ledgers])
@@ -248,6 +275,11 @@ export default function ErpLedgerList({ companyName, companyId, companyAddress }
   const [deleting, setDeleting] = useState(false)
 
   const handleDelete = async (ledgerName, row) => {
+    // The backend reads these voucher types as "delete the opening balance": an ordinary entry with one is not sent.
+    if (!isBalanceRow(row) && isOpeningDeleteType(row.vouchertype)) {
+      toast.error('This entry has no voucher type, so it cannot be deleted here.')
+      return false
+    }
     setDeleting(true)
     try {
       const reply = await deleteErpEntry({
@@ -389,7 +421,7 @@ export default function ErpLedgerList({ companyName, companyId, companyAddress }
         ) : (
           <>
             <div className="space-y-2">{view.rows.map(renderLedger)}</div>
-            <TablePager view={view} always />
+            {showsPager(view) ? <TablePager view={view} {...LEDGER_PAGER} /> : null}
           </>
         )}
       </>

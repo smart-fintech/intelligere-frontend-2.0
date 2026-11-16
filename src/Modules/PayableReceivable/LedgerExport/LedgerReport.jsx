@@ -12,32 +12,31 @@ import { useListView } from '@/Hooks/useListView'
 import { useQuery } from '@/Library/queryCache'
 import { toast } from '@/Library/toast'
 import {
-  balanceText,
+  ENTRY_PAGER,
+  LEDGER_PAGER,
   checkReportFilters,
   netText,
   readLedgerReport,
+  showsPager,
   toLedgerDate,
 } from '@/Modules/PayableReceivable/LedgerExport/ledgerExport'
 import { formatAmount } from '@/Modules/SalesInvoice/Document/invoiceFormat'
-import { getGeneralLedger, getPartyWiseLedger } from '@/Services/Accounting/ledgerExportService'
+import { getPartyWiseLedger } from '@/Services/Accounting/ledgerExportService'
 import { createPdf, downloadPdf, safeFileName } from '@/Utils/pdf'
 
 /**
- * ONE LEDGER REPORT from what came from Tally - nothing is asked for until OK:
+ * THE PARTY-WISE LEDGER REPORT from what came from Tally - nothing is asked for
+ * until OK: one or more ledgers, one Amount with its Dr or Cr.
  *
- *   general        General Ledger: one ledger, Debit / Credit / Balance columns
- *   otherwise      Party-Wise: one or more ledgers, one Amount with its Dr or Cr
+ *   groups         [{ name, ledgers }] - groupLedgers, only the party groups
  *
- *   groups         [{ name, ledgers }] - groupLedgers
+ * An answer is cached by what was asked; OK on the same choices asks again.
  *
- * The screen remounts it for the other report (`key`), so a choice made in one
- * never carries across. An answer is cached by what was asked; OK on the same
- * choices asks again.
- *
- * Paged in the browser, as the APIs send everything at once: each ledger's rows,
- * and on Party-Wise the ledgers themselves. Each ledger's totals are of all its
- * rows, on every page. Each ledger has its own Download PDF, of all its rows,
- * never only a page.
+ * Paged in the browser, as the API sends everything at once: the ledgers
+ * (LEDGER_PAGER), and each ledger's rows on their own (ENTRY_PAGER) - neither
+ * drawn while it all fits on one page. Each ledger's totals are of all its rows,
+ * on every page. Each ledger has its own Download PDF, of all its rows, never
+ * only a page.
  */
 
 const NO_FILTERS = Object.freeze({ group: '', ledgers: [], from: '', to: '' })
@@ -45,29 +44,6 @@ const NO_FILTERS = Object.freeze({ group: '', ledgers: [], from: '', to: '' })
 const signedAmount = (row) => {
   if (!row.hasAmount) return ''
   return `${formatAmount(row.amount)} ${row.type === 'credit' ? 'Cr' : 'Dr'}`
-}
-
-function GeneralRows({ ledger, rows }) {
-  return (
-    <>
-      {rows.map((row) => (
-        <TableRow key={row.key}>
-          <TableCell>{row.date}</TableCell>
-          <TableCell title={row.invoiceNo}>{row.invoiceNo}</TableCell>
-          <TableCell title={row.particulars}>{row.particulars}</TableCell>
-          <TableCell className="text-right tabular-nums">{row.type === 'debit' && row.hasAmount ? formatAmount(row.amount) : ''}</TableCell>
-          <TableCell className="text-right tabular-nums">{row.type === 'credit' && row.hasAmount ? formatAmount(row.amount) : ''}</TableCell>
-          <TableCell className="text-right tabular-nums">{balanceText(row.balance)}</TableCell>
-        </TableRow>
-      ))}
-      <TableRow className="font-semibold">
-        <TableCell colSpan={3}>Total</TableCell>
-        <TableCell className="text-right tabular-nums">{formatAmount(ledger.debit)}</TableCell>
-        <TableCell className="text-right tabular-nums">{formatAmount(ledger.credit)}</TableCell>
-        <TableCell className="text-right tabular-nums">{netText(ledger.debit, ledger.credit)}</TableCell>
-      </TableRow>
-    </>
-  )
 }
 
 function PartyRows({ ledger, rows }) {
@@ -78,11 +54,12 @@ function PartyRows({ ledger, rows }) {
           <TableCell>{row.date}</TableCell>
           <TableCell title={row.invoiceNo}>{row.invoiceNo}</TableCell>
           <TableCell title={row.particulars}>{row.particulars}</TableCell>
+          <TableCell title={row.voucherType}>{row.voucherType}</TableCell>
           <TableCell className="text-right tabular-nums">{signedAmount(row)}</TableCell>
         </TableRow>
       ))}
       <TableRow className="font-semibold">
-        <TableCell colSpan={3}>Closing Balance</TableCell>
+        <TableCell colSpan={4}>Closing Balance</TableCell>
         <TableCell className="text-right tabular-nums">{netText(ledger.debit, ledger.credit)}</TableCell>
       </TableRow>
     </>
@@ -90,7 +67,7 @@ function PartyRows({ ledger, rows }) {
 }
 
 /** One ledger's table, with its own paging. */
-function LedgerTable({ ledger, general }) {
+function LedgerTable({ ledger }) {
   const view = useListView(ledger.rows)
 
   return (
@@ -101,35 +78,22 @@ function LedgerTable({ ledger, general }) {
             <PlainHead width={110}>Date</PlainHead>
             <PlainHead width={150}>Invoice No.</PlainHead>
             <PlainHead width={260}>Particulars</PlainHead>
-            {general ? (
-              <>
-                <PlainHead width={120} className="text-right">
-                  Debit
-                </PlainHead>
-                <PlainHead width={120} className="text-right">
-                  Credit
-                </PlainHead>
-                <PlainHead width={140} className="text-right">
-                  Balance
-                </PlainHead>
-              </>
-            ) : (
-              <PlainHead width={160} className="text-right">
-                Amount
-              </PlainHead>
-            )}
+            <PlainHead width={130}>Voucher Type</PlainHead>
+            <PlainHead width={160} className="text-right">
+              Amount
+            </PlainHead>
           </>
         }
       >
-        {general ? <GeneralRows ledger={ledger} rows={view.rows} /> : <PartyRows ledger={ledger} rows={view.rows} />}
+        <PartyRows ledger={ledger} rows={view.rows} />
       </DataTable>
-      <TablePager view={view} always={general} />
+      {showsPager(view) ? <TablePager view={view} {...ENTRY_PAGER} /> : null}
     </>
   )
 }
 
-/** One group's ledgers, each with its PDF: paged on Party-Wise; the General Ledger has only the one. */
-function ReportGroup({ group, general, downloading, onDownloadLedger }) {
+/** One group's ledgers, each with its PDF, paged. */
+function ReportGroup({ group, downloading, onDownloadLedger }) {
   const view = useListView(group.ledgers)
 
   return (
@@ -153,15 +117,15 @@ function ReportGroup({ group, general, downloading, onDownloadLedger }) {
               Download PDF
             </Button>
           </div>
-          <LedgerTable ledger={ledger} general={general} />
+          <LedgerTable ledger={ledger} />
         </div>
       ))}
-      {general ? null : <TablePager view={view} always />}
+      {showsPager(view) ? <TablePager view={view} {...LEDGER_PAGER} /> : null}
     </section>
   )
 }
 
-export default function LedgerReport({ general, groups, companyId, companyName, companyAddress }) {
+export default function LedgerReport({ groups, companyId, companyName, companyAddress }) {
   const [filters, setFilters] = useState(NO_FILTERS)
   const [errors, setErrors] = useState({})
   const [asked, setAsked] = useState(null) // what OK last asked for
@@ -173,8 +137,8 @@ export default function LedgerReport({ general, groups, companyId, companyName, 
   )
 
   const report = useQuery({
-    key: asked ? [QUERY.LEDGER_REPORT, companyId, general ? 'general' : 'party', asked] : null,
-    fetch: () => (general ? getGeneralLedger(asked) : getPartyWiseLedger(asked)).then(readLedgerReport),
+    key: asked ? [QUERY.LEDGER_REPORT, companyId, 'party', asked] : null,
+    fetch: () => getPartyWiseLedger(asked).then(readLedgerReport),
   })
   const shown = report.data
   const loading = Boolean(asked) && report.status === 'loading'
@@ -188,7 +152,7 @@ export default function LedgerReport({ general, groups, companyId, companyName, 
 
     const next = {
       company_id: companyId,
-      ledger_name: general ? filters.ledgers[0] : filters.ledgers,
+      ledger_name: filters.ledgers,
       from_date: toLedgerDate(filters.from),
       to_date: toLedgerDate(filters.to),
     }
@@ -208,12 +172,11 @@ export default function LedgerReport({ general, groups, companyId, companyName, 
       const bytes = await createPdf(() => import('@/Modules/PayableReceivable/LedgerExport/LedgerReportPdfDocument'), {
         companyName,
         companyAddress,
-        general,
         groups: [{ ...group, ledgers: [ledger], debit: ledger.debit, credit: ledger.credit }],
         from: asked.from_date,
         to: asked.to_date,
       })
-      downloadPdf(bytes, `${general ? 'GeneralLedger' : 'PartyWiseLedger'}_${safeFileName(ledger.name)}.pdf`)
+      downloadPdf(bytes, `PartyWiseLedger_${safeFileName(ledger.name)}.pdf`)
     } catch (failure) {
       toast.error(failure.message || 'The PDF could not be made.')
     } finally {
@@ -225,7 +188,7 @@ export default function LedgerReport({ general, groups, companyId, companyName, 
     if (!asked) {
       return (
         <StateMessage icon={SlidersHorizontal} title="Use the filters to show the data">
-          Choose a group, {general ? 'a ledger' : 'one or more ledgers'} and the dates, then OK.
+          Choose a group, one or more ledgers and the dates, then OK.
         </StateMessage>
       )
     }
@@ -250,7 +213,6 @@ export default function LedgerReport({ general, groups, companyId, companyName, 
       <ReportGroup
         key={`${group.name}|${JSON.stringify(asked)}`}
         group={group}
-        general={general}
         downloading={downloading}
         onDownloadLedger={downloadLedger}
       />
@@ -271,36 +233,19 @@ export default function LedgerReport({ general, groups, companyId, companyName, 
           error={errors.group}
           onValueChange={(group) => change({ group, ledgers: [] })}
         />
-        {general ? (
-          <SelectField
-            id="le-ledger"
-            label="Ledger"
-            required
-            className="w-full min-w-0 sm:w-72 min-[1200px]:w-auto min-[1200px]:max-w-96 min-[1200px]:flex-1"
-            searchable
-            searchPlaceholder="Search ledger"
-            placeholder={filters.group ? 'Select ledger' : 'Select a group first'}
-            options={ledgerOptions}
-            value={filters.ledgers[0] ?? ''}
-            error={errors.ledgers}
-            disabled={!filters.group}
-            onValueChange={(ledger) => change({ ledgers: ledger ? [ledger] : [] })}
-          />
-        ) : (
-          <MultiSelectField
-            id="le-ledgers"
-            label="Ledger"
-            required
-            placeholder={filters.group ? 'Select ledgers' : 'Select a group first'}
-            searchPlaceholder="Search ledger"
-            options={ledgerOptions}
-            value={filters.ledgers}
-            error={errors.ledgers}
-            disabled={!filters.group}
-            className="w-full min-w-0 sm:w-72 min-[1200px]:w-auto min-[1200px]:max-w-96 min-[1200px]:flex-1 [&>span:first-child]:block"
-            onChange={(ledgers) => change({ ledgers })}
-          />
-        )}
+        <MultiSelectField
+          id="le-ledgers"
+          label="Ledger"
+          required
+          placeholder={filters.group ? 'Select ledgers' : 'Select a group first'}
+          searchPlaceholder="Search ledger"
+          options={ledgerOptions}
+          value={filters.ledgers}
+          error={errors.ledgers}
+          disabled={!filters.group}
+          className="w-full min-w-0 sm:w-72 min-[1200px]:w-auto min-[1200px]:max-w-96 min-[1200px]:flex-1 [&>span:first-child]:block"
+          onChange={(ledgers) => change({ ledgers })}
+        />
         <Field
           id="le-from"
           label="From Date"

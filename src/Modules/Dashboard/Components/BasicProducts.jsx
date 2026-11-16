@@ -3,6 +3,10 @@
  * CSV Upload card and the Product Form on the left, the Product List on the
  * right - the same arrangement as Ledger Details, built from the same pieces.
  *
+ * For an Accounting Professional whose company lacks Inventory Management
+ * this is their Simple Inventory, the same page less the Vendor field (and
+ * the request for the vendors behind it) - see offersVendors.
+ *
  * WHICH PRODUCT IS IN THE FORM
  * The one whose Edit was clicked - that row is tinted in the table - and
  * otherwise none: an empty form, ready to add one.
@@ -17,7 +21,8 @@
  *   opening the section / company change   the list   POST inventory/product/ { company_name }
  *                                           the product groups   POST { company_name }
  *                                           the units            POST { company_name }
- *                                           the vendors (Intelligere only)
+ *                                           the vendors (Intelligere only,
+ *                                           and not without vendors)
  *   Refresh / Retry                         the list
  *   Save in the form                        see BasicProductForm - HTTP for
  *                                           Intelligere, the WebSocket for
@@ -89,7 +94,8 @@ import {
   toBasicProduct,
 } from '@/Services/Product/productService'
 import { selectCompanyStatus } from '@/Store/Slices/companySlice'
-import { selectIsTallyErp } from '@/Store/Slices/profileSlice'
+import { offersVendors } from '@/Services/Inventory/inventoryService'
+import { selectIsAccountingProfessional, selectIsTallyErp } from '@/Store/Slices/profileSlice'
 import BasicProductForm from './BasicProductForm'
 import ProductCsvUpload from './ProductCsvUpload'
 import ProductTable from './ProductTable'
@@ -102,8 +108,9 @@ import ProductTable from './ProductTable'
 const SYNC_TIMEOUT_MS = 5 * 60 * 1000
 
 export default function BasicProducts() {
-  const { activeCompanyId: companyId, activeCompanyName: companyName } = useActiveCompany()
+  const { activeCompany, activeCompanyId: companyId, activeCompanyName: companyName } = useActiveCompany()
   const companyStatus = useSelector(selectCompanyStatus)
+  const professional = useSelector(selectIsAccountingProfessional)
 
   // Tally, or - for everyone else - Intelligere. See "Which ERP" at the top.
   const isTally = useSelector(selectIsTallyErp)
@@ -150,7 +157,10 @@ export default function BasicProducts() {
      field. */
   const groups = useProductGroups()
   const units = useProductUnits()
-  const vendors = useVendorOptions(!isTally)
+  // No vendors at all for an Accounting Professional without Inventory
+  // Management (Simple Inventory - see offersVendors): no field, no request.
+  const withVendors = offersVendors(professional, activeCompany)
+  const vendors = useVendorOptions(!isTally && withVendors)
 
   /* ---------------- Sync Now (Tally) ---------------- */
 
@@ -360,6 +370,7 @@ export default function BasicProducts() {
           groups={groups}
           units={units}
           vendors={vendors}
+          withVendors={withVendors}
           onSaved={handleSaved}
           onCancel={() => setEditing(null)}
         />

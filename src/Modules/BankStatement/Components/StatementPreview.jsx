@@ -75,7 +75,7 @@ export default function StatementPreview({ statement }) {
           ? 'dates format must be dd-mmm-yy (e.g. 01-Dec-23).'
           : fileType === FILE_TYPE.PDF
             ? 'Select the transaction table in PDF.'
-            : 'The PDF is read on the server. Beta - check the entries before sending them.'}
+            : 'The PDF is read on the server - check the entries before sending them.'}
       </p>
     ) : null
 

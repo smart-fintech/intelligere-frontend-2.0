@@ -106,10 +106,12 @@ export default function StatementEntries({ statement, ledgerOptions, ledgerNames
       title="Entries"
       meta={` (Total: ${statement.total} · Remaining: ${statement.remainingCount} · Shown: ${visible.length})`}
       actions={<Actions statement={statement} isTally={isTally} />}
+      className="min-w-0 xl:sticky xl:top-4 py-1"
     >
       <Filters statement={statement} ledgerOptions={ledgerOptions} />
 
-      <div className="max-h-[calc(100vh-16rem)] overflow-auto pr-1">
+      {/* <div className="max-h-[calc(100vh-0rem)] overflow-auto pr-1"> */}
+      <div className="overflow-auto pr-1">
         {statement.loadingPage ? <Loader variant="section" label="Loading entries..." /> : null}
 
         {!statement.loadingPage && visible.length === 0 ? (

@@ -30,10 +30,11 @@
  *                       last came from Tally (PayableReceivableScreen)
  *   LEDGER_EXPORT_SYNC  POST tally/ledger_export/        [LEDGER_EXPORT_SYNC, companyName] - when the
  *                       ledgers last came from Tally (TallyLedgerExport)
- *   LEDGER_REPORT       POST tally/general_ledger/, tally/party_wise_ledger/  [LEDGER_REPORT, companyId,
- *                       report, what was asked] - one report (LedgerReport)
- *   ERP_LEDGER          POST tally/ERP_ledger_export/    [ERP_LEDGER, companyName, financialYear] - the
- *                       ledgers, read again after any change (ErpLedgerList)
+ *   LEDGER_REPORT       POST tally/party_wise_ledger/    [LEDGER_REPORT, companyId, 'party', what was
+ *                       asked] - one report (LedgerReport)
+ *   ERP_LEDGER          POST tally/ERP_ledger_export/    [ERP_LEDGER, companyName, financialYear, companyId] -
+ *                       the ledgers, read again each time Ledger Export is opened and after any
+ *                       change (ErpLedgerList, PayableReceivableScreen)
  *   CHEQUE_DETAILS      POST cheque/cheque_details/      [CHEQUE_DETAILS, companyId, type] - the vouchers
  *                       or past cheques, read again after any change (ChequeHistory)
  *   DOCUVAULT_USERS     POST docuvault/users/            [DOCUVAULT_USERS, companyName] - the users and

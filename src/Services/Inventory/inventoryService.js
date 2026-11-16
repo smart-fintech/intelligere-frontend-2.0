@@ -130,6 +130,17 @@ export const hasInventoryManagement = (company) =>
   company.premium_modules.includes(PREMIUM_MODULE_INVENTORY_MANAGEMENT)
 
 /**
+ * Whether vendors are offered - the Vendor tab, and the Vendor field of the
+ * simple product form. Everyone but an Accounting Professional whose active
+ * company lacks Inventory Management: such a user has Simple Inventory (the
+ * simple product form and list) and nothing of vendors.
+ *
+ *   isProfessional   selectIsAccountingProfessional
+ *   company          the active company's record - see useActiveCompany
+ */
+export const offersVendors = (isProfessional, company) => !isProfessional || hasInventoryManagement(company)
+
+/**
  * Whether a company's plan holds it to ONE warehouse: its `features` (from
  * tally/user-companies-list/ too, on the same record) lists
  * "Single Warehouse", spelt exactly so. A company without the list, or

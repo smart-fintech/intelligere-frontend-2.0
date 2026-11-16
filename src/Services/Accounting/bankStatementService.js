@@ -51,9 +51,16 @@ const statementForm = ({ companyId, bankDetailId, file, password }) => {
 export const uploadStatementFile = ({ companyId, bankDetailId, file }) =>
   api.post(FILE_URL, statementForm({ companyId, bankDetailId, file }), MULTIPART)
 
-/** A PDF the server reads itself; `password` only for a locked PDF. 201, no body. */
-export const uploadStatementAI = ({ companyId, bankDetailId, file, password = '' }) =>
-  api.post(AI_FILE_URL, statementForm({ companyId, bankDetailId, file, password }), MULTIPART)
+/**
+ * A PDF the server reads itself; `password` only for a locked PDF, and
+ * `use_advance_model` ("true" / "false" - a form field) always sent, from the
+ * Use Advance Modal tick. 201, no body.
+ */
+export const uploadStatementAI = ({ companyId, bankDetailId, file, password = '', useAdvanceModel = false }) => {
+  const body = statementForm({ companyId, bankDetailId, file, password })
+  body.append('use_advance_model', String(useAdvanceModel === true))
+  return api.post(AI_FILE_URL, body, MULTIPART)
+}
 
 /** Turns the file just uploaded into the statement's entries -> { data: [...] }. */
 export const createStatementEntry = (companyId) => api.post(ENTRY_URL, { company_id: companyId })

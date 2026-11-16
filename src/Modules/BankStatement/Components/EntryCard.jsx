@@ -78,8 +78,14 @@ function InvoicePicker({ entry, statement }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button type="button" className={cn(outlineButton, 'w-full truncate')} disabled={invoices.length === 0}>
-          {chosen.length ? `${chosen.length} Invoice` : 'Select Invoices'}
+        {/* The chosen invoices by their numbers - the whole list in the tooltip when it is cut short. */}
+        <button
+          type="button"
+          className={cn(outlineButton, 'w-full')}
+          disabled={invoices.length === 0}
+          title={chosen.length ? chosen.join(', ') : undefined}
+        >
+          <span className="truncate">{chosen.length ? chosen.join(', ') : 'Select Invoices'}</span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="max-h-72 w-auto overflow-auto p-1">
@@ -124,7 +130,8 @@ export default function EntryCard({ entry, statement, ledgerOptions, ledgerNames
   const ref = statement.refs[entry.sr_no]
   const blocked = needsRemainderType(ref)
   const date = formatDate(entry.date).replaceAll('-', '/')
-  const withRef = statement.agstOn && statement.hasInvoices(entry)
+  // A ref already set stays on show - it is sent with the entry even once the Agst Ref filter is off.
+  const withRef = Boolean(ref) || (statement.agstOn && statement.hasInvoices(entry))
 
   // A ledger the statement names that is not in the list is still shown.
   const options = ledger && !ledgerNames.has(ledger) ? [{ value: ledger, label: ledger }, ...ledgerOptions] : ledgerOptions
@@ -212,20 +219,27 @@ export default function EntryCard({ entry, statement, ledgerOptions, ledgerNames
           {withRef ? <InvoicePicker entry={entry} statement={statement} /> : null}
         </Cell>
 
-        <Cell span="sm:col-span-3" className="sm:text-right">
-          {withRef && blocked ? (
+        {/*
+          The remainder's booking stays on show once it is chosen - it used to
+          be drawn only while still empty, so picking one hid it again. Red
+          only while it is still to be chosen; cleared, it is back to that.
+        */}
+        <Cell span="sm:col-span-3" className="sm:text-right" title={withRef && remainder ? 'Remaining Amount' : null}>
+          {withRef && remainder ? (
             <SelectField
               id={`bank-statement-remainder-${entry.sr_no}`}
               ariaLabel="Remaining Amount"
-              className={cn(selectBox, '[&_[data-slot=select-trigger]]:ring-1 [&_[data-slot=select-trigger]]:ring-[#dc3545]')}
+              className={cn(selectBox, blocked && '[&_[data-slot=select-trigger]]:ring-1 [&_[data-slot=select-trigger]]:ring-[#dc3545]')}
               placeholder="Remaining Amount"
               options={REMAINDER_TYPES}
-              value={remainder?.Bill_type ?? ''}
+              value={remainder.Bill_type ?? ''}
               onValueChange={(type) => statement.setRemainderType(entry.sr_no, type)}
+              onClear={() => statement.setRemainderType(entry.sr_no, '')}
+              disabled={sending}
             />
           ) : withRef ? (
             <button type="button" className={outlineButton} onClick={() => statement.applyRef(entry)}>
-              Set Agst Ref
+              {ref ? 'Agst Ref Set' : 'Set Agst Ref'}
             </button>
           ) : null}
         </Cell>

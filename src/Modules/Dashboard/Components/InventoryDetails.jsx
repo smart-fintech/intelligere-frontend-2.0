@@ -35,9 +35,11 @@
  * screens that are then taken away.
  *
  * AN ACCOUNTING PROFESSIONAL whose active company's plan lacks Inventory
- * Management (hasInventoryManagement) is not offered Product or Vendor at
- * all - not shown, not reachable by address (`professionalNeedsInventory`
- * in Constants/inventory). With nothing else left to open, the page says so.
+ * Management (hasInventoryManagement) has SIMPLE INVENTORY: Product is the
+ * simple product form and list (BasicProducts), exactly as for anyone else
+ * without it - but there is no Vendor, neither the tab (not shown, not
+ * reachable by address: `professionalNeedsInventory` in Constants/inventory)
+ * nor the form's Vendor field (see offersVendors in inventoryService).
  * Read again when the header moves to another company.
  *
  * A sub user who may not VIEW Product Details in this company
@@ -86,7 +88,7 @@ import useInventoryAccess from '@/Hooks/useInventoryAccess'
 import useSectionAccess from '@/Hooks/useSectionAccess'
 import { cn } from '@/Library/utils'
 import { ACCESS_SECTIONS, NO_VIEW_MESSAGE, listsModule } from '@/Services/Auth/accessService'
-import { hasInventoryManagement } from '@/Services/Inventory/inventoryService'
+import { offersVendors } from '@/Services/Inventory/inventoryService'
 import { selectActiveCompany, selectCompanyStatus } from '@/Store/Slices/companySlice'
 import { selectIsAccountingProfessional } from '@/Store/Slices/profileSlice'
 import AIForecasting from './AIForecasting'
@@ -148,12 +150,13 @@ const PRODUCT_SECTION = 'product'
  * Details (`canViewProduct`), Product is still listed, `disabled` - and so
  * is a section whose `requiresModule` the company's `active_modules` lacks
  * (AI Forecasting), each with the reason it says on hover.
- * `withoutProductAndVendor` (an Accounting Professional without Inventory
- * Management) takes out whatever is marked `professionalNeedsInventory`.
+ * `withoutVendors` (an Accounting Professional without Inventory
+ * Management - see offersVendors) takes out whatever is marked
+ * `professionalNeedsInventory`.
  */
-const sectionsFor = (full, pages, canViewProduct, activeModules, withoutProductAndVendor) =>
+const sectionsFor = (full, pages, canViewProduct, activeModules, withoutVendors) =>
   INVENTORY_SECTIONS.map((section) => {
-    if (withoutProductAndVendor && section.professionalNeedsInventory) return null
+    if (withoutVendors && section.professionalNeedsInventory) return null
     const entry =
       section.key === PRODUCT_SECTION && !canViewProduct
         ? { ...section, disabled: true, disabledReason: NO_VIEW_MESSAGE }
@@ -164,7 +167,7 @@ const sectionsFor = (full, pages, canViewProduct, activeModules, withoutProductA
     if (entry.requiresInventory) return null
     if (!entry.tabs) return entry
 
-    const tabs = entry.tabs.filter((tab) => !tab.requiresInventory && !(withoutProductAndVendor && tab.professionalNeedsInventory))
+    const tabs = entry.tabs.filter((tab) => !tab.requiresInventory && !(withoutVendors && tab.professionalNeedsInventory))
     if (tabs.length > 0) return { ...entry, tabs }
     return pages[entry.key] ? { ...entry, tabs: undefined } : null
   }).filter(Boolean)
@@ -176,11 +179,11 @@ export default function InventoryDetails() {
   const company = useSelector(selectActiveCompany)
   const companyStatus = useSelector(selectCompanyStatus)
 
-  // An Accounting Professional's Product and Vendor hang on the company's
-  // plan, so for one the companies have to be in first.
+  // An Accounting Professional's Vendor tab hangs on the company's plan, so
+  // for one the companies have to be in first.
   const companiesSettled = companyStatus === 'succeeded' || companyStatus === 'failed'
   const professionalKnown = !professional || companiesSettled
-  const withoutProductAndVendor = professional && !hasInventoryManagement(company)
+  const withoutVendors = !offersVendors(professional, company)
 
   // Not known yet: a placeholder, never one user's screens for a moment.
   if (!access.known || !product.known || !professionalKnown) {
@@ -198,15 +201,15 @@ export default function InventoryDetails() {
   // of the other set is left mounted.
   return (
     <InventoryNavigation
-      key={`${access.full ? 'with-inventory' : 'without-inventory'}#${product.view ? 'product' : 'no-product'}#${withoutProductAndVendor ? 'no-product-vendor' : 'product-vendor'}`}
+      key={`${access.full ? 'with-inventory' : 'without-inventory'}#${product.view ? 'product' : 'no-product'}#${withoutVendors ? 'no-vendors' : 'vendors'}`}
       full={access.full}
       canViewProduct={product.view}
-      withoutProductAndVendor={withoutProductAndVendor}
+      withoutVendors={withoutVendors}
     />
   )
 }
 
-function InventoryNavigation({ full, canViewProduct, withoutProductAndVendor }) {
+function InventoryNavigation({ full, canViewProduct, withoutVendors }) {
   const [params, setParams] = useSearchParams()
   // Read again whenever the header moves to another company.
   const { activeCompany } = useActiveCompany()
@@ -214,8 +217,8 @@ function InventoryNavigation({ full, canViewProduct, withoutProductAndVendor }) 
 
   const pages = full ? PAGES_WITH_INVENTORY : PAGES_WITHOUT_INVENTORY
   const sections = useMemo(
-    () => sectionsFor(full, pages, canViewProduct, activeModules, withoutProductAndVendor),
-    [full, pages, canViewProduct, activeModules, withoutProductAndVendor],
+    () => sectionsFor(full, pages, canViewProduct, activeModules, withoutVendors),
+    [full, pages, canViewProduct, activeModules, withoutVendors],
   )
   // What can be opened - a disabled section is shown, never open.
   const openable = sections.filter((entry) => !entry.disabled)
@@ -227,8 +230,9 @@ function InventoryNavigation({ full, canViewProduct, withoutProductAndVendor }) 
   // An unknown or missing value falls back to the default, so a stale or
   // mistyped link - or one to a tab this user is not offered, or a section
   // they cannot open - still opens a real page.
-  // None at all only when Product and Vendor are taken out and AI Forecasting
-  // is not on the plan: then `section` is null and the page says so.
+  // None at all only when Product cannot be viewed (a sub user), there is no
+  // Vendor tab and AI Forecasting is not on the plan: then `section` is null
+  // and the page says so.
   const section = openable.find((entry) => entry.key === params.get('section')) ?? defaultSection ?? null
   const tabs = section?.tabs ?? []
   const defaultTab = tabs.length > 0 ? firstReady(tabs) : null

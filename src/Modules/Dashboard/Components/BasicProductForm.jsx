@@ -71,6 +71,10 @@
  *   groups        useProductGroups()
  *   units         useProductUnits()
  *   vendors       useVendorOptions() - Intelligere only
+ *   withVendors   false = no Vendor field (an Accounting Professional
+ *                 without Inventory Management - see offersVendors). Then
+ *                 an edit sends the product's vendors back exactly as they
+ *                 were saved, and a new product has none. Default true.
  *   onSaved()     after a successful save; the page reloads the list and
  *                 goes back to an empty form
  *   onCancel()    leaves edit mode
@@ -147,9 +151,23 @@ const initialVendors = (product) => (product?.vendors ?? []).map(vendorValueOf).
 /** Whether two lists of vendor values hold the same vendors, in any order. */
 const sameVendors = (a, b) => a.length === b.length && a.every((value) => b.includes(value))
 
-export default function BasicProductForm({ erp, product, companyName, groups, units, vendors, onSaved, onCancel, defaults }) {
+export default function BasicProductForm({
+  erp,
+  product,
+  companyName,
+  groups,
+  units,
+  vendors,
+  withVendors = true,
+  onSaved,
+  onCancel,
+  defaults,
+}) {
   const editing = Boolean(product)
   const isTally = erp === BASIC_PRODUCT_ERP.TALLY
+  // Whether the Vendor field is drawn at all - Intelligere's alone, and not
+  // where vendors are not offered (`withVendors`).
+  const showVendors = !isTally && withVendors
   const fields = BASIC_PRODUCT_FIELDS[erp]
 
   const [initial] = useState(() => ({ form: initialForm(fields, product ?? defaults), vendors: initialVendors(product) }))
@@ -476,7 +494,7 @@ export default function BasicProductForm({ erp, product, companyName, groups, un
     <>
       <Panel title={editing ? 'Edit Product' : 'Product Form'}>
         {/* A product can still be saved without vendors. */}
-        {!isTally && vendors.status === 'failed' ? (
+        {showVendors && vendors.status === 'failed' ? (
           <InlineAlert action={<RetryButton onClick={vendors.retry} />}>
             Vendors could not be loaded. {vendors.error}
           </InlineAlert>
@@ -498,7 +516,7 @@ export default function BasicProductForm({ erp, product, companyName, groups, un
 
             {/* Optional, and Intelligere's alone - see the note at the top.
                 The whole row, so the chosen vendors' chips have room. */}
-            {isTally ? null : (
+            {showVendors ? (
               <MultiSelectField
                 id="basic-product-vendor"
                 label="Vendor"
@@ -514,7 +532,7 @@ export default function BasicProductForm({ erp, product, companyName, groups, un
                 disabled={submitting || loadingVendors || vendorChoices.length === 0}
                 onChange={setChosenVendors}
               />
-            )}
+            ) : null}
           </FormGrid>
 
           {/* Cancel only exists while editing - there is nothing to go back

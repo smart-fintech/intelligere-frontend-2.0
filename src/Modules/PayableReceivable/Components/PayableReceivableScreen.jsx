@@ -72,6 +72,15 @@ export default function PayableReceivableScreen({ companyName, companyId }) {
 
   const lastSyncText = lastSync.status === 'failed' ? 'could not be read' : lastSync.data ? syncedAt || 'Not synced yet' : '...'
 
+  // Ledger Export stays mounted once opened, so on another ERP its list is asked
+  // for again here, each time the user comes back to it (the first open asks as it mounts).
+  const changeView = (next) => {
+    if (next === PR_VIEW.LEDGER_EXPORT && view !== next && ledgerExportOpened && !isTally) {
+      invalidateQueries(QUERY.ERP_LEDGER, { refetchActive: true })
+    }
+    setView(next)
+  }
+
   const syncActions = isTally ? (
     <>
       <span className="text-xs text-muted-foreground" title={lastSync.error || lastSync.data?.message || undefined}>
@@ -91,7 +100,7 @@ export default function PayableReceivableScreen({ companyName, companyId }) {
         <ViewSwitch
           options={PR_VIEW_OPTIONS}
           value={view}
-          onValueChange={setView}
+          onValueChange={changeView}
           label="Payable Receivable view"
           idPrefix="pr-view"
           className="mx-auto w-fit max-w-full"

@@ -574,8 +574,22 @@ const pageButtonsOf = (page, pageCount) => {
  * pager hides itself at, so pass the same number as the list's
  * initialPageSize (useListView). `pageNumbers` adds a button per page between
  * Previous and Next, with an ellipsis for the pages skipped on a long list.
+ *
+ * For two pagers on one screen that must not be mistaken for each other: `label`
+ * names what is paged ("Ledgers", "Entries") before the count and for screen
+ * readers, `className` adds to the bar's own classes, and `buttonVariant` is
+ * Previous and Next's look. Left out, the pager looks as it always has.
  */
-export function TablePager({ view, pageSizeChoice = true, always = false, pageSizes, pageNumbers = false }) {
+export function TablePager({
+  view,
+  pageSizeChoice = true,
+  always = false,
+  pageSizes,
+  pageNumbers = false,
+  label,
+  className,
+  buttonVariant = 'default',
+}) {
   const sizeOptions = pageSizes ? toPageSizeOptions(pageSizes) : PAGE_SIZES
 
   // Check if "All" was explicitly chosen
@@ -590,7 +604,11 @@ export function TablePager({ view, pageSizeChoice = true, always = false, pageSi
   if (!always && view.pageCount <= 1 && view.pageSize === sizeOptions[0].value) return null
 
   return (
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+    <div
+      role={label ? 'navigation' : undefined}
+      aria-label={label ? `${label} pages` : undefined}
+      className={cn('mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground', className)}
+    >
       <div className="flex items-center gap-2">
         {pageSizeChoice ? (
           <Select
@@ -604,7 +622,7 @@ export function TablePager({ view, pageSizeChoice = true, always = false, pageSi
               }
             }}
           >
-            <SelectTrigger size="sm" aria-label="Rows per page" className="w-20 text-xs">
+            <SelectTrigger size="sm" aria-label={label ? `${label} per page` : 'Rows per page'} className="w-20 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -618,6 +636,7 @@ export function TablePager({ view, pageSizeChoice = true, always = false, pageSi
         ) : null}
 
         <span>
+          {label ? <span className="font-medium text-foreground">{label} </span> : null}
           {first}-{last} of {view.total}
         </span>
       </div>
@@ -625,7 +644,7 @@ export function TablePager({ view, pageSizeChoice = true, always = false, pageSi
       <div className="flex items-center gap-1">
         <Button
           type="button"
-          variant="default"
+          variant={buttonVariant}
           size="sm"
           disabled={view.page <= 1}
           onClick={() => view.setPage(view.page - 1)}
@@ -662,7 +681,7 @@ export function TablePager({ view, pageSizeChoice = true, always = false, pageSi
 
         <Button
           type="button"
-          variant="default"
+          variant={buttonVariant}
           size="sm"
           disabled={view.page >= pageCount || isAll}
           onClick={() => view.setPage(view.page + 1)}

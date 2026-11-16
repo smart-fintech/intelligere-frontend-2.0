@@ -32,9 +32,15 @@ import { gstLinesOf } from '@/Modules/B2BCNDN/shared/gstValidation'
 import { GST_TAX, NOTE_KIND, mappedNoteLedger, mappedTaxLedger, noteKindOf } from '@/Modules/B2BCNDN/shared/ledgerMapping'
 import { text, toNumber } from '@/Modules/SalesEntries/shared/ledgerLists'
 
+const countOf = (value) => (value === null || value === undefined || value === '' ? null : Math.max(0, Math.trunc(toNumber(value))))
+
 /**
- * The upload's answer -> { notes: [{ raw, saved, key }], similar }. The last
- * row of matchedList is { duplicate_data }, not a note.
+ * The upload's answer -> { notes: [{ raw, saved, key }], similar, counts }. The
+ * last row of matchedList is { duplicate_data }, not a note.
+ *
+ * counts { total, batch, remaining }: CNDN has no batches - the upload answers
+ * with every note of the file - so the batch is all of it and nothing remains.
+ * Should the answer ever carry total_len / Remaining, those are used instead.
  */
 export const readCndnUpload = (reply) => {
   const seen = new Map()
@@ -47,9 +53,16 @@ export const readCndnUpload = (reply) => {
   const list = (value, saved) =>
     (Array.isArray(value) ? value : []).filter((raw) => raw && typeof raw === 'object' && 'note_no' in raw).map((raw) => ({ raw, saved, key: keyOf(raw) }))
 
+  const notes = [...list(reply?.matchedList, true), ...list(reply?.unMatchedList, false)]
+  const total = Math.max(countOf(reply?.total_len) ?? notes.length, notes.length)
   return {
-    notes: [...list(reply?.matchedList, true), ...list(reply?.unMatchedList, false)],
+    notes,
     similar: readSimilarLedgers(reply?.['similar_ledger_GSTNO.']),
+    counts: {
+      total,
+      batch: notes.length,
+      remaining: countOf(reply?.Remaining) ?? Math.max(0, total - notes.length),
+    },
   }
 }
 

@@ -33,7 +33,7 @@ jobs:
         echo "VITE_API_TABULA_URL=https://stage.tabula.digitaldocsys.in" >> .env
         echo "VITE_API_WEBSOCKET_URL=ws://15.207.57.26:8005/" >> .env
         echo "VITE_API_WEBSOCKET_PATH=ws/tally-connector/" >> .env
-        echo "VITE_GST_LOOKUP_URL=https://stage.api.digitaldocsys.in/tally/gst-details/" >> .env
+        echo "VITE_GST_LOOKUP_URL=http://15.207.57.26:8005/gst_portal_integration/gst-details/" >> .env
         echo "VITE_GST_LOOKUP_METHOD=post" >> .env
         echo "REACT_APP_CASHFREE_ENV=sandbox" >> .env
         npm run build

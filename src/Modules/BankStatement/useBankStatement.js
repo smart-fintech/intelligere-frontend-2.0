@@ -89,6 +89,8 @@ export default function useBankStatement({ company, companyId, banks, isTally })
   const [csv, setCsv] = useState(null)
   const [pdfUrl, setPdfUrl] = useState('')
   const [password, setPassword] = useState('')
+  // AI PDF only: read with the advance model. Off unless ticked.
+  const [useAdvanceModel, setUseAdvanceModel] = useState(false)
   const [uploading, setUploading] = useState(false)
 
   // A PDF is previewed from an object URL, which must be let go of.
@@ -187,7 +189,7 @@ export default function useBankStatement({ company, companyId, banks, isTally })
     setUploading(true)
     try {
       if (fileType === FILE_TYPE.AI_PDF) {
-        await uploadStatementAI({ companyId, bankDetailId: bank.id, file, password })
+        await uploadStatementAI({ companyId, bankDetailId: bank.id, file, password, useAdvanceModel })
       } else {
         await uploadStatementFile({ companyId, bankDetailId: bank.id, file })
       }
@@ -417,6 +419,8 @@ export default function useBankStatement({ company, companyId, banks, isTally })
     pdfUrl,
     password,
     setPassword,
+    useAdvanceModel,
+    setUseAdvanceModel,
     uploading,
     submit,
     // the statement

@@ -5,13 +5,12 @@ import { useDispatch, useSelector } from 'react-redux'
 import { ListSkeleton, RetryButton, StateMessage } from '@/Components/Common/DataList'
 import { Loader } from '@/Components/Common/Loader'
 import { Panel } from '@/Components/Common/Panel'
-import { ViewSwitch } from '@/Components/Common/ViewSwitch'
 import { Button } from '@/Components/ui/button'
 import { MASTER_DATA_STALE_MS, QUERY } from '@/Constants/queryKeys'
 import { invalidateQueries, useQuery } from '@/Library/queryCache'
 import LedgerReport from '@/Modules/PayableReceivable/LedgerExport/LedgerReport'
 import LedgerSyncModal from '@/Modules/PayableReceivable/LedgerExport/LedgerSyncModal'
-import { groupLedgers } from '@/Modules/PayableReceivable/LedgerExport/ledgerExport'
+import { PARTY_GROUPS, groupLedgers, partyGroupsOnly } from '@/Modules/PayableReceivable/LedgerExport/ledgerExport'
 import { readLastSync } from '@/Modules/PayableReceivable/payableReceivable'
 import useTallySync from '@/Modules/PayableReceivable/useTallySync'
 import { TALLY_LEDGER_EXPORT_MODULE, buildLedgerExportSyncMessage, getLedgerLastSync } from '@/Services/Accounting/ledgerExportService'
@@ -26,18 +25,15 @@ import {
 /**
  * LEDGER EXPORT FOR A TALLY USER.
  *
- *   Last Sync, Sync Now                  the ledgers come over from Tally for the
- *                                        period chosen in LedgerSyncModal
- *   General Ledger, Party Wise Ledger    what came over (LedgerReport)
+ *   Last Sync, Sync Now     the ledgers come over from Tally for the period
+ *                           chosen in LedgerSyncModal
+ *   Party Wise Ledger       what came over (LedgerReport)
  *
- * The groups and ledgers the reports offer are the company's own, from the
- * shared ledger store. A ledger with nothing synced for it reports "No data found".
+ * The groups and ledgers the report offers are the company's own, from the
+ * shared ledger store - only the party groups (PARTY_GROUPS), each with its
+ * own ledgers. A ledger with nothing synced for it reports "No data found".
  */
 
-const REPORTS = [
-  { value: 'general', label: 'General Ledger' },
-  { value: 'party', label: 'Party Wise Ledger' },
-]
 const NO_RANGE = Object.freeze({ startMonth: '', startYear: '', endMonth: '', endYear: '' })
 const SYNC_MESSAGES = Object.freeze({
   done: 'Ledgers synced from Tally.',
@@ -49,7 +45,6 @@ export default function TallyLedgerExport({ companyName, companyId, companyAddre
   const dispatch = useDispatch()
   const [range, setRange] = useState(NO_RANGE) // the period last asked for
   const [choosing, setChoosing] = useState(false)
-  const [report, setReport] = useState(REPORTS[0].value)
 
   const lastSync = useQuery({
     key: [QUERY.LEDGER_EXPORT_SYNC, companyName],
@@ -65,7 +60,7 @@ export default function TallyLedgerExport({ companyName, companyId, companyAddre
   const ledgerError = useSelector(selectLedgerError)
   const ledgersReady = ledgersFor === companyId && ledgerStatus === 'succeeded'
   const ledgers = ledgersFor === companyId ? storeLedgers : NO_LEDGERS
-  const groups = useMemo(() => groupLedgers(ledgers), [ledgers])
+  const groups = useMemo(() => partyGroupsOnly(groupLedgers(ledgers)), [ledgers])
 
   useEffect(() => {
     dispatch(fetchLedgers({ companyId }))
@@ -119,31 +114,11 @@ export default function TallyLedgerExport({ companyName, companyId, companyAddre
       if (!ledgersReady) return <ListSkeleton rows={3} />
       return (
         <StateMessage icon={ArrowLeftRight} title="No ledgers yet">
-          This company has no ledgers to report on.
+          This company has no {PARTY_GROUPS.join(' or ')} ledgers to report on.
         </StateMessage>
       )
     }
-    return (
-      <div className="space-y-4">
-        <ViewSwitch
-          options={REPORTS}
-          value={report}
-          onValueChange={setReport}
-          label="Ledger report"
-          idPrefix="le-report"
-          className="mx-auto w-fit max-w-full"
-        />
-        {/* A remount per report: a choice made in one never carries to the other. */}
-        <LedgerReport
-          key={report}
-          general={report === 'general'}
-          groups={groups}
-          companyId={companyId}
-          companyName={companyName}
-          companyAddress={companyAddress}
-        />
-      </div>
-    )
+    return <LedgerReport groups={groups} companyId={companyId} companyName={companyName} companyAddress={companyAddress} />
   }
 
   return (

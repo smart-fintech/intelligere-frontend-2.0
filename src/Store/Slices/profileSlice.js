@@ -272,8 +272,8 @@ export const selectIsMsme = (state) =>
 /**
  * True when the signed-in user is an Accounting Professional - spelt as the
  * backend writes profile_details.user_type (and as Register sends it).
- * Inventory Details hides Product and Vendor from one whose active company
- * lacks Inventory Management.
+ * One whose active company lacks Inventory Management has Simple Inventory
+ * and no vendors (see offersVendors in inventoryService).
  */
 export const selectIsAccountingProfessional = (state) =>
   state.profile.data?.profile_details?.user_type === 'Accounting Professional'

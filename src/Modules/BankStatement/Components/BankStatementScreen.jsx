@@ -62,7 +62,10 @@ export default function BankStatementScreen({ company, companyId, banks, onResta
 
       <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
         <div className="min-w-0 space-y-4">
-          <StatementUpload statement={statement} banks={banks} company={company} companyId={companyId} />
+          {/* Gone once the summary is in: every entry of the statement has been dealt with. */}
+          {statement.summary === null && !statement.entries.length  ? (
+            <StatementUpload statement={statement} banks={banks} company={company} companyId={companyId} />
+          ) : null}
 
           {statement.started && !finished ? (
             <StatementEntries
@@ -79,7 +82,7 @@ export default function BankStatementScreen({ company, companyId, banks, onResta
 
         <Panel
           title={mapping ? 'Assign Ledger' : 'Statement'}
-          className="min-w-0 xl:sticky xl:top-4"
+          className="min-w-0 xl:sticky xl:top-4 py-1"
           actions={<StatementFileBar statement={statement} view={view} views={VIEWS} onViewChange={setView} />}
         >
           {mapping ? <KeywordMapping statement={statement} ledgerOptions={ledgerOptions} /> : <StatementPreview statement={statement} />}

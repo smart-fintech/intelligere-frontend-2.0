@@ -105,7 +105,7 @@ const creditPeriod = (days) =>
 /* The group is shown, searched and filtered by `ledeger_group_name`, the
    name the ledger API sends with every row - never by the `ledeger_group`
    number, which means nothing to a user. */
-const SEARCH_FIELDS = ['ledeger_name', 'ledeger_email', 'ledeger_phone', 'ledeger_group_name']
+const SEARCH_FIELDS = ['ledeger_name', 'ledeger_email', 'ledeger_phone','ledeger_gstin']
 const FILTER_FIELDS = {
   ledeger_group_name: 'Group',
   // ledger_gst_reg_type: 'GST Type',
@@ -473,7 +473,7 @@ export default function LedgerDetails() {
       <>
         <TableFilters
           view={view}
-          searchPlaceholder="Search name, email or phone"
+          searchPlaceholder="Search name, GSTIN, email or phone"
           // The export is of the company the header is on, by name.
           actions={
             <CsvDownloadButton

@@ -112,6 +112,10 @@ export const readB2BEntry = (raw, matched, key, { mapping, ledgerNames }) => {
  * as the backend lists them. A row has no id, so its key is what the PUT finds
  * it by (GSTIN, invoice number, taxable value) plus its rate - and a count for
  * the rare row that repeats all of them.
+ *
+ * total and remaining are the API's own and are taken as they come: total_len
+ * counts every row of the upload, sent or not, so it holds for the session;
+ * Remaining is the unsent rows outside this batch (never below 0).
  */
 export const readB2BBatch = (reply, context) => {
   const seen = new Map()

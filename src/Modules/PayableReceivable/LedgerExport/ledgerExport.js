@@ -1,13 +1,14 @@
 /**
  * Ledger Export's plain logic - no React, no requests.
  *
- *   groupLedgers      the company's ledgers, by group, for the report filters
+ *   groupLedgers / partyGroupsOnly   the company's ledgers, by group, for the report filters
  *   readLedgerReport / readErpLedgers   the replies
  *   toLedgerDate      a date as the ledger APIs want it, DD-MMM-YYYY
  *   balanceText / netText   an amount with its Dr or Cr
  *   financialYearOptions / currentFinancialYear   the April-March years
  *   checkSyncRange / checkReportFilters / checkBankEntry   what is wrong with a form - {} when fine
- *   filterErpRows / isFixedRow / rowDetails / erpLedgersCsv   the ERP list
+ *   filterErpRows / isFixedRow / isBalanceRow / rowDetails / erpLedgersCsv   the ERP list
+ *   showsPager / LEDGER_PAGER / ENTRY_PAGER   the two pagers, the ledgers' and each ledger's entries'
  */
 
 import { formatAmount } from '@/Modules/SalesInvoice/Document/invoiceFormat'
@@ -67,11 +68,19 @@ export const groupLedgers = (rows) => {
     .sort((a, b) => byName(a.name, b.name))
 }
 
+/** The only groups the Tally report offers: its parties. */
+export const PARTY_GROUPS = ['Sundry Creditors', 'Sundry Debtors']
+const PARTY_GROUP_KEYS = PARTY_GROUPS.map((name) => name.toLowerCase())
+
+/** groupLedgers' groups, less every one that is not a party group. */
+export const partyGroupsOnly = (groups) => groups.filter((group) => PARTY_GROUP_KEYS.includes(group.name.trim().toLowerCase()))
+
 const readReportRow = (row, index) => ({
   key: String(index),
   date: row.Date ?? '',
   invoiceNo: row['Invoice No.'] ?? '',
   particulars: row.Particulars ?? '',
+  voucherType: row['Voucher Type'] ?? row.vouchertype ?? '',
   type: row.type ?? '',
   amount: toNumber(row.amount),
   // The opening row's amount may be '' - nothing to show, not a 0.
@@ -109,7 +118,7 @@ export const readLedgerReport = (reply) => {
     .filter((group) => group.ledgers.length > 0)
 }
 
-/** `ledgers` is one name for the General Ledger, a list for Party-Wise; neither may be empty. */
+/** `ledgers` is a list of names, which may not be empty. */
 export const checkReportFilters = ({ group, ledgers, from, to }) => {
   const found = {}
   if (!group) found.group = 'Select the group'
@@ -195,6 +204,16 @@ const BALANCE_ROWS = ['OPENING BALANCE', 'CLOSING BALANCE']
  */
 export const isFixedRow = (row) => FIXED_VOUCHER_TYPES.includes(row.vouchertype) || BALANCE_ROWS.includes(row.particular)
 
+/** The opening or closing row - given Edit and Delete as the old screen did. */
+export const isBalanceRow = (row) => BALANCE_ROWS.includes(row.particular)
+
+/**
+ * The voucher types the backend reads as "delete the opening balance". An
+ * ordinary entry carrying one is not sent, or the opening balances would go
+ * and the entry stay.
+ */
+export const isOpeningDeleteType = (vouchertype) => vouchertype === '' || vouchertype === 'opening balance'
+
 /** What a row opens out into - null when it has nothing more to show. */
 export const rowDetails = (row) => {
   const debits = row.jv_details?.dr ?? []
@@ -236,6 +255,26 @@ export const erpLedgersCsv = (ledgers, companyName, companyAddress) => {
   })
   return lines.map((line) => line.map(csvCell).join(',')).join('\r\n')
 }
+
+/* ------------------------------------------------------------------ */
+/* Both: the pagers                                                   */
+/* ------------------------------------------------------------------ */
+
+/** Rows per page, the useListView default, for the ledgers and each ledger's entries alike. */
+export const PAGE_SIZE = 10
+
+/** A pager is drawn only once there is more than one page of it. */
+export const showsPager = (view) => view.total > PAGE_SIZE
+
+/** Between ledgers: a framed bar under the list, with a button per page. */
+export const LEDGER_PAGER = Object.freeze({
+  label: 'Ledgers',
+  pageNumbers: true,
+  className: 'rounded-md border border-border bg-muted/40 px-3 py-2',
+})
+
+/** Within one ledger: plain, under its table, with outline buttons. */
+export const ENTRY_PAGER = Object.freeze({ label: 'Entries', buttonVariant: 'outline', className: 'mt-2' })
 
 /** The backend refuses a blank narration, so it is asked for here. */
 export const checkBankEntry = ({ date, amount, narration, particular, vouchertype }) => {

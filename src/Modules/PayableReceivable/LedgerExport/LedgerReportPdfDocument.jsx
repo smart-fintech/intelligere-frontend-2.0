@@ -1,14 +1,13 @@
 import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
 
-import { balanceText, netText } from '@/Modules/PayableReceivable/LedgerExport/ledgerExport'
+import { netText } from '@/Modules/PayableReceivable/LedgerExport/ledgerExport'
 import { formatAmount } from '@/Modules/SalesInvoice/Document/invoiceFormat'
 import { breakLongWords } from '@/Utils/pdf'
 
 /**
- * A LEDGER REPORT AS A VECTOR PDF - A4, what the screen shows (LedgerReport):
- * the company, the period, then each ledger's rows and closing balance, and the
- * grand total. As the old reports, the General Ledger has Debit, Credit and
- * Balance columns; Party-Wise has one Amount with its Dr or Cr.
+ * THE PARTY-WISE LEDGER REPORT AS A VECTOR PDF - A4, what the screen shows
+ * (LedgerReport): the company, the period, then each ledger's rows and closing
+ * balance, and the grand total. As the old report, one Amount with its Dr or Cr.
  *
  *   rendered to bytes by createPdf (Utils/pdf)
  *
@@ -34,15 +33,6 @@ const s = StyleSheet.create({
   grandTotal: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 14, padding: 5, borderTopWidth: 1, borderColor: BLUE, fontFamily: 'Helvetica-Bold', fontSize: 10 },
   pageNo: { position: 'absolute', bottom: 18, right: 28, fontSize: 7.5, color: '#666' },
 })
-
-const GENERAL = [
-  { label: 'Date', width: '11%', value: (row) => row.date },
-  { label: 'Ref No.', width: '14%', value: (row) => breakLongWords(row.invoiceNo, 14) },
-  { label: 'Particulars', width: '33%', value: (row) => breakLongWords(row.particulars, 34) },
-  { label: 'Debit', width: '14%', right: true, value: (row) => (row.type === 'debit' && row.hasAmount ? formatAmount(row.amount) : '') },
-  { label: 'Credit', width: '14%', right: true, value: (row) => (row.type === 'credit' && row.hasAmount ? formatAmount(row.amount) : '') },
-  { label: 'Balance', width: '14%', right: true, value: (row) => balanceText(row.balance) },
-]
 
 /** As the old report: what the ledger's balance amounts to says what its amounts are. */
 const amountHeading = ({ debit, credit }) => {
@@ -74,7 +64,7 @@ function Row({ row, columns }) {
   )
 }
 
-function Ledger({ ledger, columns, general }) {
+function Ledger({ ledger, columns }) {
   return (
     <View style={s.ledger}>
       {/* With the first row, so a ledger's name and column heads never end a page alone. */}
@@ -94,32 +84,21 @@ function Ledger({ ledger, columns, general }) {
         <Row key={row.key} row={row} columns={columns} />
       ))}
 
-      {general ? (
-        <View style={s.total} wrap={false}>
-          <Text style={[s.cell, { width: '58%' }]}>Total</Text>
-          <Text style={[s.cell, s.right, { width: '14%' }]}>{formatAmount(ledger.debit)}</Text>
-          <Text style={[s.cell, s.right, { width: '14%' }]}>{formatAmount(ledger.credit)}</Text>
-          <Text style={[s.cell, s.right, { width: '14%' }]}>{netText(ledger.debit, ledger.credit)}</Text>
-        </View>
-      ) : (
-        <View style={s.total} wrap={false}>
-          <Text style={[s.cell, { width: '80%' }]}>Closing Balance</Text>
-          <Text style={[s.cell, s.right, { width: '20%' }]}>{netText(ledger.debit, ledger.credit)}</Text>
-        </View>
-      )}
+      <View style={s.total} wrap={false}>
+        <Text style={[s.cell, { width: '80%' }]}>Closing Balance</Text>
+        <Text style={[s.cell, s.right, { width: '20%' }]}>{netText(ledger.debit, ledger.credit)}</Text>
+      </View>
     </View>
   )
 }
 
-export default function LedgerReportPdfDocument({ companyName, companyAddress, general, groups, from, to }) {
-  const columns = general ? GENERAL : PARTY_WISE
-
+export default function LedgerReportPdfDocument({ companyName, companyAddress, groups, from, to }) {
   return (
-    <Document title={`${companyName} - ${general ? 'General Ledger' : 'Party Wise Ledger'}`}>
+    <Document title={`${companyName} - Party Wise Ledger`}>
       <Page size="A4" style={s.page}>
         <Text style={s.company}>{companyName}</Text>
         {companyAddress ? <Text style={s.address}>{companyAddress}</Text> : null}
-        <Text style={s.title}>{general ? 'General Ledger' : 'Party Wise Ledger - Bill-wise Details'}</Text>
+        <Text style={s.title}>Party Wise Ledger - Bill-wise Details</Text>
         <Text style={s.period}>
           From {from} to {to}
         </Text>
@@ -128,7 +107,7 @@ export default function LedgerReportPdfDocument({ companyName, companyAddress, g
           <View key={group.name}>
             <Text style={[s.title, { textAlign: 'left' }]}>{group.name}</Text>
             {group.ledgers.map((ledger) => (
-              <Ledger key={ledger.name} ledger={ledger} columns={columns} general={general} />
+              <Ledger key={ledger.name} ledger={ledger} columns={PARTY_WISE} />
             ))}
             <View style={s.grandTotal} wrap={false}>
               <Text>Grand Total</Text>

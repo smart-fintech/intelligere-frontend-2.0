@@ -540,7 +540,8 @@ export default function OutstandingList({ companyName, companyId, source, syncin
         ) : (
           <>
             <div className="space-y-2">{view.rows.map(renderParty)}</div>
-            <TablePager view={view} always />
+            {/* Only once there is more than one page of 10 (useListView's page size) to go through. */}
+            {view.total > 10 ? <TablePager view={view} /> : null}
           </>
         )}
       </>

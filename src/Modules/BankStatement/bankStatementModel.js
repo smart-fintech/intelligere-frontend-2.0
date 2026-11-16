@@ -21,7 +21,7 @@ export const FILE_TYPE = Object.freeze({ CSV: 'csv', PDF: 'pdf', AI_PDF: 'ai-pdf
 export const FILE_TYPE_OPTIONS = [
   { value: FILE_TYPE.CSV, label: 'CSV' },
   { value: FILE_TYPE.PDF, label: 'PDF' },
-  { value: FILE_TYPE.AI_PDF, label: 'AI PDF (Beta)' },
+  { value: FILE_TYPE.AI_PDF, label: 'AI PDF' },
 ]
 
 export const VOUCHER = Object.freeze({ PAYMENT: 'Payment', RECEIPT: 'Receipt', CONTRA: 'Contra' })

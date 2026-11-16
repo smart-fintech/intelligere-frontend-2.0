@@ -20,6 +20,7 @@ import {
   toCndnTallyRow,
 } from '@/Modules/B2BCNDN/Cndn/cndnEntry'
 import EntriesCard from '@/Modules/B2BCNDN/shared/EntriesCard'
+import EntryCounts from '@/Modules/B2BCNDN/shared/EntryCounts'
 import { failureText } from '@/Modules/B2BCNDN/shared/failureText'
 import GetEntriesCard from '@/Modules/B2BCNDN/shared/GetEntriesCard'
 import GetEntriesToggle from '@/Modules/B2BCNDN/shared/GetEntriesToggle'
@@ -87,6 +88,8 @@ export default function CndnView({ companyId, companyName, isTally, canCreateLed
   const [notes, setNotes] = useState([])
   const [similar, setSimilar] = useState([])
   const [uploaded, setUploaded] = useState(false)
+  // Set by an upload only: notes leave `notes` as they are sent, the counts of the upload stay.
+  const [counts, setCounts] = useState({ total: 0, batch: 0, remaining: 0 })
   const [overrides, setOverrides] = useState({})
   const [noteNumbers, setNoteNumbers] = useState({})
   const [savingKey, setSavingKey] = useState(null)
@@ -196,6 +199,7 @@ export default function CndnView({ companyId, companyName, isTally, canCreateLed
     resolving.clear()
     setNotes(read.notes)
     setSimilar(read.similar)
+    setCounts(read.counts)
     setUploaded(true)
     getEntries.onLoaded()
   }
@@ -368,6 +372,7 @@ export default function CndnView({ companyId, companyName, isTally, canCreateLed
         emptyTitle="No credit / debit notes yet"
         emptyHint="Upload the GSTR-2B file. The notes show here before anything goes to Tally, and stay until you leave this page."
         doneHint="Every note of the upload has been sent to Tally."
+        counts={<EntryCounts total={counts.total} batch={counts.batch} remaining={counts.remaining} />}
         meta={
           uploaded ? ` (${entries.filter((entry) => entry.saved).length} matched · ${entries.filter((entry) => !entry.saved).length} unmatched)` : undefined
         }

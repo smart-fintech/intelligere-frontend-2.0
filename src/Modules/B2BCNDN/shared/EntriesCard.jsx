@@ -19,6 +19,7 @@ import { plural } from '@/Modules/SalesEntries/shared/ledgerLists'
  *   hasAny      whether anything was uploaded at all; entryCount the entries left
  *   emptyTitle, emptyHint, doneHint   the words of those states
  *   meta, actions   beside the title; footer   under the list (the next batch)
+ *   counts      the EntryCounts strip, shown once anything was uploaded
  */
 export default function EntriesCard({
   status,
@@ -34,6 +35,7 @@ export default function EntriesCard({
   meta,
   actions,
   footer,
+  counts,
   children,
 }) {
   const firstLoad = status === 'loading' && !hasAny
@@ -75,6 +77,7 @@ export default function EntriesCard({
 
   return (
     <Panel title="Entries" meta={meta} actions={actions}>
+      {hasAny && counts ? <div className="mb-3">{counts}</div> : null}
       {!isTally ? (
         <p className="mb-3 rounded-md border border-border bg-muted/40 px-2.5 py-2 text-xs text-muted-foreground">
           Sending to Tally is for a Tally ERP account. You can upload and review the entries here.

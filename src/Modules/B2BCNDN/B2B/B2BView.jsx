@@ -11,6 +11,7 @@ import Gstr2bFetchModal from '@/Modules/B2BCNDN/B2B/Gstr2bFetchModal'
 import { b2bVoucherLines, checkB2BEntry, purchaseTypeText, readB2BBatch, toB2BSentRow, toB2BTallyRow } from '@/Modules/B2BCNDN/B2B/b2bEntry'
 import useB2BBatch from '@/Modules/B2BCNDN/B2B/useB2BBatch'
 import EntriesCard from '@/Modules/B2BCNDN/shared/EntriesCard'
+import EntryCounts from '@/Modules/B2BCNDN/shared/EntryCounts'
 import GetEntriesCard from '@/Modules/B2BCNDN/shared/GetEntriesCard'
 import GetEntriesToggle from '@/Modules/B2BCNDN/shared/GetEntriesToggle'
 import GstLines from '@/Modules/B2BCNDN/shared/GstLines'
@@ -64,7 +65,9 @@ import { formatDate } from '@/Utils/date'
  */
 
 const SEARCH_FIELDS = ['invoiceNo', 'party', 'ownParty', 'gstin']
-const FILTER_FIELDS = { ledgerStatus: 'Ledger', gstStatus: 'GST Ledger', typeText: 'Purchase Type' }
+const FILTER_FIELDS = { ledgerStatus: 'Ledger',
+  //  gstStatus: 'GST Ledger',
+   typeText: 'Purchase Type' }
 
 const SEND_LABELS = Object.freeze({
   done: 'B2B entries sent to Tally.',
@@ -368,7 +371,9 @@ export default function B2BView({ companyId, companyName, isTally, canCreateLedg
         emptyTitle="No B2B entries yet"
         emptyHint="Upload the GSTR-2B file, or fetch it from the GST portal. The entries show here before anything goes to Tally."
         doneHint={read.remaining > 0 ? 'Load the next batch for the entries after these.' : 'Every B2B entry has been sent to Tally.'}
-        meta={read.total > 0 ? ` (Batch: ${entries.length} · Total: ${read.total})` : undefined}
+        // The API's own counts: total_len (every row of the upload, sent or not) and
+        // Remaining (unsent rows outside this batch). Read off each answer, never added up.
+        counts={<EntryCounts total={read.total} batch={read.entries.length} remaining={read.remaining} />}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <GetEntriesToggle toggle={getEntries.toggle} disabled={busy} />

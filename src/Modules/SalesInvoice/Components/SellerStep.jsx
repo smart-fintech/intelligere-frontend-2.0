@@ -36,7 +36,7 @@ const SELLER_SETTINGS = [
   { key: 'eWayBill', label: 'E-Way Bill' },
   { key: 'eInvoice', label: 'E-Invoice' },
   { key: 'reverseCharge', label: 'Reverse Charge Applicable' },
-  { key: 'voucherQr', label: 'Show Voucher QR Code' },
+  // { key: 'voucherQr', label: 'Show Voucher QR Code' },
   { key: 'roundOff', label: 'Show Round Off' },
 ]
 

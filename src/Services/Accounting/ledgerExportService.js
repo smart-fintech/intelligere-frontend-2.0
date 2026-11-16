@@ -4,7 +4,6 @@
  * For a Tally user:
  *
  *   POST    tally/ledger_export/       { company_name }  -> "27-10-2026 11:42:05"  when it last came from Tally
- *   POST    tally/general_ledger/      { company_id, ledger_name: "<one>", from_date, to_date }
  *   POST    tally/party_wise_ledger/   { company_id, ledger_name: ["<one or more>"], from_date, to_date }
  *             -> { "<group>": { "<ledger>": { "1": { Date, "Invoice No.", Particulars, type, amount, balance } } } }
  *
@@ -16,6 +15,8 @@
  *             -> { "<ledger>": [{ date, voucher_no, vouchertype, narration, particular, debit, credit, balance, ... }] }
  *   PUT     tally/ERP_ledger_export/   { id, position, from_ledger, to_ledger: { "<ledger>": [row] }, module_name }
  *   DELETE  tally/ERP_ledger_export/   { id, ledger_name, position, vouchertype, module_name, object_id }
+ *             the OPENING BALANCE row as it came (vouchertype "", position "") clears the
+ *             saved opening balance - for every ledger of the company, as the backend has it
  *   POST    tally/save_bank_entry/     { leader_name, date, amount, narration, particular, vouchertype, company_id }
  *
  * `leader_name` is spelt as the backend reads it. A failure is an Error carrying
@@ -37,7 +38,6 @@ import { getEmail } from '@/Library/secureStorage'
 import { api } from '@/Services/Global/apiService'
 
 const LEDGER_EXPORT_URL = 'tally/ledger_export/'
-const GENERAL_LEDGER_URL = 'tally/general_ledger/'
 const PARTY_WISE_LEDGER_URL = 'tally/party_wise_ledger/'
 const ERP_LEDGER_URL = 'tally/ERP_ledger_export/'
 const BANK_ENTRY_URL = 'tally/save_bank_entry/'
@@ -67,9 +67,6 @@ const keepNoDataReply = (failure) => {
 /** When this company's ledgers last came from Tally: the text, or { msg } - see readLastSync. */
 export const getLedgerLastSync = (companyName) =>
   api.post(LEDGER_EXPORT_URL, { company_name: companyName }).catch(keepNoDataReply)
-
-/** One ledger's transactions. */
-export const getGeneralLedger = (payload) => api.post(GENERAL_LEDGER_URL, payload)
 
 /** The transactions of one or more ledgers. */
 export const getPartyWiseLedger = (payload) => api.post(PARTY_WISE_LEDGER_URL, payload)

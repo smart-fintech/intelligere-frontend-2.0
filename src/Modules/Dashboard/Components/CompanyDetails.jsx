@@ -152,7 +152,7 @@ export default function CompanyDetails() {
 
     try {
       const response = await deleteCompany(confirming.company_id)
-      toast.success(response?.msg || `${confirming.comp_name} has been deleted.`)
+      toast.success(response?.msg)
 
       // Out of the table at once, then the list is reloaded to be sure it
       // matches the backend (and, if it was the header's company, so a new
