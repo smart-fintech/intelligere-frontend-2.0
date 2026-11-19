@@ -222,7 +222,7 @@ function InventoryNavigation({ full, canViewProduct, withoutVendors }) {
   )
   // What can be opened - a disabled section is shown, never open.
   const openable = sections.filter((entry) => !entry.disabled)
-
+  
   // The landing section is named, not worked out - see INVENTORY_DEFAULT_SECTION.
   const defaultKey = full ? INVENTORY_DEFAULT_SECTION : INVENTORY_DEFAULT_SECTION_WITHOUT_INVENTORY
   const defaultSection = openable.find((entry) => entry.key === defaultKey) ?? firstReady(openable)
@@ -272,7 +272,6 @@ function InventoryNavigation({ full, canViewProduct, withoutVendors }) {
 
   // The control that names the open page, for its panel's aria-labelledby.
   const labelledBy = tab && showTabs ? `inventory-tab-${tab.key}` : section ? `inventory-section-${section.key}` : undefined
-
   return (
     <div className="space-y-3">
       {/* ---------------- Sections ----------------

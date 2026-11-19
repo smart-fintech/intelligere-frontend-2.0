@@ -71,7 +71,7 @@ export function useCompanyLedgers(companyId) {
     dispatch(fetchLedgers({ companyId }))
   }, [dispatch, companyId])
 
-  const names = useMemo(() => ledgers.map((ledger) => String(ledger.ledeger_name ?? '').trim()).filter(Boolean), [ledgers])
+  const names = useMemo(() => ledgers.map((ledger) => String(ledger.ledger_name ?? '').trim()).filter(Boolean), [ledgers])
 
   return {
     options: useMemo(() => toOptions(names), [names]),

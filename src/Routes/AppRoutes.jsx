@@ -97,6 +97,7 @@ import SalesInvoicePage from '@/Modules/SalesInvoice/Pages/SalesInvoicePage'
 import CreateSubUser from '@/Modules/SubUser/Pages/CreateSubUser'
 import NotFound from '@/Modules/Misc/Pages/NotFound'
 import ReportIssue from '@/Modules/Support/Pages/ReportIssue'
+import ModuleRouteGate from '@/Routes/ModuleRouteGate'
 import VendorLoginPage from '@/Modules/VendorPortal/Pages/VendorLoginPage'
 import VendorPortalPage from '@/Modules/VendorPortal/Pages/VendorPortalPage'
 
@@ -194,14 +195,19 @@ export default function AppRoutes() {
 
         {/* ---- The product modules ----
             One route per PRODUCT_MODULES entry, at /modules/<key>, generated
-            from that list so a new module needs no line here. */}
+            from that list so a new module needs no line here. A module the
+            user's type is denied goes back to the dashboard (ModuleRouteGate). */}
         {PRODUCT_MODULES.map(({ key, name, icon, path }) => {
           const Page = PRODUCT_MODULE_PAGES[key]
           return (
             <Route
               key={key}
               path={path}
-              element={Page ? <Page /> : <ComingSoonPage title={name} icon={icon} />}
+              element={
+                <ModuleRouteGate moduleKey={key}>
+                  {Page ? <Page /> : <ComingSoonPage title={name} icon={icon} />}
+                </ModuleRouteGate>
+              }
             />
           )
         })}

@@ -32,6 +32,15 @@
  *   keptLineId(line, savedLines)
  *       the product_id to update the line under - only while its product, SKU and
  *       quantity are as saved; null for a changed or added line, booked again.
+ *   savedLinesAfterSave(productData, lines, keptIds)
+ *       savedLinesOf for a document just saved from the form (it stays open -
+ *       the next Save updates it): its rows read back, in id order - the lines
+ *       kept under their product_id first, then the ones added, in the order
+ *       sent (the form's lines). keptIds: { [line id]: product_id sent | null }.
+ *       Rows that do not add up to the lines -> {} (every line booked again).
+ *   stockLinesUnchanged(lines, savedLines)
+ *       every product line is kept as saved (keptLineId) and none was removed - an
+ *       edited Challan / Sales Invoice then takes no stock out again (challanStock).
  */
 
 import { PURCHASE_DOCUMENT_TYPE_INBOUND_CHALLAN, PURCHASE_DOCUMENT_TYPE_INVOICE } from '@/Constants/purchaseInvoice'
@@ -73,7 +82,7 @@ export const stockBookingItems = ({ lines, productsByKey }) => {
 }
 
 /** The type a saved prefill_from names - { document_from, document_id } as sent, or { "<type>": [...] } as the server keeps it. */
-const savedSourceOf = (prefillFrom) => {
+export const savedSourceOf = (prefillFrom) => {
   if (!prefillFrom || typeof prefillFrom !== 'object') return ''
   if (textOf(prefillFrom.document_from)) return textOf(prefillFrom.document_from)
   return Object.keys(prefillFrom).find((key) => Array.isArray(prefillFrom[key]) && prefillFrom[key].length > 0) ?? ''
@@ -87,10 +96,32 @@ const stockOf = (line) => JSON.stringify([line.kind, line.productKey, line.skuVa
 
 export const savedLinesOf = (productData, lines) => {
   const rows = listOf(productData)
-  return Object.fromEntries(lines.map((line, index) => [line.id, { productId: rows[index]?.product_id ?? null, stock: stockOf(line) }]))
+  return Object.fromEntries(
+    lines.map((line, index) => [line.id, { productId: rows[index]?.product_id ?? null, stock: stockOf(line), product: !isServiceLine(line) }]),
+  )
 }
 
 export const keptLineId = (line, savedLines) => {
   const saved = savedLines?.[line.id]
   return saved && textOf(saved.productId) && saved.stock === stockOf(line) ? saved.productId : null
+}
+
+export const savedLinesAfterSave = (productData, lines, keptIds = {}) => {
+  const rows = listOf(productData)
+  if (rows.length !== lines.length) return {}
+  const kept = new Set(Object.values(keptIds).filter((id) => textOf(id)).map(String))
+  const added = rows.filter((row) => !kept.has(String(row?.product_id))).sort((a, b) => Number(a?.product_id) - Number(b?.product_id))
+  let next = 0
+  return Object.fromEntries(
+    lines.map((line) => {
+      const productId = textOf(keptIds[line.id]) ? keptIds[line.id] : (added[next++]?.product_id ?? null)
+      return [line.id, { productId, stock: stockOf(line), product: !isServiceLine(line) }]
+    }),
+  )
+}
+
+export const stockLinesUnchanged = (lines, savedLines) => {
+  const products = listOf(lines).filter((line) => !isServiceLine(line))
+  const saved = Object.values(savedLines ?? {}).filter((entry) => entry?.product)
+  return products.length === saved.length && products.every((line) => keptLineId(line, savedLines) !== null)
 }

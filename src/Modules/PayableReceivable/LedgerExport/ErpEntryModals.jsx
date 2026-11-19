@@ -52,7 +52,7 @@ export function EditEntryModal({ companyId, ledgerName, row, ledgerNames, onClos
   }, [dispatch, companyId])
 
   const options = useMemo(() => {
-    const own = ledgersFor === companyId ? ledgers.map((ledger) => ledger.ledeger_name) : []
+    const own = ledgersFor === companyId ? ledgers.map((ledger) => ledger.ledger_name) : []
     return [...new Set([...own, ...ledgerNames].filter(Boolean))]
       .sort((a, b) => a.localeCompare(b))
       .map((name) => ({ value: name, label: name }))

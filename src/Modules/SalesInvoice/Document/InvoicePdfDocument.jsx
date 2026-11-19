@@ -2,6 +2,7 @@ import { Document, Image, Page, StyleSheet, Text, View } from '@react-pdf/render
 
 import {
   amountInWords,
+  currencyLine,
   dispatchLines,
   formatAmount,
   has,
@@ -457,6 +458,7 @@ function WordsView({ model }) {
         <Text style={{ fontSize: 6.4 }}>E.&amp;O.E</Text>
       </View>
       <Text style={[s.bold, { fontSize: 7.5 }]}>{amountInWords(model.totals.grandTotal)}</Text>
+      {model.currency ? <Text style={{ fontSize: 6.4 }}>{currencyLine(model.currency)}</Text> : null}
     </View>
   )
 }

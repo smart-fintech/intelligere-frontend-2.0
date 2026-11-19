@@ -4,7 +4,7 @@
  * share one set of ledgers, templates, vouchers and bank entries.
  *
  *   journal_vouchers/jv-ledgers/
- *     POST   { company_id }                      -> [{ id, ledeger_name }]
+ *     POST   { company_id }                      -> [{ id, ledger_name }]
  *     POST   multipart { company_id, file }      column "Ledger Name" -> those become JV ledgers
  *     PUT    { company_id, data: [{ id, jv }] }  marks or unmarks ledgers
  *

@@ -11,6 +11,7 @@ import {
 } from '@/Constants/dashboardModules'
 import { ROUTES } from '@/Constants/routes'
 import { useActiveCompany } from '@/Hooks/useActiveCompany'
+import useModuleVisibility from '@/Hooks/useModuleVisibility'
 import ModuleLayout from '@/Modules/Dashboard/Components/ModuleLayout'
 import { cn } from '@/Library/utils'
 import { hasActiveModule } from '@/Services/Auth/accessService'
@@ -137,11 +138,14 @@ function PremiumFeaturesCard() {
 export default function Dashboard() {
   const page = findModule('home')
   const { activeCompany } = useActiveCompany()
+  // A module the user's type is denied has no card at all (useModuleVisibility).
+  const { isHidden } = useModuleVisibility()
+  const modules = PRODUCT_MODULES.filter((module) => !isHidden(module.key))
 
   return (
     <ModuleLayout title={page.label}>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        {PRODUCT_MODULES.map((module) => (
+        {modules.map((module) => (
           <FeatureCard key={module.key} module={module} company={activeCompany} />
         ))}
       </div>

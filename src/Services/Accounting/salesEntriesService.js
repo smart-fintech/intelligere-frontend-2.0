@@ -5,7 +5,7 @@
  * body takes `company_id`.
  *
  *   accounting_entries/sales_ledger_list/
- *     POST   { company_id }                     -> [{ id, ledeger_name }] - the
+ *     POST   { company_id }                     -> [{ id, ledger_name }] - the
  *                                                  company's "Sales Accounts" ledgers
  *
  * MULTI LEDGER
@@ -55,6 +55,7 @@ import { SALES_ENTRIES_MODULE } from '@/Constants/salesEntries'
 import { hasActiveModule } from '@/Services/Auth/accessService'
 import { api } from '@/Services/Global/apiService'
 import { MULTIPART } from '@/Services/Global/apiHelpers'
+import { fromApiLedger } from '@/Services/Ledger/ledgerFields'
 
 const SALES_LEDGERS_URL = 'accounting_entries/sales_ledger_list/'
 const MULTI_UPLOAD_URL = 'accounting_entries/multi_party_sales_upload/'
@@ -82,7 +83,8 @@ export const hasSalesEntriesModule = (company) => hasActiveModule(company, SALES
 export const getSalesLedgers = async (companyId) => {
   const reply = await api.post(SALES_LEDGERS_URL, { company_id: companyId })
   return (Array.isArray(reply) ? reply : [])
-    .map((ledger) => ({ id: ledger?.id ?? null, name: String(ledger?.ledeger_name ?? '').trim() }))
+    .map(fromApiLedger)
+    .map((ledger) => ({ id: ledger?.id ?? null, name: String(ledger?.ledger_name ?? '').trim() }))
     .filter((ledger) => ledger.name)
 }
 

@@ -87,6 +87,8 @@ export default function useHistoryDocumentPdf(company) {
           ledgersById: ledgers.byId,
           bank,
           images: { logo: null, signature: null, paymentQr },
+          // The currency it was saved with (documentCurrency) - printed as when it was saved.
+          currency: applicable.savedCurrency,
         }),
       }
     },

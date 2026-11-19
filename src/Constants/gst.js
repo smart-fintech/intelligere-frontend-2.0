@@ -29,7 +29,7 @@ export const GST_REGISTRATION_TYPES = ['Regular', 'Composition', 'Unregistered',
  * Stored and sent as plain strings, because that is what the ledger API's
  * `gst_rate` field holds - no unit, no percent sign.
  */
-export const GST_RATES = ['0', '0.25', '3', '5', '12', '18', '28']
+export const GST_RATES = ['0', '0.25', '3', '5',  '18', '40']
 
 /**
  * What a GST rate is made of - the tax rule itself, not anything of ours:

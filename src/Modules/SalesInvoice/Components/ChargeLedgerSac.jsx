@@ -27,7 +27,7 @@ export default function ChargeLedgerSac({ id, ledger, erp, companyId, disabled, 
   const [sac, setSac] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
-  const name = String(ledger?.ledeger_name ?? '').trim() || 'This ledger'
+  const name = String(ledger?.ledger_name ?? '').trim() || 'This ledger'
 
   const save = async () => {
     if (saving) return

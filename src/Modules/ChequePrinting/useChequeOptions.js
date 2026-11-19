@@ -56,7 +56,7 @@ export function useLedgerOptions(companyId) {
   }, [dispatch, companyId])
 
   return {
-    options: useMemo(() => toOptions(ledgers, 'ledeger_name'), [ledgers]),
+    options: useMemo(() => toOptions(ledgers, 'ledger_name'), [ledgers]),
     loading: status === 'idle' || status === 'loading',
     error: status === 'failed' ? error : null,
     retry: () => dispatch(fetchLedgers({ companyId, force: true })),

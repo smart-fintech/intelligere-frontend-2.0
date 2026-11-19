@@ -1,11 +1,12 @@
 /**
- * A CHALLAN'S STOCK, TAKEN OUT OF THE WAREHOUSES - before a Challan with no
- * Prefill From is saved, for a company with Inventory Management
+ * A CHALLAN'S STOCK, TAKEN OUT OF THE WAREHOUSES - before a Challan, or a Sales
+ * Invoice, with no Prefill From is saved, for a company with Inventory Management
  * (inventory/SKUWarehouseSummaryAPI/ - Services/Inventory/inventoryBookingService), with
  * no screen attached:
  *
  *   needsChallanStock({ documentType, inventory, prefilled, savedStock })
- *       a Challan, new or edited, Inventory Management, nothing in Prefill From
+ *       a Challan or Sales Invoice (STOCK_OUT_TYPES - the backend takes its stock
+ *       out with it), new or edited, Inventory Management, nothing in Prefill From
  *       (neither a Sales Order - its booking is the order's - nor a Proforma);
  *       or an edited one whose record has a skuWarehouseSummary (savedStock)
  *   buildStockSummaryRequest({ companyName, lines, productsByKey })
@@ -33,7 +34,7 @@
  * `manage_qty` decides none of it.
  */
 
-import { DOCUMENT_TYPE_CHALLAN } from '@/Constants/salesInvoice'
+import { DOCUMENT_TYPE_CHALLAN, DOCUMENT_TYPE_INVOICE } from '@/Constants/salesInvoice'
 import { isServiceLine, isSkuManaged, lineVariant, textOf } from '@/Modules/SalesInvoice/salesInvoiceForm'
 
 const numberOf = (value) => {
@@ -45,8 +46,11 @@ const listOf = (value) => (Array.isArray(value) ? value : [])
 // The backend sends some keys with a space after them ("document_no ") - read either way.
 const field = (object, name) => object?.[name] ?? object?.[`${name} `]
 
+/** The types whose stock goes out with them - the backend's STOCK_OUT_DOCUMENT_TYPES. */
+export const STOCK_OUT_TYPES = Object.freeze([DOCUMENT_TYPE_CHALLAN, DOCUMENT_TYPE_INVOICE])
+
 export const needsChallanStock = ({ documentType, inventory, prefilled, savedStock = null }) =>
-  documentType === DOCUMENT_TYPE_CHALLAN && Boolean(inventory) && (Boolean(savedStock) || !prefilled)
+  STOCK_OUT_TYPES.includes(documentType) && Boolean(inventory) && (Boolean(savedStock) || !prefilled)
 
 export const buildStockSummaryRequest = ({ companyName, lines, productsByKey }) => {
   const items = []

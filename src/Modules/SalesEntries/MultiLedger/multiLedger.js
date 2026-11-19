@@ -43,6 +43,10 @@ import { SALES_BUYER_KIND } from '@/Constants/salesEntries'
 import { mapPartyName, renamerOf } from '@/Modules/SalesEntries/shared/keywordMapping'
 import { readLedgerList, readLines, renameLedgerList, text, toNumber } from '@/Modules/SalesEntries/shared/ledgerLists'
 import { rowKey } from '@/Modules/SalesEntries/shared/entryBatch'
+import { toApiLedgerKey } from '@/Services/Ledger/ledgerFields'
+
+/** The party address's key in the backend's entry rows (see ledgerFields). */
+const ADDRESS_KEY = toApiLedgerKey('ledger_address')
 
 const NOT_IN_TALLY = 'not in tally'
 
@@ -74,7 +78,7 @@ export const readMultiEntry = (raw, { mapping, ledgerNames }) => {
     mappedFrom: mappedParty ? fileParty : null,
     gstin: text(raw?.gstin),
     state: text(raw?.state),
-    address: text(raw?.ledeger_address),
+    address: text(raw?.[ADDRESS_KEY]),
     total: toNumber(raw?.total),
     taxable: toNumber(raw?.taxable_amount),
     notInTally: mappedParty
@@ -150,7 +154,7 @@ export const toMultiLedgerRow = (entry, salesLedger) => ({
   Roundoffamount: '0.00',
   // As the old screen and the agreed payload: the party's GSTIN goes in party_gstin.
   buyer_gstin: '',
-  ledeger_address: entry.address,
+  [ADDRESS_KEY]: entry.address,
   buyer_state: entry.state,
 })
 

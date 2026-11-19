@@ -30,6 +30,7 @@
  * API directly: the backend must refuse the same things on its own.
  */
 
+import { B2B_CNDN_MODULE, B2B_MODULE_NAMES, CNDN_MODULE_NAMES } from '@/Constants/b2bCndn'
 import { hasInventoryManagement } from '@/Services/Inventory/inventoryService'
 
 /** The `role` a sub user signs in with (and is registered with). */
@@ -99,6 +100,66 @@ const BACKEND_MODULE_NAMES = {
  */
 export const hasActiveModule = (company, moduleKey) =>
   listsModule(company?.active_modules, [moduleKey, ...(BACKEND_MODULE_NAMES[moduleKey] ?? [])])
+
+/* ------------------------------------------------------------------ */
+/* Product modules a user type never gets                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The modules each USER TYPE (profile_details.user_type) is never shown,
+ * whatever the company's `active_modules` says - a company record may list
+ * them by mistake, so that list is deliberately not consulted here. Keyed by
+ * the module's key in Constants/dashboardModules (PRODUCT_MODULES).
+ *
+ *   Accounting Professional   no Procurement Automation, no Cheque Printing
+ *   MSME                      no B2B/CNDN, no Sales Entries
+ *
+ * A hidden module has no dashboard card, no sidebar row, and its URL sends
+ * the user back to the dashboard (Hooks/useModuleVisibility and
+ * Routes/ModuleRouteGate). It is not offered among the modules a sub user can
+ * be given, nor among those a support ticket can be about.
+ *
+ * THE SCREEN'S SIDE ONLY, like everything in this file.
+ */
+const HIDDEN_MODULES_BY_USER_TYPE = {
+  accountingprofessional: ['Procurement Automation', 'Cheque Printing'],
+  msme: ['B2B/CNDN', 'Sales Entries'],
+}
+
+/** Every module some user type is denied - held back until the user type is known. */
+export const USER_TYPE_RESTRICTED_MODULES = Object.freeze([...new Set(Object.values(HIDDEN_MODULES_BY_USER_TYPE).flat())])
+
+/**
+ * Other names the backend may give a restricted module in a company's or a
+ * sub user's module list - beyond BACKEND_MODULE_NAMES: B2B/CNDN's two halves
+ * may be listed on their own (Constants/b2bCndn).
+ */
+const MODULE_LIST_NAMES = {
+  [B2B_CNDN_MODULE]: [...B2B_MODULE_NAMES, ...CNDN_MODULE_NAMES],
+}
+
+const namesOfModule = (moduleKey) => [
+  moduleKey,
+  ...(BACKEND_MODULE_NAMES[moduleKey] ?? []),
+  ...(MODULE_LIST_NAMES[moduleKey] ?? []),
+]
+
+/** The module keys hidden from a user type ("MSME", "Accounting Professional"); none for any other. */
+export const hiddenModulesForUserType = (userType) => HIDDEN_MODULES_BY_USER_TYPE[compactName(userType)] ?? []
+
+/** Whether a user type is denied a module, by its key in PRODUCT_MODULES. */
+export const isModuleHiddenForUserType = (userType, moduleKey) => hiddenModulesForUserType(userType).includes(moduleKey)
+
+/**
+ * Whether a user type is denied a module named as a backend list writes it
+ * ("Sales Inventory", "Procurement", "CNDN", ...), not by its key.
+ */
+export const isModuleNameHiddenForUserType = (userType, name) =>
+  hiddenModulesForUserType(userType).some((moduleKey) => listsModule([name], namesOfModule(moduleKey)))
+
+/** Whether a backend-written module name is one that SOME user type is denied. */
+export const isRestrictedModuleName = (name) =>
+  USER_TYPE_RESTRICTED_MODULES.some((moduleKey) => listsModule([name], namesOfModule(moduleKey)))
 
 /** True for the sub user role. */
 export const isSubUserRole = (role) => role === SUB_USER_ROLE

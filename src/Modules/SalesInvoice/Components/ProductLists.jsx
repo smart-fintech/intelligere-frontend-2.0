@@ -63,7 +63,7 @@ export function AddedProducts({ lines, productsByKey, ledgersById, figures, edit
             const product = service ? null : productsByKey.get(line.productKey)
             const variant = lineVariant(product, line)
             const name = service
-              ? (ledgersById?.get(String(line.ledgerId))?.ledeger_name ?? 'Ledger no longer listed')
+              ? (ledgersById?.get(String(line.ledgerId))?.ledger_name ?? 'Ledger no longer listed')
               : (product?.name ?? 'Product no longer listed')
             const flagged = Object.keys(errors).some((key) => key.startsWith(`lines.${line.id}.`))
             return (

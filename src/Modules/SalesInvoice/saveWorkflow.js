@@ -29,9 +29,10 @@
  *   uploadPdf(id, bytes)      -> the upload reply
  *   onStage(stage)            'creating' | 'booking' | 'pdf' | 'uploading', as each starts
  *
- * -> { outcome, saved?, error?, uploaded?, reply? } - `outcome` is one of SAVE_OUTCOME,
- *    `saved` is what to keep for a retry (the document exists from step 2 on), and
- *    `reply` the upload's answer (a Sales Order's carries its `stock`).
+ * -> { outcome, saved?, error?, uploaded?, reply?, pdfBytes? } - `outcome` is one of SAVE_OUTCOME,
+ *    `saved` is what to keep for a retry (the document exists from step 2 on),
+ *    `reply` the upload's answer (a Sales Order's carries its `stock`), and
+ *    `pdfBytes` (DONE, uploaded) the very PDF - or file - that went up.
  */
 
 import { documentIdOf } from '@/Services/Invoice/salesInvoiceService'
@@ -95,5 +96,5 @@ export async function runSaveWorkflow({ saved, invoiceNo, createDocument, book =
     return { outcome: SAVE_OUTCOME.UPLOAD_FAILED, saved: { ...document, pdfBytes }, error }
   }
 
-  return { outcome: SAVE_OUTCOME.DONE, saved: document, uploaded: true, reply }
+  return { outcome: SAVE_OUTCOME.DONE, saved: document, uploaded: true, reply, pdfBytes }
 }

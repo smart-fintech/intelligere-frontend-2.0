@@ -32,6 +32,10 @@
 import { renamerOf } from '@/Modules/SalesEntries/shared/keywordMapping'
 import { readTaxLines, renameTaxJson, sumByName, text, toNumber } from '@/Modules/SalesEntries/shared/ledgerLists'
 import { rowKey } from '@/Modules/SalesEntries/shared/entryBatch'
+import { toApiLedgerKey } from '@/Services/Ledger/ledgerFields'
+
+/** The party address's key in the backend's entry rows (see ledgerFields). */
+const ADDRESS_KEY = toApiLedgerKey('ledger_address')
 
 const NOT_IN_TALLY = 'not in tally'
 const TAXES = Object.freeze(['CGST', 'SGST', 'IGST', 'UGST'])
@@ -76,7 +80,7 @@ export const readInventoryInvoice = (raw, { mapping }) => {
     partyLedger: text(raw?.ledgername),
     gstin: text(raw?.gstno),
     state: text(raw?.state),
-    address: text(raw?.ledeger_address),
+    address: text(raw?.[ADDRESS_KEY]),
     total: toNumber(raw?.total),
     ownSalesLedger: text(raw?.purchaseLedger),
     notInTally: text(raw?.tallyledger).toLowerCase() === NOT_IN_TALLY,
@@ -145,7 +149,7 @@ export const toInventoryTallyRow = (invoice, { salesLedger, stockNameOf, chargeL
     Roundoffdata: null,
     Roundoffamount: '0.00',
     buyer_gstin: invoice.gstin,
-    ledeger_address: invoice.address,
+    [ADDRESS_KEY]: invoice.address,
     buyer_state: invoice.state,
     productdetails: invoice.products.map((product) => ({
       Invoice_data: product.raw.Invoice_data ?? '',

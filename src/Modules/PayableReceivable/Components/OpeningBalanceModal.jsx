@@ -42,7 +42,7 @@ export default function OpeningBalanceModal({ companyId, partyNames, initialLedg
   }, [dispatch, companyId])
 
   const options = useMemo(() => {
-    const own = ledgersFor === companyId ? ledgers.map((ledger) => ledger.ledeger_name) : []
+    const own = ledgersFor === companyId ? ledgers.map((ledger) => ledger.ledger_name) : []
     return [...new Set([...own, ...partyNames].filter(Boolean))]
       .sort((a, b) => a.localeCompare(b))
       .map((name) => ({ value: name, label: name }))

@@ -19,6 +19,7 @@
  */
 
 import { JV_SIDE } from '@/Constants/journalVoucher'
+import { fromApiLedger } from '@/Services/Ledger/ledgerFields'
 import { toInputDate } from '@/Utils/date'
 
 const isRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -55,11 +56,12 @@ const templateKey = (value) => nameKey(String(value ?? '').replaceAll('_', ' '))
 /* The list replies                                                   */
 /* ------------------------------------------------------------------ */
 
-/** [{ id, ledeger_name }] -> [{ id, name }], A to Z. */
+/** [{ id, ledger_name }] (the backend's field names translated - ledgerFields) -> [{ id, name }], A to Z. */
 export const readJvLedgers = (reply) =>
   toList(reply)
-    .filter((row) => isRecord(row) && row.id !== undefined && text(row.ledeger_name))
-    .map((row) => ({ id: row.id, name: text(row.ledeger_name) }))
+    .map(fromApiLedger)
+    .filter((row) => isRecord(row) && row.id !== undefined && text(row.ledger_name))
+    .map((row) => ({ id: row.id, name: text(row.ledger_name) }))
     .sort((a, b) => byName(a.name, b.name))
 
 /** { name: { dr, cr, party_name } } -> [{ name, dr: [names], cr: [names], partyName }], as saved. */

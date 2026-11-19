@@ -172,8 +172,10 @@ const taxFields = (figures, interState, rate) => ({
  *                          product: [{ document_id, warehouse: [{ id, remove_qty,
  *                          so_booked_qty? }] }] }. Not there for anything else
  *   product_data[].product_id   only an edited Purchase Invoice / Inbound Challan's
- *                          line kept as saved (`savedLineId` - stockBooking's
- *                          keptLineId): the update keeps that line and its stock
+ *                          line kept as saved, or an edited Challan / Sales Invoice
+ *                          whose product lines are all as saved (`savedLineId` -
+ *                          stockBooking's keptLineId): the update keeps that line
+ *                          and its stock
  */
 export const buildBusinessDocumentPayload = (request) => {
   const { document, figures, interState } = request
@@ -239,6 +241,9 @@ export const buildBusinessDocumentPayload = (request) => {
     // challan screens gave it (challan_type).
     ...(namesInvoice ? { invoice_no: text(document.challanInvoiceNo), invoice_date: toDocumentDate(document.challanInvoiceDate) } : null),
     ...(hasChallanType ? { challan_type: text(document.challanType) } : null),
+    // A buyer / supplier from another country: its currency and what one unit of it is worth in the
+    // company's (Procurement's names - Modules/SalesInvoice/documentCurrency). Never for a domestic one.
+    ...(request.currency ? { currency: request.currency.currency, conversion_rate: request.currency.conversion_rate } : null),
   }
 
   // A product line as it always was. A service line (a ledger) has the same
@@ -577,16 +582,16 @@ export const saveAutoIncrement = (companyId, on) => updateCompany({ company_id: 
  * rate...) go back exactly as the ledger has them.
  */
 const LEDGER_RECORD_FIELDS = [
-  'ledeger_name',
+  'ledger_name',
   'ledger_gst_reg_type',
-  'ledeger_group_name',
+  'ledger_group_name',
   'ledger_sac',
-  'ledeger_address',
-  'ledeger_email',
-  'ledeger_phone',
-  'ledeger_website',
-  'ledeger_gstin',
-  'ledeger_state',
+  'ledger_address',
+  'ledger_email',
+  'ledger_phone',
+  'ledger_website',
+  'ledger_gstin',
+  'ledger_state',
   'ledger_country',
   'ledger_city',
   'ledger_pincode',
@@ -599,13 +604,13 @@ const LEDGER_RECORD_FIELDS = [
 
 /** The Buyer Details a ledger keeps, as `form field -> ledger field`. The name is not one: the buyer IS that ledger. */
 const BUYER_LEDGER_FIELDS = {
-  address: 'ledeger_address',
-  phone: 'ledeger_phone',
-  email: 'ledeger_email',
-  website: 'ledeger_website',
-  gstin: 'ledeger_gstin',
+  address: 'ledger_address',
+  phone: 'ledger_phone',
+  email: 'ledger_email',
+  website: 'ledger_website',
+  gstin: 'ledger_gstin',
   country: 'ledger_country',
-  state: 'ledeger_state',
+  state: 'ledger_state',
   pincode: 'ledger_pincode',
 }
 
@@ -712,6 +717,9 @@ export const getUniqueProducts = async ({ companyId, ledgerId, documentType }) =
  *                            type's profile (buildBusinessDocumentPayload)
  *   chargeLedgerSac          each Other Charges row carries its own ledger's
  *                            SAC (`ledgerSac`, saved as ledger_sac) - Sales Invoice
+ *   currency                 { currency, conversion_rate } of a party from another
+ *                            country (documentCurrencyOf) - saved in
+ *                            invoice_master_details; null for none
  */
 export const buildInvoiceSaveRequest = ({
   form,
@@ -729,15 +737,17 @@ export const buildInvoiceSaveRequest = ({
   rules,
   chargeLedgerSac = false,
   prefillFrom = {},
+  currency = null,
 }) => {
   const ledgerOf = (id) => (id ? ledgersById.get(String(id)) : null)
-  const ledgerName = (id) => text(ledgerOf(id)?.ledeger_name)
+  const ledgerName = (id) => text(ledgerOf(id)?.ledger_name)
   const bank = banks.find((entry) => String(entry.id) === String(form.document.bankId)) ?? null
 
   return {
     documentType: form.documentType,
     invoiceNo,
     prefillFrom,
+    currency,
     sellerId: company?.company_id ?? null,
     buyerId: getLedgerId(ledgerOf(partyLedgerId)) ?? (partyLedgerId || null),
     rules,

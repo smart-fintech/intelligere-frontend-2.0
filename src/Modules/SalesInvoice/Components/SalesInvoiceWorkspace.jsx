@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { ArrowLeft, ArrowRight, Boxes, FilePlus, RefreshCw, Save, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Boxes, Download, FilePlus, RefreshCw, Save, X } from 'lucide-react'
 
 import { InlineAlert } from '@/Components/Common/DataList'
 import { CheckboxField } from '@/Components/Common/FormFields'
@@ -44,14 +44,19 @@ import OrderProducts from '@/Modules/SalesInvoice/Components/OrderProducts'
 import InventoryBookingModal from '@/Modules/SalesInvoice/Components/InventoryBookingModal'
 import StockBookingModal from '@/Modules/SalesInvoice/Components/StockBookingModal'
 import ChallanStockModal from '@/Modules/SalesInvoice/Components/ChallanStockModal'
+import PartyCurrencyCard from '@/Modules/SalesInvoice/Components/PartyCurrencyCard'
+import { checkDocumentCurrency, documentCurrencyOf, documentCurrencyParty, showsDocumentCurrency } from '@/Modules/SalesInvoice/documentCurrency'
+import useCompanyCurrency from '@/Modules/Procurement/useCompanyCurrency'
 import { allocateStock, buildStockSummaryRequest, needsChallanStock, readSavedStockSummary, readStockSummary, withSavedStock } from '@/Modules/SalesInvoice/challanStock'
 import InventoryDetailsModal from '@/Modules/SalesInvoice/Components/InventoryDetailsModal'
 import { buildBookingBody } from '@/Modules/SalesInvoice/inventoryBooking'
-import { keptLineId, needsStockBooking, needsStockRebooking, savedLinesOf, stockBookingItems } from '@/Modules/SalesInvoice/stockBooking'
+import { keptLineId, needsStockBooking, needsStockRebooking, savedLinesAfterSave, savedLinesOf, savedSourceOf, stockBookingItems, stockLinesUnchanged } from '@/Modules/SalesInvoice/stockBooking'
 import { PROCUREMENT_STATE, QUOTATION_STATES } from '@/Modules/SalesInvoice/procurement'
 import useProcurement from '@/Modules/SalesInvoice/useProcurement'
+import useTallyLedgerAlter from '@/Modules/SalesInvoice/useTallyLedgerAlter'
 import useInventoryAccess from '@/Hooks/useInventoryAccess'
-import { buildPrefillFrom, readPrefillFrom } from '@/Services/Invoice/documentPrefillService'
+import { buildPrefillFrom, getPrefillDocumentDetails, readPrefillFrom } from '@/Services/Invoice/documentPrefillService'
+import { downloadTextFile } from '@/Utils/fileDownload'
 import { bookInventory, getStockSummary } from '@/Services/Inventory/inventoryBookingService'
 import { SAVE_OUTCOME, runSaveWorkflow } from '@/Modules/SalesInvoice/saveWorkflow'
 import {
@@ -209,11 +214,26 @@ const STEP_OF_PARTY = { seller: INVOICE_STEP.SELLER, buyer: INVOICE_STEP.BUYER }
  *   3. the PDF is made from the preview sheets  (Document/invoicePdf)
  *   4. POST invoice/save-document-pdf/  { id: document_id, file }
  *
- * Success is announced, and the form cleared, only after step 4. If step 2
- * fails nothing else runs. Once step 2 has succeeded the document exists:
- * its id is kept (`saved`), the form is locked so the PDF cannot drift from
- * what was saved, and Save becomes "Retry PDF" - which repeats steps 3-4
- * only, never step 2, so a retry can never create a second document.
+ * Success is announced only after step 4. If step 2 fails nothing else runs.
+ * Once step 2 has succeeded the document exists: its id is kept (`saved`),
+ * the form is locked so the PDF cannot drift from what was saved, and Save
+ * becomes "Retry PDF" - which repeats steps 3-4 only, never step 2, so a
+ * retry can never create a second document.
+ *
+ * SAVED, IT STAYS OPEN: once step 4 is done the form is NOT cleared - the
+ * document stays on screen, as it is, and becomes the document being edited
+ * (`editing`, as History's Edit makes it, under the id step 2 gave): the next
+ * Save is an Update - PUT under that id, never a second POST - with its PDF
+ * made and uploaded again. Download PDF (beside Save) then saves to disk the
+ * very PDF last uploaded (`savedPdf`; a type that uploads its own file: that
+ * file) - the latest saved version, not unsaved edits - and is not offered
+ * while a Retry is pending. New Document leaves it for a new, empty one. What
+ * an update needs from the saved record that the form does not hold - a
+ * purchase's line ids (stockBooking's savedLinesAfterSave), a Challan's
+ * skuWarehouseSummary - is read back once, after the save
+ * (invoice/prefill-document-details/, by its id), only for those types; read
+ * or not, the form is left as it is. A type that uploads its own file sends
+ * it again only when another file was chosen since.
  *
  * ------------------------------------------------------------------
  * A TYPE THAT UPLOADS ITS OWN FILE (the profile's `uploadsFile` - Purchase
@@ -285,24 +305,27 @@ const STEP_OF_PARTY = { seller: INVOICE_STEP.SELLER, buyer: INVOICE_STEP.BUYER }
  * StockBookingModal books those lines alone, with their new quantities. Nothing
  * changed, nothing is booked.
  *
- * A CHALLAN'S STOCK (Challan with no Prefill From - Inventory Management)
+ * A CHALLAN'S / SALES INVOICE'S STOCK (no Prefill From - Inventory Management)
  * ------------------------------------------------------------------
  * Before a NEW one is created: its products' stock summary (POST
  * inventory/SKUWarehouseSummaryAPI/), ChallanStockModal to take each one's
  * quantity out of a warehouse's free stock or a Sales Order's booking - and
  * what it takes out (the body once PUT to that API, whole) goes with the
- * Challan as its `skuWarehouseSummary`: no PUT of its own. Closed, nothing is
+ * document as its `skuWarehouseSummary`: no PUT of its own. Closed, nothing is
  * saved. Chosen once for the same lines (a create that fails is sent again
  * with the same skuWarehouseSummary, not asked for again). EDITING a saved
- * Challan from History: the POST for its lines as it opens, and nothing else;
- * the modal only on Update Challan - from that answer (a new POST only if the
- * lines changed), starting with its saved skuWarehouseSummary's quantities
+ * one (History's Edit, or one that stays open once saved): nothing is read or
+ * asked as it opens. On Update, with its product lines as saved (product, SKU,
+ * quantity - stockLinesUnchanged): no modal - each line goes under its own
+ * product_id, so the update keeps it with the stock it took, and no
+ * skuWarehouseSummary is sent. With them changed: the POST for the lines as
+ * they are, the modal starting with its saved skuWarehouseSummary's quantities
  * (counted back into the stock), or empty when it has none - then, on OK, the
  * PUT carrying what OK gave. Closed, nothing is sent. One with no saved
  * skuWarehouseSummary can also go on without taking stock: the PUT as before,
- * without the key. Not with a
- * Prefill From - a Sales Order's stock is that order's booking; a Proforma's
- * as it always was (needsChallanStock).
+ * without the key. Not with a Prefill From - its stock is the source's (a
+ * Sales Order's booking, a Challan's stock out); a Proforma's as it always
+ * was (needsChallanStock).
  *
  * EDITING A SAVED DOCUMENT (History's Edit)
  * ------------------------------------------------------------------
@@ -319,8 +342,8 @@ const STEP_OF_PARTY = { seller: INVOICE_STEP.SELLER, buyer: INVOICE_STEP.BUYER }
  *   PUT invoice/business-documents/  { ...the same body, document_id }
  * (updateBusinessDocument) - never a POST, so no second document is made.
  * The PDF is then made and uploaded under the same id, as on a save, with
- * the same Retry PDF if that fails. Cancel edit, or a finished update, goes
- * back to a new, empty document.
+ * the same Retry PDF if that fails. Cancel edit goes back to a new, empty
+ * document; a finished update stays open, as a saved one does (above).
  *
  * ------------------------------------------------------------------
  * A NEW DOCUMENT FILLED FROM ELSEWHERE (Compare Quotation's Raise a PO)
@@ -479,11 +502,29 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
   const isTallyErp = useSelector(selectIsTallyErp)
   const isIntelligereErp = useSelector(selectIsIntelligereErp)
   const erp = isTallyErp ? 'tally' : isIntelligereErp ? 'intelligere' : null
+  const alterTallyLedger = useTallyLedgerAlter()
   const chargeSacRule = useMemo(() => (flow.chargeLedgerSac ? { erp } : null), [flow.chargeLedgerSac, erp])
 
+  // The ledger party's currency when it is from another country - Procurement's rules and fields
+  // (documentCurrency), on every document type: checked on that party's step, saved in
+  // invoice_master_details, printed under the amount in words (a challan prints no money).
+  const companyCurrency = useCompanyCurrency()
+  const { countryList, companyCountry, loaded: countriesLoaded, currencies } = companyCurrency
+  const currencyRules = useMemo(
+    () => ({ countryList, companyCountry, loaded: countriesLoaded, currencies }),
+    [countryList, companyCountry, countriesLoaded, currencies],
+  )
+  const checkCurrency = useCallback(
+    (checked, found) => checkDocumentCurrency(checked, found, parties.ledger, currencyRules),
+    [parties.ledger, currencyRules],
+  )
+  const currencyEntry = documentCurrencyParty(form, parties.ledger, currencyRules)
+  // What is saved, and printed - null for a domestic party (or one with no rate yet).
+  const documentCurrency = useMemo(() => documentCurrencyOf(applicable, parties.ledger, currencyRules), [applicable, parties.ledger, currencyRules])
+
   const context = useMemo(
-    () => ({ allowedTypes, productsByKey: products.byKey, ledgersById: ledgers.byId, chargeSac: chargeSacRule }),
-    [allowedTypes, products.byKey, ledgers.byId, chargeSacRule],
+    () => ({ allowedTypes, productsByKey: products.byKey, ledgersById: ledgers.byId, chargeSac: chargeSacRule, checkCurrency }),
+    [allowedTypes, products.byKey, ledgers.byId, chargeSacRule, checkCurrency],
   )
 
   /* ---- the live preview ---- */
@@ -503,8 +544,11 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
         ledgersById: ledgers.byId,
         bank,
         images: { logo, signature, paymentQr },
+        // A party from another country: its total in its currency, under the amount in words.
+        currency: documentCurrency,
+        baseCode: companyCurrency.base?.code ?? 'INR',
       }),
-    [applicable, figures, gstLedgers, products.byKey, ledgers.byId, bank, logo, signature, paymentQr],
+    [applicable, figures, gstLedgers, products.byKey, ledgers.byId, bank, logo, signature, paymentQr, documentCurrency, companyCurrency.base],
   )
   // The preview's measured layout for the current model - what the PDF is drawn to.
   const layoutRef = useRef(null)
@@ -542,11 +586,15 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
   }
 
   /* ---- saving ---- */
-  // 'idle' | 'step' | 'creating' | 'pdf' | 'uploading' | 'download'
+  // 'idle' | 'step' | 'creating' | 'booking' | 'pdf' | 'uploading'
   const [phase, setPhase] = useState('idle')
   const busyRef = useRef(false)
   // { documentId, invoiceNo } once the document exists and only its PDF is still to go.
   const [saved, setSaved] = useState(null)
+  // The PDF (or own file) the last finished save uploaded - what Download PDF saves: { bytes, fileName } | { file }.
+  const [savedPdf, setSavedPdf] = useState(null)
+  // What a save, once done, keeps for the updates after it: { prefillFrom, keptIds, stockBody } (see SAVED, IT STAYS OPEN).
+  const afterSaveRef = useRef(null)
 
   /* ---- History's Edit ----
      `editing` is the saved document being edited ({ documentId, documentNo })
@@ -702,12 +750,13 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
     })
     return documentIds.length > 0 ? { documentFrom: orders.source, documentIds } : null
   }
-  // A NEW Challan with nothing in Prefill From takes its stock out before it is created - and a saved one
-  // being edited as it opens: nothing in its own prefill_from, or a skuWarehouseSummary saved (needsChallanStock).
+  // A NEW Challan / Sales Invoice with nothing in Prefill From takes its stock out before it is created - and a
+  // saved one being edited: nothing in its own prefill_from (as sent, or as the server keeps it - savedSourceOf),
+  // or a skuWarehouseSummary saved (needsChallanStock) - on Update, only when its product lines changed.
   const takesChallanStock = needsChallanStock({
     documentType: documentTypeValue,
     inventory: inventoryAccess.full,
-    prefilled: editing ? Boolean(textOf(editing.prefillFrom?.document_from)) : Boolean(orders.source || prefill.sourceType || prefilledFrom),
+    prefilled: editing ? Boolean(savedSourceOf(editing.prefillFrom)) : Boolean(orders.source || prefill.sourceType || prefilledFrom),
     savedStock: editing?.stockSummary ?? null,
   })
   // { rows, entered, documentNo } while the modal is open; challanStockAnswer settles the save's wait for it;
@@ -715,10 +764,10 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
   const [challanStockAsk, setChallanStockAsk] = useState(null)
   const challanStockAnswer = useRef(null)
   const challanStockFor = useRef(null)
-  // Editing: { lines, answer } - the POST made as it opened (its promise), which Update Challan's modal reads
-  // - even while it is still on its way - with no second POST for the same lines.
+  // Editing: { lines, answer } - the POST for these lines (its promise), which an Update asked again for the
+  // same lines reads (the modal closed, a refused update) - with no second POST for them.
   const challanStockRows = useRef(null)
-  // The Edit press whose stock has been asked for - once each.
+  // The Edit press (or the save it stays open after) whose stock refs are its own - once each.
   const challanStockOpened = useRef(null)
   // The lines - and, editing, which document - the stock is chosen for.
   const linesTaken = JSON.stringify([editing?.documentId ?? null, applicable.lines.map((line) => [line.productKey, line.skuValue, line.quantity])])
@@ -767,23 +816,21 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
     },
     [],
   )
-  // A Challan opened for editing: its stock summary at once - once per Edit press. The modal waits for Update Challan.
+  // A document opened for editing starts with nothing chosen - once per Edit press. Nothing is read as it
+  // opens: the stock summary only on an Update whose product lines changed (stockLinesUnchanged).
   useEffect(() => {
-    if (!editing || !takesChallanStock || challanStockOpened.current === editing) return
+    if (!editing || challanStockOpened.current === editing) return
     challanStockOpened.current = editing
     challanStockFor.current = null
     challanStockRows.current = null
-    // Refused - said on Update Challan, which asks again.
-    readChallanStock().catch(() => {})
-    // Only the press matters - the lines are those it just loaded.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing, takesChallanStock])
+  }, [editing])
 
   if (editRequest && editRequest !== seenEditRequest) {
     setSeenEditRequest(editRequest)
     setPendingEdit(editRequest.record)
     setEditing(null)
     setSaved(null)
+    setSavedPdf(null)
     setStepIndex(0)
     setPendingPrefill(null)
     setPrefilledFrom(null)
@@ -902,7 +949,14 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
       }
       const payload = buildBuyerLedgerPayload(companyId, ledger, party, buyerFromLedger(ledger, party.ledgerId, lists))
       if (payload) {
-        await saveBuyerLedger(payload)
+        // A Tally user's ledger is changed in Tally, as the Ledger Form does -
+        // the API update would have the backend send Tally India for the
+        // country (see useTallyLedgerAlter). The EXE finds it by its GUID.
+        if (isTallyErp && textOf(ledger.ledger_guid)) {
+          if (!(await alterTallyLedger(company.comp_name, { ...payload, ledger_guid: ledger.ledger_guid }))) return false
+        } else {
+          await saveBuyerLedger(payload)
+        }
         // The list is read again, so the next comparison is against what was saved.
         ledgers.retry()
       }
@@ -950,7 +1004,7 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
   // Another module's type names itself in its profile (label).
   const documentType = profile.label ? { label: profile.label } : findDocumentType(form.documentType)
   const busy = phase !== 'idle'
-  const locked = (busy && phase !== 'download') || Boolean(saved) || Boolean(pendingEdit)
+  const locked = busy || Boolean(saved) || Boolean(pendingEdit)
   const fileNameFor = (invoiceNo) => documentPdfFileName(documentType?.label, invoiceNo)
 
   /* ---- the E-Way Bill PDF ----
@@ -979,29 +1033,34 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
         })
 
   /**
-   * Download PDF (the preview's button): the same PDF the save uploads, from
-   * the same sheets, to the user's disk. Shares the save's guard, so a
-   * download and a save can never run at once, nor either twice.
+   * Download PDF (beside Save, once saved): the very PDF the last finished
+   * save uploaded - the invoice's (an E-Way Bill's goes up with it, but is
+   * not this) - or, a type that uploads its own file, that file as chosen.
    */
-  const download = async () => {
-    if (busyRef.current) return
-    busyRef.current = true
-    setPhase('download')
+  const downloadSaved = async () => {
+    if (!savedPdf) return
     try {
-      // A challan downloads as all three copies, one after another.
-      const bytes = await makeInvoicePdf(model, layoutRef, isChallanDoc ? ALL_COPIES : undefined)
-      await saveToDisk(bytes, fileNameFor(invoiceNumberOf(form.document)))
+      if (savedPdf.file) downloadTextFile(savedPdf.file.name, savedPdf.file, savedPdf.file.type || 'application/octet-stream')
+      else await saveToDisk(savedPdf.bytes, savedPdf.fileName)
     } catch (failure) {
       console.error('[Sales Invoice] PDF download failed:', failure)
-      toast.error(`The PDF could not be made: ${failure.message}`)
-    } finally {
-      busyRef.current = false
-      setPhase('idle')
+      toast.error(`The PDF could not be downloaded: ${failure.message}`)
     }
   }
 
-  /** The outcome of a save attempt, in words - and what is kept for a retry. */
-  const report = ({ outcome, saved: keep, error, uploaded, reply }, invoiceNo) => {
+  /** The saved record as the server keeps it (one read, by its id) - null when it could not be read. */
+  const readSavedRecord = async (documentId) => {
+    try {
+      const rows = await getPrefillDocumentDetails([{ documentId, documentNo: '' }])
+      return rows.find((row) => String(row.document_id) === String(documentId)) ?? null
+    } catch (failure) {
+      console.warn('[Sales Invoice] The saved document could not be read back:', failure)
+      return null
+    }
+  }
+
+  /** The outcome of a save attempt, in words - and what is kept for a retry, or for the updates after it (`after`). */
+  const report = ({ outcome, saved: keep, error, uploaded, reply, pdfBytes }, invoiceNo, after = null) => {
     const what = `${documentType?.label ?? 'Document'} ${invoiceNo}`
     // What goes with the document: its PDF (and its E-Way Bill PDF), or (a type that uploads its own) the file chosen.
     const attachment = uploadsFile ? 'file' : makesEwayBill ? 'PDFs' : 'PDF'
@@ -1018,15 +1077,20 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
         if (documentTypeValue === SALES_ORDER && keep?.documentId != null) procurement.stockArrived(keep.documentId, reply?.stock ?? null)
         bookedRef.current = null
         challanStockFor.current = null
+        // It stays open, as it is - the document being edited now, so the next Save updates it (SAVED, IT STAYS OPEN).
+        // Its stock is read only when an Update with changed product lines asks for it.
+        setEditing({ ...after, documentId: keep.documentId, documentNo: invoiceNo, afterSave: true })
         setSaved(null)
-        setEditing(null)
-        setDocumentFile(null)
+        if (uploaded && pdfBytes) {
+          setSavedPdf(
+            uploadsFile
+              ? { file: pdfBytes }
+              : { bytes: pdfBytes instanceof Uint8Array ? pdfBytes : pdfBytes.invoice, fileName: fileNameFor(invoiceNo) },
+          )
+        }
         setPrefilledFrom(null)
         clearPrefill()
         orders.clearSource()
-        reset()
-        setNumberingRound((round) => round + 1)
-        goTo(0)
         onDocumentSaved?.()
         return
       case SAVE_OUTCOME.CREATE_FAILED:
@@ -1144,10 +1208,12 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
             challanType: showsDocumentField(form, 'challanType'),
           },
           chargeLedgerSac: Boolean(flow.chargeLedgerSac),
+          currency: documentCurrency,
           prefillFrom: editing
             ? editing.prefillFrom
             : buildPrefillFrom(prefilledFrom && prefill.sources.includes(prefilledFrom.documentFrom) ? prefilledFrom : orderPrefillFrom()),
         })
+        afterSaveRef.current = { prefillFrom: request.prefillFrom, keptIds: {}, stockBody: null }
       }
 
       const invoiceNo = saved?.invoiceNo ?? request.invoiceNo
@@ -1161,10 +1227,14 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
         if (!booking) return
         bookedRef.current = booking.booked
       }
-      // A new Challan with no Prefill From (or one being edited): its stock out of the warehouses chosen first -
-      // once for these lines - and sent with it (skuWarehouseSummary), also when a create or update that failed
-      // is tried again.
-      if (!saved && takesChallanStock) {
+      // A new Challan / Sales Invoice with no Prefill From (or one being edited): its stock out of the warehouses
+      // chosen first - once for these lines - and sent with it (skuWarehouseSummary), also when a create or update
+      // that failed is tried again. Edited with its product lines as saved (stockLinesUnchanged): no modal and no
+      // skuWarehouseSummary - each line goes under its own product_id, so the update keeps it and the stock it took.
+      if (!saved && takesChallanStock && editing && stockLinesUnchanged(applicable.lines, editing.savedLines)) {
+        request = { ...request, lines: request.lines.map((line) => ({ ...line, savedLineId: keptLineId(line, editing.savedLines) })) }
+        afterSaveRef.current.keptIds = Object.fromEntries(applicable.lines.map((line) => [line.id, keptLineId(line, editing.savedLines)]))
+      } else if (!saved && takesChallanStock) {
         if (challanStockFor.current?.lines !== linesTaken) {
           setPhase('booking')
           const taken = await takeChallanStock(invoiceNo)
@@ -1172,12 +1242,16 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
           challanStockFor.current = { lines: linesTaken, body: taken }
         }
         if (challanStockFor.current?.body) request = { ...request, skuWarehouseSummary: challanStockFor.current.body }
+        afterSaveRef.current.stockBody = challanStockFor.current?.body ?? null
       }
       // An edited purchase: the lines kept as saved go under their product_id; the rest are booked once updated.
       const rebookLines = rebooksStock ? applicable.lines.filter((line) => !keptLineId(line, editing.savedLines)) : []
       if (request && rebooksStock) {
         request = { ...request, lines: request.lines.map((line) => ({ ...line, savedLineId: keptLineId(line, editing.savedLines) })) }
+        afterSaveRef.current.keptIds = Object.fromEntries(applicable.lines.map((line) => [line.id, keptLineId(line, editing.savedLines)]))
       }
+      // A type that uploads its own file: sent again only when another was chosen since the last one went up.
+      const fileToSend = uploadsFile && savedPdf?.file && savedPdf.file === documentFile ? null : documentFile
       const result = await runSaveWorkflow({
         // A retry of a type that uploads its own file sends the file chosen NOW (it may have been replaced).
         // (`booked` kept, so a retry never books the stock again.)
@@ -1201,7 +1275,7 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
               ? (documentId) => bookStock(documentId, invoiceNo, rebookLines)
               : null,
         // Purchase Invoice / Inbound Challan: the chosen file, or none - never a PDF made from the form.
-        makePdf: uploadsFile ? () => documentFile : makeDocumentPdfs(copies),
+        makePdf: uploadsFile ? () => fileToSend : makeDocumentPdfs(copies),
         uploadPdf: uploadsFile
           ? (documentId, file) => saveDocumentFile(documentId, file)
           : uploadDocumentPdfs(invoiceNo),
@@ -1218,7 +1292,21 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
               buyerGstin: applicable.buyer.gstin,
             }
           : null
-      report(result, invoiceNo)
+      // Saved: what its updates need, for it stays open (SAVED, IT STAYS OPEN) - read back only where the form lacks it.
+      let after = null
+      if (result.outcome === SAVE_OUTCOME.DONE) {
+        const { prefillFrom, keptIds, stockBody } = afterSaveRef.current ?? { prefillFrom: {}, keptIds: {}, stockBody: null }
+        const rebooks = needsStockRebooking({ documentType: documentTypeValue, prefillFrom, inventory: inventoryAccess.full })
+        const challanStock = needsChallanStock({ documentType: documentTypeValue, inventory: inventoryAccess.full, prefilled: Boolean(savedSourceOf(prefillFrom)) })
+        const record = rebooks || challanStock ? await readSavedRecord(result.saved.documentId) : null
+        after = {
+          prefillFrom,
+          // Its lines' ids now - what the next Update keeps a line (and its stock) under.
+          savedLines: rebooks || challanStock ? savedLinesAfterSave(record?.product_data, applicable.lines, keptIds) : {},
+          stockSummary: record ? readSavedStockSummary(record.skuWarehouseSummary) : readSavedStockSummary(stockBody),
+        }
+      }
+      report(result, invoiceNo, after)
       if (shareCheck) offerSharing(shareCheck)
     } finally {
       busyRef.current = false
@@ -1245,13 +1333,18 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
     if (match) setShareOffer((current) => current ?? { ...saved, companyId, company: match })
   }
 
-  /** Leaves a saved document whose PDF did not go up, and starts a fresh one. */
-  const startNew = () => {
+  /**
+   * Leaves a saved document whose PDF did not go up (or the one being
+   * edited), and starts a fresh one. `keepPurchasing` - New Document after a
+   * finished save: that order's PDF is up, so its purchasing goes on.
+   */
+  const startNew = ({ keepPurchasing = false } = {}) => {
     // That order's purchasing ends with it - its PDF (and so its stock) is not coming.
-    procurement.reset()
+    if (!keepPurchasing) procurement.reset()
     bookedRef.current = null
     challanStockFor.current = null
     setSaved(null)
+    setSavedPdf(null)
     setEditing(null)
     setPendingEdit(null)
     setDocumentFile(null)
@@ -1270,7 +1363,6 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
   const bookingPending = Boolean(saved) && saved.booked === false
   const retryWord = uploadsFile ? 'Retry Upload' : 'Retry PDF'
   const saveLabel = {
-    download: saved ? retryWord : saveWord,
     creating: 'Saving...',
     booking: 'Booking inventory...',
     pdf: uploadsFile ? 'Saving...' : 'Generating PDF...',
@@ -1323,7 +1415,7 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
           ) : saved ? (
             <InlineAlert
               action={
-                <Button type="button" variant="outline" size="sm" icon={FilePlus} disabled={busy} onClick={startNew}>
+                <Button type="button" variant="outline" size="sm" icon={FilePlus} disabled={busy} onClick={() => startNew()}>
                   Start new
                 </Button>
               }
@@ -1364,6 +1456,17 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
             </>
           ) : null}
           {step.key === INVOICE_STEP.BUYER ? <BuyerDetails {...stepProps} ledgers={ledgers} countries={countries} /> : null}
+          {/* The ledger party's step (a sale's buyer, a purchase's supplier): its currency, when it is from another country. */}
+          {step.key === (parties.ledger === 'seller' ? INVOICE_STEP.SELLER : INVOICE_STEP.BUYER) && showsDocumentCurrency(currencyEntry) ? (
+            <PartyCurrencyCard
+              {...stepProps}
+              entry={currencyEntry}
+              partyKey={parties.ledger}
+              currency={companyCurrency}
+              // A challan carries goods, not money - saved with a total of 0, so none is converted.
+              totalPaise={isChallanDoc ? 0 : figures.totalPaise}
+            />
+          ) : null}
           {step.key === INVOICE_STEP.DOCUMENT && orders.source ? (
             <OrderProducts orders={orders} partyLabel={parties.ledger === 'buyer' ? 'buyer' : 'supplier'} disabled={locked} />
           ) : null}
@@ -1420,23 +1523,37 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
               <Button type="button" variant="outline" icon={ArrowLeft} disabled={stepIndex === 0 || busy} onClick={() => goTo(stepIndex - 1)}>
                 Previous
               </Button>
-              {/* Leaves the document being edited, unsaved, for a new one. */}
+              {/* Leaves the document being edited, unsaved, for a new one - or, saved here, for the next one. */}
               {editing && !saved ? (
-                <Button type="button" variant="outline" icon={X} disabled={busy} onClick={startNew}>
-                  Cancel Edit
-                </Button>
+                editing.afterSave ? (
+                  <Button type="button" variant="outline" icon={FilePlus} disabled={busy} onClick={() => startNew({ keepPurchasing: true })}>
+                    New Document
+                  </Button>
+                ) : (
+                  <Button type="button" variant="outline" icon={X} disabled={busy} onClick={() => startNew()}>
+                    Cancel Edit
+                  </Button>
+                )
               ) : null}
             </div>
 
-            {lastStep || saved ? (
-              <Button type="button" variant="secondary" icon={saved ? RefreshCw : Save} loading={busy} disabled={Boolean(pendingEdit)} onClick={onSaveClick}>
-                {saveLabel}
-              </Button>
-            ) : (
-              <Button type="button" icon={ArrowRight} loading={phase === 'step'} disabled={busy} onClick={next}>
-                Next
-              </Button>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* The latest saved version's PDF - not while its update's PDF is still to go up. */}
+              {savedPdf && !saved ? (
+                <Button type="button" variant="outline" icon={Download} disabled={busy} onClick={downloadSaved}>
+                  {savedPdf.file && !/\.pdf$/i.test(savedPdf.file.name) ? 'Download File' : 'Download PDF'}
+                </Button>
+              ) : null}
+              {lastStep || saved ? (
+                <Button type="button" variant="secondary" icon={saved ? RefreshCw : Save} loading={busy} disabled={Boolean(pendingEdit)} onClick={onSaveClick}>
+                  {saveLabel}
+                </Button>
+              ) : (
+                <Button type="button" icon={ArrowRight} loading={phase === 'step'} disabled={busy} onClick={next}>
+                  Next
+                </Button>
+              )}
+            </div>
           </div>
         </section>
 
@@ -1449,13 +1566,8 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
             // No PDF from the form for this type: the user's own document, chosen here and uploaded on save.
             <DocumentFileUpload file={documentFile} onChange={setDocumentFile} disabled={busy} />
           ) : (
-            <InvoicePreview
-              model={model}
-              onLayout={keepLayout}
-              onDownload={download}
-              downloading={phase === 'download'}
-              disabled={busy && phase !== 'download'}
-            />
+            // Its PDF is downloaded beside Save, once saved - the preview itself offers no download.
+            <InvoicePreview model={model} onLayout={keepLayout} disabled={busy} />
           )}
         </aside>
       </div>

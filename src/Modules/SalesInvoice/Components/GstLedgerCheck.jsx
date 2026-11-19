@@ -104,7 +104,7 @@ export default function GstLedgerCheck({ check, companyId, companyName, disabled
           <LedgerForm
             key={creating.tax}
             ledger={null}
-            defaults={{ ledeger_name: creating.suggestedName }}
+            defaults={{ ledger_name: creating.suggestedName }}
             companyId={companyId}
             companyName={companyName}
             groups={groups}

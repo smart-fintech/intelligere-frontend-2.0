@@ -174,7 +174,7 @@ const validateSupplierStep = (form, found) => {
   if (!textOf(seller.address)) found['seller.address'] = 'Seller address is required'
   if (!textOf(seller.state)) found['seller.state'] = 'Select the seller state'
   checkContact(found, 'seller', seller)
-  if (!textOf(seller.gstin)) found['seller.gstin'] = 'Seller GSTN is required'
+  // if (!textOf(seller.gstin)) found['seller.gstin'] = 'Seller GSTN is required'
   if (!foreign && textOf(seller.pincode) && !isValidPincode(seller.pincode)) found['seller.pincode'] = 'Enter a valid 6-digit pincode'
 
   if (!form.dispatchSameAsSeller) checkAddressCard(found, 'dispatch', form.dispatch, { indian: !foreign })

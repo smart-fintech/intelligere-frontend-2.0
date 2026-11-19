@@ -25,8 +25,8 @@ export default function useLedgerDirectory(companyId) {
     const found = new Map()
     if (forCompany !== companyId) return found
     ;(Array.isArray(items) ? items : []).forEach((ledger) => {
-      const gstin = text(ledger?.ledeger_gstin).toUpperCase()
-      const name = text(ledger?.ledeger_name)
+      const gstin = text(ledger?.ledger_gstin).toUpperCase()
+      const name = text(ledger?.ledger_name)
       if (!gstin || !name) return
       // A GSTIN on two ledgers names neither - the backend refuses it too.
       found.set(gstin, found.has(gstin) && found.get(gstin) !== name ? '' : name)

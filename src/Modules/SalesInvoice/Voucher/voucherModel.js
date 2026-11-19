@@ -36,6 +36,7 @@
 
 import { isSkuManaged, skuValueOf } from '@/Modules/SalesInvoice/salesInvoiceForm'
 import { getLedgerSac } from '@/Services/Ledger/ledgerService'
+import { fromApiLedger } from '@/Services/Ledger/ledgerFields'
 import { fileUrlOf } from '@/Services/Global/apiHelpers'
 import { OTHER_CHARGES_SOURCE, SERVICE_PRODUCT_TYPE, toDocumentDate } from '@/Services/Invoice/salesInvoiceService'
 import { TALLY_VOUCHER_MODULE } from '@/Services/Invoice/tallyVoucherService'
@@ -222,7 +223,7 @@ const readCharges = (other) => {
  */
 export const readVoucher = (row) => {
   const master = objectOf(row.invoice_master_details)
-  const buyer = objectOf(row.buyer_details)
+  const buyer = fromApiLedger(objectOf(row.buyer_details))
   const other = objectOf(row.other_details)
   const lines = listOf(row.product_data).filter((line) => line && typeof line === 'object').map(readLine)
   return {
@@ -235,10 +236,10 @@ export const readVoucher = (row) => {
     pdfUrl: fileUrlOf(row.doc_pdf ?? row.doc_PDF),
     party: {
       id: textOf(row.buyer_id ?? buyer.ledger_obj_id),
-      name: textOf(row.buyer_name ?? buyer.ledeger_name),
+      name: textOf(row.buyer_name ?? buyer.ledger_name),
     },
     buyerDetails: buyer,
-    sellerDetails: objectOf(row.seller_details),
+    sellerDetails: fromApiLedger(objectOf(row.seller_details)),
     shipTo: objectOf(row.ship_to),
     dispatchFrom: objectOf(row.dispatch_from),
     master,
@@ -355,7 +356,7 @@ export const findLedgerId = (ledgers, { id, name }) => {
   return ledgers.named.find((ledger) => sameText(ledger.name, name))?.id ?? ''
 }
 
-const ledgerNameOf = (ledgers, id) => textOf(ledgers.byId.get(textOf(id))?.ledeger_name)
+const ledgerNameOf = (ledgers, id) => textOf(ledgers.byId.get(textOf(id))?.ledger_name)
 
 /**
  * One ledger slot: the user's choice when there is one (and it is still a
@@ -777,13 +778,13 @@ const firstText = (records, keys) => {
   return null
 }
 
-/** A party's fields, under each name the company record (comp_*), a ledger record (ledeger_*) or a saved address may use. */
+/** A party's fields, under each name the company record (comp_*), a ledger record (ledger_*) or a saved address may use. */
 const PARTY_FIELDS = {
-  name: ['comp_name', 'ledeger_name', 'name'],
-  gstin: ['comp_gstin', 'ledeger_gstin', 'ledger_gstin', 'gstin', 'gst_no'],
-  state: ['comp_state', 'ledeger_state', 'ledger_state', 'state', 'statename'],
-  pincode: ['pincode', 'ledger_pincode', 'ledeger_pincode', 'comp_pincode'],
-  address: ['comp_address', 'ledeger_address', 'ledger_address', 'address'],
+  name: ['comp_name', 'ledger_name', 'name'],
+  gstin: ['comp_gstin', 'ledger_gstin', 'gstin', 'gst_no'],
+  state: ['comp_state', 'ledger_state', 'state', 'statename'],
+  pincode: ['pincode', 'ledger_pincode', 'comp_pincode'],
+  address: ['comp_address', 'ledger_address', 'address'],
 }
 
 const partyOf = (records, name) => ({

@@ -161,18 +161,17 @@ const starsOf = (value) => {
 const TIDY = { contact: cleanPhone, whatsapp: cleanPhone, gst_no: upperCase }
 
 /**
- * Which ledger property fills which vendor field. The ledger's names are the
- * backend's own, misspelling included ("ledeger"). City and country are read
- * under both spellings the ledger endpoints use for them.
+ * Which ledger property fills which vendor field, under the app's ledger
+ * field names (the rows are translated as they arrive - ledgerFields).
  */
 const LEDGER_SOURCES = {
-  email: ['ledeger_email'],
-  contact: ['ledeger_phone'],
-  address: ['ledeger_address'],
-  state: ['ledeger_state'],
-  city: ['ledeger_city', 'ledger_city'],
-  country: ['ledeger_country', 'ledger_country'],
-  gst_no: ['ledeger_gstin'],
+  email: ['ledger_email'],
+  contact: ['ledger_phone'],
+  address: ['ledger_address'],
+  state: ['ledger_state'],
+  city: ['ledger_city'],
+  country: ['ledger_country'],
+  gst_no: ['ledger_gstin'],
 }
 
 /** What a found vendor carries, in the order it is shown - and what Set on Form copies. */
@@ -324,14 +323,14 @@ export default function VendorFormModal({
    * nothing; its name is then shown as the dropdown's placeholder rather
    * than silently disappearing.
    */
-  const selectedLedger = ledgers.find((ledger) => ledger.ledeger_name === form.ledger_name)
+  const selectedLedger = ledgers.find((ledger) => ledger.ledger_name === form.ledger_name)
 
   // Built once per ledger list, not on every keystroke in the form.
   const ledgerOptions = useMemo(
     () =>
       ledgers.map((ledger) => ({
         value: String(getLedgerId(ledger)),
-        label: ledger.ledeger_name,
+        label: ledger.ledger_name,
       })),
     [ledgers],
   )
@@ -341,7 +340,7 @@ export default function VendorFormModal({
     const ledger = ledgers.find((entry) => String(getLedgerId(entry)) === value)
     if (!ledger) return
 
-    fillForm({ ledger_name: textOf(ledger.ledeger_name), ...presentValues(ledger, LEDGER_SOURCES) })
+    fillForm({ ledger_name: textOf(ledger.ledger_name), ...presentValues(ledger, LEDGER_SOURCES) })
   }
 
   const loadingLedgers = ledgersStatus === 'loading' || ledgersStatus === 'idle'
@@ -674,7 +673,8 @@ export default function VendorFormModal({
               checked={findExisting}
               disabled={submitting || searching}
               onCheckedChange={toggleFindExisting}
-              className="h-8 self-end"
+              // className="h-8 self-end"
+            className={cn(COMPACT.className, 'sm:col-span-3')}
             />
           ) : null}
 
@@ -791,7 +791,7 @@ export default function VendorFormModal({
             options={ledgerOptions}
             size="sm"
             // className={cn(COMPACT.className, 'sm:col-span-3')}
-            className={cn(COMPACT.className, 'sm:col-span-3')}
+            // className={cn(COMPACT.className, 'sm:col-span-3')}
           />
 
           {/* ---- Contact | WhatsApp | Email ---- */}

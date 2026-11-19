@@ -102,12 +102,12 @@ const SYNC_TIMEOUT_MS = 5 * 60 * 1000
 const creditPeriod = (days) =>
   days === null || days === undefined || days === '' ? '--' : `${days} days`
 
-/* The group is shown, searched and filtered by `ledeger_group_name`, the
-   name the ledger API sends with every row - never by the `ledeger_group`
+/* The group is shown, searched and filtered by `ledger_group_name`, the
+   name the ledger API sends with every row - never by the `ledger_group`
    number, which means nothing to a user. */
-const SEARCH_FIELDS = ['ledeger_name', 'ledeger_email', 'ledeger_phone','ledeger_gstin']
+const SEARCH_FIELDS = ['ledger_name', 'ledger_email', 'ledger_phone','ledger_gstin']
 const FILTER_FIELDS = {
-  ledeger_group_name: 'Group',
+  ledger_group_name: 'Group',
   // ledger_gst_reg_type: 'GST Type',
 }
 
@@ -491,10 +491,10 @@ export default function LedgerDetails() {
           <DataTable
             head={
               <>
-                <SortableHead view={view} field="ledeger_name" width={200}>
+                <SortableHead view={view} field="ledger_name" width={200}>
                   Ledger Name
                 </SortableHead>
-                <SortableHead view={view} field="ledeger_gstin" width={170}>
+                <SortableHead view={view} field="ledger_gstin" width={170}>
                   GSTIN
                 </SortableHead>
                 <SortableHead view={view} field="ledger_sac" width={140}>
@@ -503,10 +503,10 @@ export default function LedgerDetails() {
                 <SortableHead view={view} field="gst_rate" width={140}>
                   GST Rate
                 </SortableHead>
-                <SortableHead view={view} field="ledeger_group_name" width={170}>
+                <SortableHead view={view} field="ledger_group_name" width={170}>
                   Group
                 </SortableHead>
-                <SortableHead view={view} field="ledeger_state" width={150}>
+                <SortableHead view={view} field="ledger_state" width={150}>
                   State
                 </SortableHead>
                 <SortableHead view={view} field="credit_period_days" width={120}>
@@ -528,21 +528,21 @@ export default function LedgerDetails() {
                 data-state={editingId === getLedgerId(ledger) ? 'selected' : undefined}
               >
                 <TableCell className="font-medium">
-                  {orDash(ledger.ledeger_name)}
+                  {orDash(ledger.ledger_name)}
                 </TableCell>
                 {/* The group's NAME, as the API sends it - not its number. */}
-                <TableCell>{orDash(ledger.ledeger_gstin)}</TableCell>
+                <TableCell>{orDash(ledger.ledger_gstin)}</TableCell>
                 <TableCell>{orDash(ledger.ledger_sac)}</TableCell>
                 <TableCell>{orDash(ledger.gst_rate)}</TableCell>
-                <TableCell>{orDash(ledger.ledeger_group_name)}</TableCell>
-                <TableCell>{orDash(ledger.ledeger_state)}</TableCell>
+                <TableCell>{orDash(ledger.ledger_group_name)}</TableCell>
+                <TableCell>{orDash(ledger.ledger_state)}</TableCell>
                 <TableCell>{creditPeriod(ledger.credit_period_days)}</TableCell>
                 {rowActions ? (
                   <TableCell className="text-right">
                     {/* Nothing is deleted on the click itself - the popover
                         beside the button asks first. */}
                     <RowActions
-                      label={ledger.ledeger_name}
+                      label={ledger.ledger_name}
                       onEdit={access.edit ? () => setEditing(ledger) : undefined}
                       deleteConfirm={
                         access.delete
@@ -552,7 +552,7 @@ export default function LedgerDetails() {
                               title: 'Delete Ledger?',
                               description: (
                                 <>
-                                  Are you sure you want to delete the ledger <strong>{ledger.ledeger_name}</strong> ?
+                                  Are you sure you want to delete the ledger <strong>{ledger.ledger_name}</strong> ?
                                   This cannot be undone.
                                 </>
                               ),

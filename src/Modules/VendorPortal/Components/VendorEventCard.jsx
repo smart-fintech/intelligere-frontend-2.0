@@ -6,16 +6,12 @@ import { Button } from '@/Components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table'
 import { EVENT_KIND, EVENT_KINDS, EVENT_STAGE } from '@/Constants/procurementAutomation'
 import { cn } from '@/Library/utils'
+import BidAmount from '@/Modules/Procurement/Components/BidAmount'
 import { Countdown, Windows } from '@/Modules/Procurement/Components/EventCard'
 import { CancelledWatermark, EventStatusBadge } from '@/Modules/Procurement/Components/EventSummary'
-import {
-  CertificationBlock,
-  DocumentBlock,
-  FaqBlock,
-  NoteBlock,
-  TechnicalBlock,
-} from '@/Modules/Procurement/Components/TechnicalBid'
-import { bidGapLabel, fileName, readTechnicalDetails, showAmount, skuDetailList } from '@/Modules/Procurement/procurement'
+import { PreBidDetails, TechnicalBlock } from '@/Modules/Procurement/Components/TechnicalBid'
+import { bidGapLabel, fileName, showAmount, skuDetailList } from '@/Modules/Procurement/procurement'
+import { bidCurrencyOf } from '@/Modules/Procurement/vendorCurrency'
 import BidPanel from '@/Modules/VendorPortal/Components/BidPanel'
 import { canBid, canChat, myEntry } from '@/Modules/VendorPortal/vendorPortal'
 import { orDash } from '@/Utils/display'
@@ -27,17 +23,31 @@ import { orDash } from '@/Utils/display'
  *
  *   Bid       each product with its lowest bid (unless the company hides the
  *             amounts), the vendor's own bid, position and delivery days; its
- *             arrow opens the vendor's history and, while it runs, the bid form
- *   Pre Bid   the products, the technical bid (certifications, FAQ, note), the
- *             files, and the chat with the company
+ *             arrow opens the vendor's history and, while it runs, the bid form.
+ *             A vendor with a currency on this auction sees each amount in its
+ *             currency first, the company-currency amount under it (BidAmount);
+ *             the position is the backend's bid_rank, as it is sent
+ *   Pre Bid   the products, the technical bid under them (certifications, FAQ,
+ *             meeting, note), the files, and the chat with the company
  */
 
 const productKey = (product, index) => String(product.sr_no ?? index)
 
-function Terms({ event }) {
+/** This vendor's currency on this auction - the same on all its entries (the company form writes it so). */
+const eventCurrencyOf = (event, email) => {
+  for (const product of event.product) {
+    const currency = bidCurrencyOf(myEntry(product, email))
+    if (currency) return currency
+  }
+  return null
+}
+
+function Terms({ event, email }) {
+  const currency = event.kind === EVENT_KIND.BID ? eventCurrencyOf(event, email) : null
+  const own = (value) => (currency ? <BidAmount value={value} currency={currency} lead="own" /> : showAmount(value))
   const items = [
-    ['Starting Amount', showAmount(event.starting_bid_amount)],
-    ['Bid Gap', bidGapLabel(event)],
+    ['Starting Amount', own(event.starting_bid_amount)],
+    ['Bid Gap', currency && !event.bid_gap_percentage && Number(event.gap) > 0 ? own(event.gap) : bidGapLabel(event)],
     ['Extra Time', event.add_extra_time ? `${orDash(event.extra_time)} min` : 'No'],
   ]
   return (
@@ -123,6 +133,7 @@ function BidProducts({ event, email, onPlaced }) {
           const mine = myEntry(product, email)
           const isOpen = opened === key
           const leading = mine?.bid_rank === 'L1'
+          const currency = bidCurrencyOf(mine)
           return (
             <Fragment key={key}>
               <TableRow>
@@ -133,8 +144,12 @@ function BidProducts({ event, email, onPlaced }) {
                 <TableCell className="tabular-nums">
                   {orDash(product.qty)} {product.Per ?? ''}
                 </TableCell>
-                <TableCell className="tabular-nums">{amountsShown ? showAmount(product.last_bid) : 'Hidden'}</TableCell>
-                <TableCell className="font-semibold tabular-nums">{showAmount(mine?.last_vender_bid)}</TableCell>
+                <TableCell className="tabular-nums">
+                  {amountsShown ? <BidAmount value={product.last_bid} currency={currency} lead="own" /> : 'Hidden'}
+                </TableCell>
+                <TableCell className="font-semibold tabular-nums">
+                  <BidAmount value={mine?.last_vender_bid} currency={currency} lead="own" />
+                </TableCell>
                 <TableCell>
                   {mine?.bid_rank ? (
                     <span
@@ -227,36 +242,26 @@ function PreBidProducts({ event }) {
 }
 
 /**
- * A Pre Bid as the vendor works through it. On a wide screen the products and
- * the FAQs take the left, and what the vendor must bring - the required
- * certifications, the buyer's documents and note - the right; on a narrow one
- * they stack in that order: products, requirements, then the FAQs.
+ * A Pre Bid as the vendor works through it: the products, then under them the
+ * pre bid's details in PreBidDetails' order - required certifications, FAQs,
+ * meeting details, notes - and the buyer's documents last.
  */
 function PreBidBody({ event }) {
-  const details = readTechnicalDetails(event)
-  const hasSide = details.certifications.length > 0 || details.hasNote || event.file.length > 0
-
   return (
-    <div className={cn('grid gap-3', hasSide && 'lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:grid-rows-[auto_1fr]')}>
-      <TechnicalBlock icon={Package} title="Products" count={event.product.length} bodyClassName="p-0" className="overflow-hidden lg:col-start-1">
+    <div className="grid gap-3">
+      <TechnicalBlock icon={Package} title="Products" count={event.product.length} bodyClassName="p-0" className="overflow-hidden">
         <PreBidProducts event={event} />
       </TechnicalBlock>
 
-      {hasSide ? (
-        <div className="min-w-0 space-y-3 lg:col-start-2 lg:row-span-2 lg:row-start-1">
-          {details.certifications.length > 0 ? <CertificationBlock names={details.certifications} /> : null}
-          {event.file.length > 0 ? <DocumentBlock urls={event.file} /> : null}
-          {details.hasNote ? <NoteBlock html={details.note} /> : null}
-        </div>
-      ) : null}
-
-      {details.faqs.length > 0 ? <FaqBlock faqs={details.faqs} className="lg:col-start-1 lg:self-start" /> : null}
-
-      {details.isEmpty ? (
-        <p className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground lg:col-start-1">
-          The buyer has not added certifications, FAQs or a note to this pre bid.
-        </p>
-      ) : null}
+      <PreBidDetails
+        event={event}
+        documents
+        empty={
+          <p className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+            The buyer has not added certifications, FAQs, a meeting or a note to this pre bid.
+          </p>
+        }
+      />
     </div>
   )
 }
@@ -286,7 +291,7 @@ export default function VendorEventCard({ event, email, onPlaced, onChat, onExpi
       </header>
 
       <div className="space-y-3 p-3 sm:p-4">
-        <Terms event={event} />
+        <Terms event={event} email={email} />
         {preBid ? (
           <PreBidBody event={event} />
         ) : (

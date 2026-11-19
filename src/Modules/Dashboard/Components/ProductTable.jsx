@@ -116,7 +116,7 @@ import { filterProducts, PRODUCT_FILTER, productFilterOptions, readProducts } fr
 import ProductDetailsModal from './ProductDetailsModal'
 import ProductVariantRows from './ProductVariantRows'
 
-const SEARCH_FIELDS = ['name']
+const SEARCH_FIELDS = ['name','hsn']
 
 /** The seven columns of data, and the Actions column: the cells an opened row spans. */
 const COLUMN_COUNT = 9
@@ -327,7 +327,7 @@ const ProductRow = memo(function ProductRow({
         <TableCell>{orDash(product.hsn)}</TableCell>
         <TableCell title={product.group || undefined}>{orDash(product.group)}</TableCell>
         <TableCell>{orDash(product.unit)}</TableCell>
-         <TableCell>{orDash(product.category)}</TableCell> 
+         {/* <TableCell>{orDash(product.category)}</TableCell>  */}
         <TableCell>{orDash(product.quantity)}</TableCell>
         {withCategoryAndAmount ? <TableCell>{orDash(product.totalAmount)}</TableCell> : null}
         <TableCell>{orDash(product.gstRate)}</TableCell>
@@ -572,7 +572,7 @@ export default function ProductTable({
     <>
       <TableFilters
         view={filterView}
-        searchPlaceholder="Search product name"
+        searchPlaceholder="Product name & HSN code"
         moreFilters={moreFilters}
         moreLayout="panel"
         moreTitle="SKU Details"
@@ -603,9 +603,9 @@ export default function ProductTable({
               <SortableHead view={view} field="unit" width={90}>
                 Unit
               </SortableHead>
-                <SortableHead view={view} field="category" width={130}>
+                {/* <SortableHead view={view} field="category" width={130}>
                   Category
-                </SortableHead>
+                </SortableHead> */}
               <SortableHead view={view} field="quantity">
                 Quantity
               </SortableHead>

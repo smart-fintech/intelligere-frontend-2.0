@@ -7,7 +7,7 @@ import { Panel } from '@/Components/Common/Panel'
 import { ViewSwitch } from '@/Components/Common/ViewSwitch'
 import { Button } from '@/Components/ui/button'
 import { EVENT_KIND, EVENT_KINDS, EVENT_STAGE, EVENT_STAGES } from '@/Constants/procurementAutomation'
-import { useQuery } from '@/Library/queryCache'
+import { updateQueryData, useQuery } from '@/Library/queryCache'
 import { toast } from '@/Library/toast'
 import AuctionBidLive from '@/Modules/Procurement/Components/AuctionBidLive'
 import CreateBlockedModal from '@/Modules/Procurement/Components/CreateBlockedModal'
@@ -15,13 +15,20 @@ import EventDetailsModal from '@/Modules/Procurement/Components/EventDetailsModa
 import EventFormModal from '@/Modules/Procurement/Components/EventFormModal'
 import EventList from '@/Modules/Procurement/Components/EventList'
 import PreBidChatModal from '@/Modules/Procurement/Components/PreBidChatModal'
-import { creationBlocker, eventsKey, readEvents, refreshEvents } from '@/Modules/Procurement/procurement'
+import {
+  creationBlocker,
+  eventsKey,
+  markCertificateVerified,
+  readEvents,
+  refreshEvents,
+} from '@/Modules/Procurement/procurement'
 import useProductOptions, { useCompanyVendors } from '@/Modules/Procurement/useProductOptions'
 import { cancelEvent, getEvents } from '@/Services/Procurement/procurementAutomationService'
 
 /**
  * The module's screen: Bids or Pre Bids, by stage, and everything done to one
- * of them - view, create, edit, cancel, and a Pre Bid's chat.
+ * of them - view, create, edit, cancel, a Pre Bid's chat, and the Bid created
+ * from a Pre Bid whose technical bid has closed (Create Bid).
  *
  * What is open (details, form, chat, cancel) is held by id, and the event is
  * looked up in the latest list each render - so a list read again while it is
@@ -39,7 +46,7 @@ const KIND_OPTIONS = [
 export default function ProcurementScreen({ companyId, companyName }) {
   const [kind, setKind] = useState(EVENT_KIND.BID)
   const [stage, setStage] = useState(EVENT_STAGE.ONGOING)
-  // { mode: 'view' | 'edit' | 'chat' | 'cancel', id } or { mode: 'create' }
+  // { mode: 'view' | 'edit' | 'chat' | 'cancel' | 'createBid', id } or { mode: 'create' }
   const [open, setOpen] = useState(null)
   const [cancelling, setCancelling] = useState(false)
 
@@ -133,6 +140,14 @@ export default function ProcurementScreen({ companyId, companyName }) {
           onChat={(event) => setOpen({ mode: 'chat', id: event.id })}
           onCancel={(event) => setOpen({ mode: 'cancel', id: event.id })}
           onExpire={list.reload}
+          onCreateBid={(event) => setOpen({ mode: 'createBid', id: event.id })}
+          onCertificateVerified={(event, vendor, certificateName) => {
+            // The list on screen takes the new status at once; if it cannot (no such certificate in it), it is read again.
+            const marked = updateQueryData(listKey, (data) =>
+              markCertificateVerified(data, { eventId: event.id, vendorEmail: vendor.email, certificateName }),
+            )
+            if (!marked) list.reload()
+          }}
         />
       </>
     )
@@ -188,6 +203,18 @@ export default function ProcurementScreen({ companyId, companyName }) {
           key={current.id}
           kind={kind}
           event={current}
+          companyId={companyId}
+          companyName={companyName}
+          onClose={close}
+        />
+      ) : null}
+
+      {open?.mode === 'createBid' && current ? (
+        // A Pre Bid's Financial Bid: the Add Bid form and save, prefilled from it.
+        <EventFormModal
+          key={`bid-from-${current.id}`}
+          kind={EVENT_KIND.BID}
+          fromPreBid={current}
           companyId={companyId}
           companyName={companyName}
           onClose={close}

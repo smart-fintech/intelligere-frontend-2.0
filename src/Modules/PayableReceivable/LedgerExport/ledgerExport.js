@@ -58,7 +58,7 @@ const NO_GROUP = 'Other Ledgers'
 /** The ledger store's rows -> [{ name, ledgers: [names] }], both sorted. A row with no name is left out. */
 export const groupLedgers = (rows) => {
   const groups = new Map()
-  rows.forEach(({ ledeger_name: name, ledeger_group_name: group }) => {
+  rows.forEach(({ ledger_name: name, ledger_group_name: group }) => {
     if (!name) return
     const key = group || NO_GROUP
     groups.set(key, [...(groups.get(key) ?? []), name])

@@ -1,5 +1,6 @@
 import {
   amountInWords,
+  currencyLine,
   dispatchLines,
   formatAmount,
   has,
@@ -310,6 +311,7 @@ function WordsBlock({ model }) {
         <span>E.&amp;O.E</span>
       </div>
       <div className="val">{amountInWords(model.totals.grandTotal)}</div>
+      {model.currency ? <div className="cur">{currencyLine(model.currency)}</div> : null}
     </div>
   )
 }

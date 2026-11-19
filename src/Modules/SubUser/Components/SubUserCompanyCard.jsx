@@ -60,6 +60,7 @@ import { Button } from '@/Components/ui/button'
 import { Checkbox } from '@/Components/ui/checkbox'
 import { Label } from '@/Components/ui/label'
 import useCompanyRoles from '@/Hooks/useCompanyRoles'
+import useModuleVisibility from '@/Hooks/useModuleVisibility'
 import useWarehouseOptions from '@/Hooks/useWarehouseOptions'
 import {
   canAssignRole,
@@ -155,7 +156,14 @@ export default function SubUserCompanyCard({
 
   const roles = useCompanyRoles(withRole ? companyId : null)
   const warehouses = useWarehouseOptions(Boolean(companyId), companyId)
-  const modules = getCompanyModules(company)
+  // A module the signed-in user's type is denied is not theirs to hand out,
+  // whatever the company's own list says (useModuleVisibility).
+  const { isNameHidden } = useModuleVisibility()
+  const companyModules = getCompanyModules(company)
+  const modules = {
+    active: companyModules.active.filter((name) => !isNameHidden(name)),
+    premium: companyModules.premium.filter((name) => !isNameHidden(name)),
+  }
 
   // Each role name once; the one already chosen is kept even if the company
   // no longer has it, so the select can still show it.

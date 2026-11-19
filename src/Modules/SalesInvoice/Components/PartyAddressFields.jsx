@@ -48,7 +48,7 @@ export default function PartyAddressFields({ prefix, value, locked, required, er
 
         <Field
           id={id('gstin')}
-          required={needs('gstin')}
+          // required={needs('gstin')}
           label="GSTN"
           maxLength={15}
           inputClassName="uppercase"

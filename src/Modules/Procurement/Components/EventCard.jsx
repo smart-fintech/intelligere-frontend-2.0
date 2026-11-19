@@ -1,25 +1,42 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { Ban, ChevronDown, Eye, EyeOff, MessagesSquare, Pencil } from 'lucide-react'
+import { Ban, ChevronDown, Eye, EyeOff, FilePlus2, MessagesSquare, Pencil } from 'lucide-react'
 
 import { SkuDetailsTooltip } from '@/Components/Common/SkuDetailsTooltip'
 import { Button } from '@/Components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table'
+import { Tooltip } from '@/Components/ui/tooltip'
 import { EVENT_KIND, EVENT_STAGE } from '@/Constants/procurementAutomation'
 import { cn } from '@/Library/utils'
 import { CancelledWatermark, EventStatusBadge } from '@/Modules/Procurement/Components/EventSummary'
 import ProductVendors from '@/Modules/Procurement/Components/ProductVendors'
+import { PreBidDetails } from '@/Modules/Procurement/Components/TechnicalBid'
 import VendorProfileModal from '@/Modules/Procurement/Components/VendorProfileModal'
-import { amountsHidden, isEditable, showAmount, skuDetailList, vendorBidsHidden } from '@/Modules/Procurement/procurement'
+import {
+  amountsHidden,
+  canCreateBidFrom,
+  financialStartOf,
+  isEditable,
+  showAmount,
+  showWhen,
+  skuDetailList,
+  vendorBidsHidden,
+} from '@/Modules/Procurement/procurement'
+import useCompanyCurrency from '@/Modules/Procurement/useCompanyCurrency'
+import { bidCurrencyOf, moneyIn } from '@/Modules/Procurement/vendorCurrency'
 import { orDash } from '@/Utils/display'
 
 /**
  * One Bid or Pre Bid as a card: its number at the top left, its window(s) at the
  * top right, its products in a short table. A product's arrow opens the vendors
  * invited for it (ProductVendors) under its row; "Show All Vendors" opens or
- * closes every product's at once.
+ * closes every product's at once. A Pre Bid's details (certifications, FAQs,
+ * meeting, notes - PreBidDetails) follow its products.
  *
  * The buttons are only those that can work for it: Edit and Cancel until it has
- * closed or been cancelled; Chat on a Pre Bid once its vendors have been invited.
+ * closed or been cancelled; Chat on a Pre Bid once its vendors have been invited;
+ * Create Bid on a Pre Bid whose technical bid has closed (disabled once its
+ * Financial Bid Start has passed). A running event counts down to its close, an
+ * upcoming one to its start; either reads the list again as it reaches zero.
  */
 
 const DANGER_MS = 30 * 60 * 1000
@@ -35,13 +52,31 @@ const showLeft = (ms) => {
   return days > 0 ? `${days}d ${clock}` : clock
 }
 
+/** After the reload at 00:00:00, how long until the one follow-up - the backend moves the event on at that same minute. */
+const FOLLOW_UP_MS = 5 * 1000
+
 /**
- * Time left until `until`. When it runs out `onExpire` is called once - the
- * list is read again, so the event moves on to Completed.
+ * Time left until `until`. When it reaches 00:00:00 `onExpire` is called once -
+ * the list is read again, so the event moves on (Upcoming to Ongoing, Ongoing
+ * to Completed). The backend moves it at that same minute, so the first read
+ * may still find it where it was: if this timer is still on screen
+ * FOLLOW_UP_MS later (the event has not moved, or the card would be gone) it is
+ * read once more, and that is all. A new `until` (extra time moved the close)
+ * arms it again.
+ *
+ *   label    the caption above the time ("Time Remaining", "Starts In")
+ *   urgent   false: never turns red in its last 30 minutes (a countdown to a start)
  */
-export function Countdown({ until, onExpire }) {
+export function Countdown({ until, onExpire, label = 'Time Remaining', urgent = true }) {
   const [now, setNow] = useState(() => Date.now())
-  const fired = useRef(false)
+  // The `until` the list was last read for, so each close time is read for once (twice in Strict Mode otherwise).
+  const firedFor = useRef(null)
+  // The latest handler, so a new function from the parent neither fires it again nor drops the follow-up.
+  const expire = useRef(onExpire)
+
+  useEffect(() => {
+    expire.current = onExpire
+  })
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)
@@ -52,26 +87,77 @@ export function Countdown({ until, onExpire }) {
   const over = until > 0 && left === 0
 
   useEffect(() => {
-    if (over && !fired.current) {
-      fired.current = true
-      onExpire?.()
+    if (!over) return undefined
+    if (firedFor.current !== until) {
+      firedFor.current = until
+      expire.current?.()
     }
-  }, [over, onExpire])
+    const followUp = setTimeout(() => expire.current?.(), FOLLOW_UP_MS)
+    return () => clearTimeout(followUp)
+  }, [over, until])
 
   if (!until) return null
   return (
     <div className="flex flex-col items-center text-center">
-      <span className="text-[11px] font-medium tracking-wide text-brand-muted uppercase">Time Remaining</span>
+      <span className="text-[11px] font-medium tracking-wide text-brand-muted uppercase">{label}</span>
       <span
         role="timer"
         className={cn(
           'mt-0.5 text-2xl leading-none font-bold tabular-nums sm:text-3xl',
-          left <= DANGER_MS ? 'text-destructive' : 'text-brand',
+          urgent && left <= DANGER_MS ? 'text-destructive' : 'text-brand',
         )}
       >
         {showLeft(left)}
       </span>
     </div>
+  )
+}
+
+// The longest a browser timer can wait (about 24.8 days); a later moment is waited for in steps.
+const MAX_TIMER_MS = 2 ** 31 - 1
+
+/** Whether the moment `at` (a timestamp, or null for none) has come - it turns true at that moment, with no reload. */
+function useMomentPassed(at) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (at === null || at <= now) return undefined
+    const timer = setTimeout(() => setNow(Date.now()), Math.min(at - now + 50, MAX_TIMER_MS))
+    return () => clearTimeout(timer)
+  }, [at, now])
+  return at !== null && at <= now
+}
+
+/**
+ * Create Bid on a Pre Bid whose technical bid has closed. Once its Financial
+ * Bid Start has passed it is disabled, and says why (a disabled button gets no
+ * pointer events, so the hint is on a focusable wrapper).
+ */
+function CreateBidButton({ event, onCreateBid }) {
+  const start = financialStartOf(event)
+  const passed = useMomentPassed(start)
+  const button = (
+    <Button
+      type="button"
+      size="sm"
+      icon={FilePlus2}
+      disabled={passed}
+      aria-describedby={passed ? `create-bid-${event.id}-why` : undefined}
+      onClick={() => onCreateBid(event)}
+    >
+      Create Bid
+    </Button>
+  )
+  if (!passed) return button
+  const why = `The Financial Bid Start (${showWhen(event.starting_date, event.starting_time)}) has passed.`
+  return (
+    <Tooltip text={why}>
+      <span tabIndex={0} className="inline-flex rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
+        {button}
+        <span id={`create-bid-${event.id}-why`} className="sr-only">
+          {why}
+        </span>
+      </span>
+    </Tooltip>
   )
 }
 
@@ -134,10 +220,16 @@ function VendorsHidden() {
  * The products, one row each; the arrow in a row's Action column opens its
  * vendors in a row under it (`opened` holds the open rows' keys).
  */
-function ProductTable({ event, opened, onToggle, onProfile }) {
+function ProductTable({ event, opened, onToggle, onProfile, onCertificateVerified }) {
   const showLowest = event.kind === EVENT_KIND.BID && event.stage !== EVENT_STAGE.UPCOMING
   const hidden = amountsHidden(event)
   const columns = 8 + (showLowest ? 1 : 0)
+  // The lowest bid is in the company's currency (foreign bids are converted as they are placed);
+  // its own sign is looked up only when a vendor of this bid bids in another currency.
+  const hasForeign =
+    showLowest && event.product.some((product) => Array.isArray(product.vendor) && product.vendor.some(bidCurrencyOf))
+  const { base } = useCompanyCurrency({ load: hasForeign })
+  const lowestOf = (value) => (hasForeign && base ? moneyIn(value, base.code) : showAmount(value))
 
   return (
     <Table containerClassName="rounded-md border border-border">
@@ -191,7 +283,7 @@ function ProductTable({ event, opened, onToggle, onProfile }) {
                 <TableCell className="align-top tabular-nums">{orDash(product.delivery_days)}</TableCell>
                 {showLowest ? (
                   <TableCell className="align-top font-semibold text-emerald-700 tabular-nums dark:text-emerald-400">
-                    {hidden ? 'Hidden' : showAmount(product.last_bid)}
+                    {hidden ? 'Hidden' : lowestOf(product.last_bid)}
                   </TableCell>
                 ) : null}
                 <TableCell className="align-top tabular-nums">{Array.isArray(product.vendor) ? product.vendor.length : 0}</TableCell>
@@ -215,7 +307,12 @@ function ProductTable({ event, opened, onToggle, onProfile }) {
                     {vendorBidsHidden(event) ? (
                       <VendorsHidden />
                     ) : (
-                      <ProductVendors event={event} product={product} onProfile={onProfile} />
+                      <ProductVendors
+                        event={event}
+                        product={product}
+                        onProfile={onProfile}
+                        onCertificateVerified={onCertificateVerified}
+                      />
                     )}
                   </TableCell>
                 </TableRow>
@@ -228,13 +325,23 @@ function ProductTable({ event, opened, onToggle, onProfile }) {
   )
 }
 
-export default function EventCard({ event, onView, onEdit, onCancel, onChat, onExpire }) {
+export default function EventCard({
+  event,
+  onView,
+  onEdit,
+  onCancel,
+  onChat,
+  onExpire,
+  onCertificateVerified,
+  onCreateBid,
+}) {
   const [opened, setOpened] = useState(() => new Set())
   const [profileOf, setProfileOf] = useState(null)
 
   const preBid = event.kind === EVENT_KIND.PRE_BID
   const label = preBid ? 'Pre Bid' : 'Bid'
   const running = event.stage === EVENT_STAGE.ONGOING && !event.cancelled
+  const upcoming = event.stage === EVENT_STAGE.UPCOMING && !event.cancelled
   const canChat = preBid && event.stage !== EVENT_STAGE.UPCOMING
   const editable = isEditable(event)
   // For the "Show All Vendors" button below, commented out with it - uncomment both together.
@@ -263,7 +370,14 @@ export default function EventCard({ event, onView, onEdit, onCancel, onChat, onE
             <EventStatusBadge event={event} />
           </div>
         </div>
-        {running ? <Countdown until={event.closes_at} onExpire={onExpire} /> : <div aria-hidden="true" className="hidden sm:block" />}
+        {running ? (
+          <Countdown until={event.closes_at} onExpire={onExpire} />
+        ) : upcoming && event.opens_at > 0 ? (
+          // Counts down to the start, so the list is read again as it opens.
+          <Countdown until={event.opens_at} onExpire={onExpire} label="Starts In" urgent={false} />
+        ) : (
+          <div aria-hidden="true" className="hidden sm:block" />
+        )}
         <div className="sm:justify-self-end">
           <Windows event={event} />
         </div>
@@ -274,15 +388,22 @@ export default function EventCard({ event, onView, onEdit, onCancel, onChat, onE
           <p className="text-sm text-muted-foreground">No product.</p>
         ) : (
           <>
-            <ProductTable event={event} opened={opened} onToggle={toggle} onProfile={setProfileOf} />
+            <ProductTable
+              event={event}
+              opened={opened}
+              onToggle={toggle}
+              onProfile={setProfileOf}
+              onCertificateVerified={(vendor, certificateName) => onCertificateVerified?.(event, vendor, certificateName)}
+            />
             {/* <div>
                <Button type="button" variant="link" size="sm" className="h-7 px-0" aria-expanded={allOpen} onClick={toggleAll}>
                 {allOpen ? 'Hide All Vendors' : `Show All Vendors (${event.vendor_count})`}
                 <ChevronDown className={cn('size-3.5 transition-transform', allOpen && 'rotate-180')} />
-              </Button> 
+              </Button>
             </div> */}
           </>
         )}
+        {preBid ? <PreBidDetails event={event} className="pt-0.5" /> : null}
       </div>
 
       <footer className="flex flex-wrap justify-end gap-2 border-t border-border bg-muted/40 px-3 py-2 sm:px-4">
@@ -294,6 +415,7 @@ export default function EventCard({ event, onView, onEdit, onCancel, onChat, onE
             Chat
           </Button>
         ) : null}
+        {onCreateBid && canCreateBidFrom(event) ? <CreateBidButton event={event} onCreateBid={onCreateBid} /> : null}
         {editable ? (
           <>
             <Button type="button" variant="outline" size="sm" icon={Pencil} onClick={() => onEdit(event)}>

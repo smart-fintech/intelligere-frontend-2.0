@@ -1,17 +1,21 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { AlertCircle, Info, Paperclip, Save, Upload, X } from 'lucide-react'
 
 import { CheckboxField, Field, FieldLabel, fieldLabelClass } from '@/Components/Common/FormFields'
 import { formatBytes } from '@/Components/Common/Loader/helpers'
 import { Modal } from '@/Components/Common/Modal'
+import { TimePicker } from '@/Components/Common/TimePicker'
 import { Button } from '@/Components/ui/button'
 import { Tooltip } from '@/Components/ui/tooltip'
 import { EVENT_KIND, EVENT_KINDS } from '@/Constants/procurementAutomation'
+import { shiftInputDate } from '@/Library/timeOfDay'
 import { toast } from '@/Library/toast'
 import { cn } from '@/Library/utils'
+import PreBidVendorChecklist from '@/Modules/Procurement/Components/PreBidVendorChecklist'
 import ProductPicker from '@/Modules/Procurement/Components/ProductPicker'
 import ProductRows from '@/Modules/Procurement/Components/ProductRows'
 import TechnicalBidFields from '@/Modules/Procurement/Components/TechnicalBidFields'
+import VendorCurrencyFields from '@/Modules/Procurement/Components/VendorCurrencyFields'
 import {
   buildCreateBody,
   buildTechnicalBid,
@@ -21,19 +25,36 @@ import {
   fileName,
   isRowErrorKey,
   isTechnicalErrorKey,
+  isVendorChosen,
   masterFromEvent,
+  masterFromPreBid,
   newProductRow,
   nextSrNo,
+  preBidVendorChoices,
   readTechnicalBid,
   recheckErrors,
   refreshEvents,
   rowErrors,
   rowsFromEvent,
+  rowsFromPreBid,
+  SELECTED_VENDORS_ERROR,
+  selectedVendorsError,
   serverFieldErrors,
   technicalBidErrors,
+  TIME_STEP_MINUTES,
   validateMaster,
+  vendorReminderError,
 } from '@/Modules/Procurement/procurement'
+import useCompanyCurrency from '@/Modules/Procurement/useCompanyCurrency'
 import useProductOptions, { useCompanyVendors } from '@/Modules/Procurement/useProductOptions'
+import {
+  currencyErrors,
+  currencyVendors,
+  isCurrencyErrorKey,
+  listedVendors,
+  pendingVendors,
+  withVendorCurrencies,
+} from '@/Modules/Procurement/vendorCurrency'
 import { createEvent, updateEvent } from '@/Services/Procurement/procurementAutomationService'
 
 /**
@@ -44,6 +65,20 @@ import { createEvent, updateEvent } from '@/Services/Procurement/procurementAuto
  *            product list (and a Pre Bid's technical bid) only, so the master
  *            details and files are shown read only and never sent. Saved
  *            products stay as they are; products and vendors can be added.
+ *
+ *   create a Bid from a Pre Bid (`fromPreBid`, Create Bid)
+ *            the Add Bid form, prefilled from the Pre Bid - its number, its
+ *            financial window as the Bid's, its options, products and vendors
+ *            - with a tick box per vendor (PreBidVendorChecklist): only the
+ *            ticked ones are saved, and at least one must be. Saved as any
+ *            new Bid. The Pre Bid's files are not copied (the API takes new
+ *            uploads only), nor its technical bid (a Bid has none).
+ *
+ * A vendor from another country than the company's gets a currency and its
+ * conversion rate for THIS event (Vendor Currency, see vendorCurrency), written
+ * on its entries as the products are saved - on a create and on an edit alike,
+ * where a saved pair can be changed. Nothing is saved while a vendor's country
+ * still needs the country list.
  *
  * Nothing is sent until every check here passes. Each error is shown on its own
  * field (one flat map, see rowErrorKey) and nothing moves the view: the footer
@@ -72,9 +107,14 @@ function Section({ title, aside, children }) {
   )
 }
 
-/** One end of a window under one label: a date box and a time box, each only as wide as its value. */
+/**
+ * One end of a window under one label: a date box and a time picker. The time
+ * goes in 15-minute steps (TIME_STEP_MINUTES); the picker rounds a value up,
+ * never down, and past 23:45 the date moves on a day with it.
+ */
 function WhenField({ name, label, master, errors, min, disabled, onField }) {
   const dateId = `procurement-${name}-date`
+  const dateField = `${name}_date`
   return (
     <div className="space-y-1.5">
       <FieldLabel htmlFor={dateId} required>
@@ -87,22 +127,25 @@ function WhenField({ name, label, master, errors, min, disabled, onField }) {
           aria-label={`${label} date`}
           required
           min={min}
-          value={master[`${name}_date`]}
-          error={errors[`${name}_date`]}
+          value={master[dateField]}
+          error={errors[dateField]}
           disabled={disabled}
-          onChange={(event) => onField(`${name}_date`, event.target.value)}
+          onChange={(event) => onField(dateField, event.target.value)}
           className="w-38"
         />
-        <Field
+        <TimePicker
           id={`procurement-${name}-time`}
-          type="time"
           aria-label={`${label} time`}
+          step={TIME_STEP_MINUTES}
           required
           value={master[`${name}_time`]}
           error={errors[`${name}_time`]}
           disabled={disabled}
-          onChange={(event) => onField(`${name}_time`, event.target.value)}
-          className="w-30"
+          onChange={(time, { dayShift }) => {
+            onField(`${name}_time`, time)
+            if (dayShift && master[dateField]) onField(dateField, shiftInputDate(master[dateField], dayShift))
+          }}
+          className="w-34"
         />
       </div>
     </div>
@@ -308,9 +351,37 @@ function MasterFields({ kind, master, errors, disabled, onField, attachments }) 
             {...shared}
           />
         </div>
-        <div className="min-w-56 flex-1 space-y-1.5">
-          <p className={fieldLabelClass}>Attachments</p>
-          {attachments}
+        <div className="min-w-56 flex-1 space-y-3">
+          {preBid ? (
+            <div className="w-full sm:max-w-sm">
+              <Field
+                id="procurement-reminder-minutes"
+                label="Vendor Email Reminder Before Bid Start (Minutes)"
+                type="number"
+                inputMode="numeric"
+                min="1"
+                step="1"
+                placeholder="e.g. 15"
+                aria-describedby={
+                  errors.vendor_email_reminder
+                    ? 'procurement-reminder-minutes-error procurement-reminder-minutes-help'
+                    : 'procurement-reminder-minutes-help'
+                }
+                value={master.vendor_email_reminder}
+                error={errors.vendor_email_reminder}
+                disabled={disabled}
+                // No sign or exponent can be typed ("-5" is kept as 5); a decimal stays, for the check to refuse.
+                onChange={(event) => onField('vendor_email_reminder', event.target.value.replace(/[^\d.]/g, ''))}
+              />
+              <p id="procurement-reminder-minutes-help" className="mt-1 text-[11px] leading-4 text-muted-foreground">
+                How many minutes before the Technical Bid Start vendors get a reminder email. Optional - leave it empty for no reminder.
+              </p>
+            </div>
+          ) : null}
+          <div className="space-y-1.5">
+            <p className={fieldLabelClass}>Attachments</p>
+            {attachments}
+          </div>
         </div>
       </div>
     </div>
@@ -397,14 +468,25 @@ function SavedFiles({ urls }) {
   )
 }
 
-export default function EventFormModal({ kind, event = null, companyId, companyName, onClose }) {
+export default function EventFormModal({ kind, event = null, fromPreBid = null, companyId, companyName, onClose }) {
   const editing = Boolean(event)
   const preBid = kind === EVENT_KIND.PRE_BID
+  // Create Bid: a new Bid prefilled from a Pre Bid whose technical bid has closed.
+  const createBid = !editing && !preBid && Boolean(fromPreBid)
   const { label } = EVENT_KINDS[kind]
 
-  const [master, setMaster] = useState(() => (editing ? masterFromEvent(event) : emptyMaster()))
+  // The Pre Bid's rows and the vendor checklist made from them, once - the checklist keeps each vendor's own entries.
+  const [start] = useState(() => {
+    if (!createBid) return { rows: editing ? rowsFromEvent(event) : NO_ROWS, vendorChoices: NO_ROWS }
+    const prefilled = rowsFromPreBid(fromPreBid)
+    return { rows: prefilled, vendorChoices: preBidVendorChoices(prefilled) }
+  })
+
+  const [master, setMaster] = useState(() =>
+    editing ? masterFromEvent(event) : createBid ? masterFromPreBid(fromPreBid) : emptyMaster(),
+  )
   const [errors, setErrors] = useState({})
-  const [rows, setRows] = useState(() => (editing ? rowsFromEvent(event) : NO_ROWS))
+  const [rows, setRows] = useState(start.rows)
   const [technical, setTechnical] = useState(() => (editing ? readTechnicalBid(event) : emptyTechnicalBid()))
   const [files, setFiles] = useState([])
   const [saving, setSaving] = useState(false)
@@ -413,6 +495,30 @@ export default function EventFormModal({ kind, event = null, companyId, companyN
 
   const products = useProductOptions(companyName)
   const companyVendors = useCompanyVendors(companyId)
+
+  // Each vendor's { currency, conversion_rate } as typed in this form, by vendor key - this event's only.
+  const [currencyValues, setCurrencyValues] = useState({})
+  const currency = useCompanyCurrency()
+  const vendorsOf = (list) =>
+    currencyVendors({
+      rows: list,
+      companyVendors: companyVendors.data ?? NO_ROWS,
+      countryList: currency.countryList,
+      companyCountry: currency.companyCountry,
+      loaded: currency.loaded,
+    })
+  const eventVendors = useMemo(
+    () =>
+      currencyVendors({
+        rows,
+        companyVendors: companyVendors.data ?? NO_ROWS,
+        countryList: currency.countryList,
+        companyCountry: currency.companyCountry,
+        loaded: currency.loaded,
+      }),
+    [rows, companyVendors.data, currency.countryList, currency.companyCountry, currency.loaded],
+  )
+  const currencyLines = listedVendors(eventVendors)
 
   const setField = (field, value) => {
     setMaster((previous) => ({ ...previous, [field]: value }))
@@ -429,23 +535,65 @@ export default function EventFormModal({ kind, event = null, companyId, companyN
   // After a failed Save, each change re-checks only what was flagged in its part of the form.
   const handleRows = (next) => {
     setRows(next)
-    setErrors((previous) => recheckErrors(previous, rowErrors(next), isRowErrorKey))
+    // A vendor taken off, or now domestic, takes its currency messages with it.
+    const nextCurrencyErrors = currencyErrors(vendorsOf(next), currencyValues, currency.currencies)
+    setErrors((previous) =>
+      recheckErrors(recheckErrors(previous, rowErrors(next), isRowErrorKey), nextCurrencyErrors, isCurrencyErrorKey),
+    )
+  }
+  const handleCurrencies = (next) => {
+    setCurrencyValues(next)
+    setErrors((previous) =>
+      recheckErrors(previous, currencyErrors(eventVendors, next, currency.currencies), isCurrencyErrorKey),
+    )
   }
   const handleTechnical = (next) => {
     setTechnical(next)
     setErrors((previous) => recheckErrors(previous, technicalBidErrors(next), isTechnicalErrorKey))
   }
 
-  const errorCount = Object.keys(errors).length
+  // The reminder is checked on every change - of its minutes or of the Technical Bid Start date or time - not
+  // only on Save (a new pre bid; an edit cannot change them): its message is worked out from the values each
+  // render and shown with the others, so it comes and goes as they change. Save checks it once more.
+  const reminderMessage = preBid && !editing ? vendorReminderError(master) : null
+  // Create Bid's "at least one vendor" is worked out the same way, so it shows as soon as the last vendor is unticked.
+  const vendorMessage = createBid ? selectedVendorsError(rows) : null
+  const shownErrors = useMemo(() => {
+    const live = []
+    if (preBid && !editing) live.push(['vendor_email_reminder', reminderMessage])
+    if (createBid) live.push([SELECTED_VENDORS_ERROR, vendorMessage])
+    if (live.length === 0) return errors
+    const next = { ...errors }
+    live.forEach(([key, message]) => {
+      delete next[key]
+      if (message) next[key] = message
+    })
+    return next
+  }, [errors, reminderMessage, vendorMessage, preBid, editing, createBid])
+
+  const errorCount = Object.keys(shownErrors).length
 
   const handleSave = async () => {
     setProblem(null)
 
+    // A vendor that may be foreign is never saved on a guess: its country, or its currency, needs the country list.
+    const listLoading = currency.status === 'idle' || currency.status === 'loading'
+    if (pendingVendors(eventVendors).length > 0 || (listLoading && currencyLines.length > 0)) {
+      setProblem(
+        currency.status === 'failed'
+          ? 'The country list could not be loaded - retry it under Vendor Currency before saving.'
+          : 'The country list is still loading - try again in a moment.',
+      )
+      return
+    }
+
     // Every check at once, each message on its field; the view stays where it is.
     const found = {
       ...(editing ? {} : validateMaster(master, kind)),
+      ...(vendorMessage ? { [SELECTED_VENDORS_ERROR]: vendorMessage } : {}),
       ...rowErrors(rows),
       ...(preBid ? technicalBidErrors(technical) : {}),
+      ...currencyErrors(eventVendors, currencyValues, currency.currencies),
     }
     setErrors(found)
     const count = Object.keys(found).length
@@ -464,17 +612,19 @@ export default function EventFormModal({ kind, event = null, companyId, companyN
       technicalBid = built.value
     }
 
+    const savedRows = withVendorCurrencies(rows, eventVendors, currencyValues, currency.currencies)
+
     setSaving(true)
     try {
       const reply = editing
-        ? await updateEvent(kind, buildUpdateBody({ kind, companyId, event, rows, technicalBid }))
+        ? await updateEvent(kind, buildUpdateBody({ kind, companyId, event, rows: savedRows, technicalBid }))
         : await createEvent(
             kind,
             buildCreateBody({
               kind,
               companyId,
               master,
-              rows,
+              rows: savedRows,
               technicalBid,
               files,
             }),
@@ -499,7 +649,13 @@ export default function EventFormModal({ kind, event = null, companyId, companyN
         if (!saving) onClose()
       }}
       size="xxl"
-      title={editing ? `Edit ${label} ${event.Auction_no}` : `Add ${label}`}
+      title={
+        editing
+          ? `Edit ${label} ${event.Auction_no}`
+          : createBid
+            ? `Create Bid from Pre Bid ${fromPreBid.Auction_no || ''}`.trim()
+            : `Add ${label}`
+      }
       closeOnBackdropClick={false}
       closeOnEsc={!saving}
       showCloseButton={!saving}
@@ -516,7 +672,7 @@ export default function EventFormModal({ kind, event = null, companyId, companyN
             Cancel
           </Button>
           <Button type="button" icon={Save} loading={saving} onClick={handleSave}>
-            {editing ? 'Update' : 'Save'}
+            {editing ? 'Update' : createBid ? 'Create Bid' : 'Save'}
           </Button>
         </>
       }
@@ -535,18 +691,46 @@ export default function EventFormModal({ kind, event = null, companyId, companyN
           <MasterFields
             kind={kind}
             master={master}
-            errors={errors}
+            errors={shownErrors}
             disabled={editing || saving}
             onField={setField}
             attachments={
               editing ? (
                 <SavedFiles urls={event.file} />
               ) : (
-                <FilePicker files={files} onChange={setFiles} disabled={saving} />
+                <>
+                  <FilePicker files={files} onChange={setFiles} disabled={saving} />
+                  {createBid && fromPreBid.file.length > 0 ? (
+                    <p className="text-[11px] leading-4 text-muted-foreground">
+                      The Pre Bid&apos;s {fromPreBid.file.length === 1 ? 'attachment is' : `${fromPreBid.file.length} attachments are`}{' '}
+                      not copied - select any file this Bid needs.
+                    </p>
+                  ) : null}
+                </>
               )
             }
           />
         </Section>
+
+        {createBid && start.vendorChoices.length > 0 ? (
+          <Section
+            title="Pre Bid Vendors"
+            aside={
+              <span className="text-xs text-muted-foreground">
+                {start.vendorChoices.filter((choice) => isVendorChosen(rows, choice)).length} of {start.vendorChoices.length}{' '}
+                selected
+              </span>
+            }
+          >
+            <PreBidVendorChecklist
+              choices={start.vendorChoices}
+              rows={rows}
+              error={shownErrors[SELECTED_VENDORS_ERROR]}
+              disabled={saving}
+              onChange={handleRows}
+            />
+          </Section>
+        ) : null}
 
         {preBid ? (
           <Section title="Technical Bid">
@@ -579,6 +763,30 @@ export default function EventFormModal({ kind, event = null, companyId, companyN
             onChange={handleRows}
           />
         </Section>
+
+        {currencyLines.length > 0 ? (
+          <Section
+            title="Vendor Currency"
+            aside={
+              currency.base ? (
+                <span className="text-xs text-muted-foreground">Rates in {currency.base.code}</span>
+              ) : null
+            }
+          >
+            <VendorCurrencyFields
+              vendors={currencyLines}
+              values={currencyValues}
+              currencies={currency.currencies}
+              base={currency.base}
+              status={currency.status}
+              loadError={currency.error}
+              onReload={currency.reload}
+              errors={errors}
+              disabled={saving}
+              onChange={handleCurrencies}
+            />
+          </Section>
+        ) : null}
       </div>
     </Modal>
   )

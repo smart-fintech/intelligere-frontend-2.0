@@ -260,6 +260,12 @@ export const selectPaymentDetails = (state) => state.profile.data?.payment_detai
 export const selectOthersDetails = (state) => state.profile.data?.others_details || EMPTY
 
 /**
+ * The signed-in user's profile_details.user_type ("MSME", "Accounting
+ * Professional"), or null until the profile has loaded.
+ */
+export const selectUserType = (state) => state.profile.data?.profile_details?.user_type ?? null
+
+/**
  * True when the signed-in user is an MSME.
  *
  * The referral section on the profile page is the only thing that uses this

@@ -141,7 +141,7 @@ export default function BankForm({
    * matches nothing; its name is then shown as the dropdown's placeholder
    * rather than silently disappearing.
    */
-  const selectedLedger = ledgers.find((ledger) => ledger.ledeger_name === form.bank_ledger_name)
+  const selectedLedger = ledgers.find((ledger) => ledger.ledger_name === form.bank_ledger_name)
 
   // Built once per ledger list, not on every keystroke in the form: a new
   // array here would make the dropdown go through all of them again.
@@ -149,7 +149,7 @@ export default function BankForm({
     () =>
       ledgers.map((ledger) => ({
         value: String(getLedgerId(ledger)),
-        label: ledger.ledeger_name,
+        label: ledger.ledger_name,
       })),
     [ledgers],
   )
@@ -161,7 +161,7 @@ export default function BankForm({
 
     setForm((previous) => ({
       ...previous,
-      bank_ledger_name: ledger.ledeger_name ?? '',
+      bank_ledger_name: ledger.ledger_name ?? '',
       // Whatever the ledger holds, and empty where it holds nothing - the
       // user chose a different ledger, so the previous one's details go.
       account_no: textOf(ledger.ledger_accno),

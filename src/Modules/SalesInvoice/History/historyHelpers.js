@@ -19,6 +19,7 @@
 
 import { toPaise } from '@/Modules/Payment/pricing'
 import { fileUrlOf } from '@/Services/Global/apiHelpers'
+import { fromApiLedger } from '@/Services/Ledger/ledgerFields'
 
 /* ------------------------------------------------------------------ */
 /* Financial years - April to March                                   */
@@ -263,7 +264,7 @@ export const isoDateOf = (value) => {
  *               sale, the supplier on a purchase (what the Buyer / Seller
  *               filter matches on)
  *   buyerName   buyer_name
- *   buyerGstin  buyer_details.ledeger_gstin
+ *   buyerGstin  buyer_details.ledger_gstin
  *   documentNo  document_no, else invoice_master_details.document_no
  *   documentDate  document_date, else invoice_master_details.document_date
  *   documentDay   the same as YYYY-MM-DD - what the date filter compares
@@ -285,13 +286,13 @@ export const isoDateOf = (value) => {
  */
 export const readHistoryRow = (row) => {
   const master = objectOf(row.invoice_master_details)
-  const buyer = objectOf(row.buyer_details)
+  const buyer = fromApiLedger(objectOf(row.buyer_details))
   const documentDate = text(row.document_date ?? master.document_date)
   return {
     id: row.document_id ?? row.id ?? null,
     partyId: text(row.buyer_id ?? buyer.ledger_obj_id),
-    buyerName: text(row.buyer_name ?? buyer.ledeger_name),
-    buyerGstin: text(buyer.ledeger_gstin ?? row.buyer_gstin),
+    buyerName: text(row.buyer_name ?? buyer.ledger_name),
+    buyerGstin: text(buyer.ledger_gstin ?? row.buyer_gstin),
     documentNo: text(row.document_no ?? master.document_no),
     documentDate,
     documentDay: isoDateOf(documentDate),

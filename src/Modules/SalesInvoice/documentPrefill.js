@@ -19,7 +19,9 @@
  *   ship_to / dispatch_from    Shipping To / Dispatched From - "Same as ..."
  *                              when sameAsBuyer / sameAsSeller say so, or when
  *                              the card holds its party's own address
- *   invoice_master_details     the Document Details (and rcm -> Reverse Charge)
+ *   invoice_master_details     the Document Details (and rcm -> Reverse Charge),
+ *                              and the ledger party's currency / conversion_rate
+ *                              (documentCurrency)
  *   bank_id                    Select Bank, and that bank's Payment QR
  *   product_data               the lines: a product found in the product list
  *                              by name (and SKU code), a service by its
@@ -49,7 +51,9 @@ import {
   rateText,
   textOf,
 } from '@/Modules/SalesInvoice/salesInvoiceForm'
+import { readDocumentCurrency } from '@/Modules/SalesInvoice/documentCurrency'
 import { OTHER_CHARGES_SOURCE, SERVICE_PRODUCT_TYPE, paymentQrOfBank } from '@/Services/Invoice/salesInvoiceService'
+import { fromApiLedger } from '@/Services/Ledger/ledgerFields'
 import { toInputDate } from '@/Utils/date'
 
 /* ------------------------------------------------------------------ */
@@ -161,7 +165,7 @@ export const formFromSavedDocument = (record, { createForm, company, parties, le
 
   /* ---- the parties ---- */
   const ledgerId = textOf(record.buyer_id)
-  const savedLedger = objectOf(record.buyer_details)
+  const savedLedger = fromApiLedger(objectOf(record.buyer_details))
   const ledger = ledgers.byId.get(ledgerId) ?? (Object.keys(savedLedger).length ? savedLedger : null)
   const ledgerParty = ledger ? buyerFromLedger(ledger, ledgerId, countries) : { ...base[parties.ledger], ledgerId }
   const seller = parties.ledger === 'seller' ? ledgerParty : base.seller
@@ -255,6 +259,9 @@ export const formFromSavedDocument = (record, { createForm, company, parties, le
     roundOff,
     tcs,
     note,
+    // Its ledger party's currency, as saved in invoice_master_details (documentCurrency).
+    currency: {},
+    savedCurrency: readDocumentCurrency(master, ledgerId),
   }
 }
 

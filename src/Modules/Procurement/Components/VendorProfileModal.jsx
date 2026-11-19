@@ -169,7 +169,7 @@ const STATUS_TONES = {
   expiring: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
 }
 
-function ExpiryDate({ value }) {
+export function ExpiryDate({ value }) {
   if (isBlank(value)) return <span className="text-muted-foreground">--</span>
   const status = certificateStatus(value)
   return (
@@ -193,7 +193,7 @@ function RecordCell({ field, value }) {
   return String(value)
 }
 
-function SectionCard({ icon: Icon = Layers, title, meta, children }) {
+export function SectionCard({ icon: Icon = Layers, title, meta, children }) {
   return (
     <section className="rounded-lg border border-border bg-card">
       <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">

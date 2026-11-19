@@ -316,6 +316,20 @@ export const requiredCertificationRows = (event, profile) => {
     .map((name) => ({ name, certificate: held.find((entry) => sameName(entry?.certificate_name, name)) ?? null }))
 }
 
+/**
+ * The vendor's certificates the event did not ask for (every one, on an event
+ * with no required certifications) - blank records left out.
+ */
+export const otherCertifications = (event, profile) => {
+  const matched = new Set(
+    requiredCertificationRows(event, profile)
+      .map((row) => row.certificate)
+      .filter(Boolean),
+  )
+  const held = Array.isArray(profile?.technical_certifications) ? profile.technical_certifications : []
+  return held.filter((entry) => !matched.has(entry) && !isBlank(entry))
+}
+
 /* ------------------------------------------------------------------ */
 /* The edit form                                                      */
 /* ------------------------------------------------------------------ */

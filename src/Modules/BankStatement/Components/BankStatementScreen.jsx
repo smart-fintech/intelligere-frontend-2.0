@@ -37,7 +37,7 @@ export default function BankStatementScreen({ company, companyId, banks, onResta
 
   const { ledgerOptions, ledgerNames } = useMemo(() => {
     const ledgers = ledgersFor === companyId ? allLedgers : []
-    const names = [...new Set(ledgers.map((ledger) => String(ledger.ledeger_name ?? '').trim()).filter(Boolean))]
+    const names = [...new Set(ledgers.map((ledger) => String(ledger.ledger_name ?? '').trim()).filter(Boolean))]
     return { ledgerOptions: names.map((name) => ({ value: name, label: name })), ledgerNames: new Set(names) }
   }, [allLedgers, ledgersFor, companyId])
 

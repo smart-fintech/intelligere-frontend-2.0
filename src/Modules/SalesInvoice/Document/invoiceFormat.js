@@ -37,6 +37,13 @@ const amountFormat = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, 
 /** An amount as the sheet prints it - "1,00,000.00", never ₹ (the columns say what it is). */
 export const formatAmount = (value) => amountFormat.format(round2(value))
 
+/**
+ * A party from another country (the model's `currency` - documentCurrency):
+ * "Total in USD: 1,000.00 (1 USD = 83.5 INR)" - codes, not signs, so every
+ * font prints it.
+ */
+export const currencyLine = ({ code, rate, base, total }) => `Total in ${code}: ${formatAmount(total)} (1 ${code} = ${rate} ${base})`
+
 /** A date as the sheet prints it - DD/MM/YYYY, the same as the saved document. */
 export const formatSheetDate = (value) => toDocumentDate(value)
 

@@ -30,14 +30,14 @@ const NONE = new Set()
 
 /** The ledger as the bulk create reads it - the old screen's fields. */
 const toLedger = (raw) => ({
-  ledeger_name: text(raw.ledgername),
-  ledeger_gstin: text(raw.gstno),
-  ledeger_state: text(raw.state),
-  ledeger_address: '',
-  ledeger_email: '',
-  ledeger_phone: '',
-  ledeger_website: '',
-  ledeger_group: 'Sundry Debtors',
+  ledger_name: text(raw.ledgername),
+  ledger_gstin: text(raw.gstno),
+  ledger_state: text(raw.state),
+  ledger_address: '',
+  ledger_email: '',
+  ledger_phone: '',
+  ledger_website: '',
+  ledger_group: 'Sundry Debtors',
   group_name: 'Sundry Debtors',
   gst_rate: '',
 })

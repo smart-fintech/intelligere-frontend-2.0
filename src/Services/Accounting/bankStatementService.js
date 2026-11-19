@@ -53,12 +53,12 @@ export const uploadStatementFile = ({ companyId, bankDetailId, file }) =>
 
 /**
  * A PDF the server reads itself; `password` only for a locked PDF, and
- * `use_advance_model` ("true" / "false" - a form field) always sent, from the
+ * `advance_model` ("true" / "false" - a form field) always sent, from the
  * Use Advance Modal tick. 201, no body.
  */
 export const uploadStatementAI = ({ companyId, bankDetailId, file, password = '', useAdvanceModel = false }) => {
   const body = statementForm({ companyId, bankDetailId, file, password })
-  body.append('use_advance_model', String(useAdvanceModel === true))
+  body.append('advance_model', String(useAdvanceModel === true))
   return api.post(AI_FILE_URL, body, MULTIPART)
 }
 

@@ -35,6 +35,7 @@
 import { ERP, getEmail, getERP } from '@/Library/secureStorage'
 import { api } from '@/Services/Global/apiService'
 import { toList } from '@/Services/Global/apiHelpers'
+import { fromApiLedgers, toApiLedger } from '@/Services/Ledger/ledgerFields'
 
 const LEDGER_URL = 'tally/create-ledger/'
 const LEDGER_DELETEALL_URL = 'tally/delete_all_ledger/'
@@ -49,10 +50,10 @@ const TALLY_GROUP_LIST_URL = 'tally/ledger_groups/'
  * A ledger's identifier.
  *
  * The list API sends each ledger with `ledger_obj_id` - there is no `id`
- * field on these rows:
+ * field on these rows (shown with the app's field names - see ledgerFields):
  *
- *   { "ledger_obj_id": 1, "ledeger_name": "Demo Ledger 1",
- *     "ledeger_group": 1, "ledeger_group_name": "Primary", ... }
+ *   { "ledger_obj_id": 1, "ledger_name": "Demo Ledger 1",
+ *     "ledger_group": 1, "ledger_group_name": "Primary", ... }
  *
  * Every screen reads it through here - as a React key, to know which row is
  * being edited, as the value of a ledger dropdown, and for the update and
@@ -87,7 +88,8 @@ export const getLedgerSac = (ledger) => {
 export const getLedgers = async (companyId) => {
   if (!companyId) return []
 
-  return toList(await api.post(LEDGER_URL, { company_id: companyId }))
+  // The rows come with the backend's field names; the app reads its own.
+  return fromApiLedgers(toList(await api.post(LEDGER_URL, { company_id: companyId })))
 }
 
 /** Where the ledger groups come from - one endpoint per ERP, never both. */
@@ -109,7 +111,7 @@ export const LEDGER_GROUP_SOURCE = Object.freeze({
  *                 needs no change. No company, no request.
  *
  * They fill the Ledger Group dropdown on the form. (The table does not need
- * them: each ledger row arrives with its own `ledeger_group_name`.)
+ * them: each ledger row arrives with its own `ledger_group_name`.)
  */
 export const getLedgerGroups = async (source = LEDGER_GROUP_SOURCE.INTELLIGERE, companyId = null) => {
   if (source === LEDGER_GROUP_SOURCE.TALLY) {
@@ -153,7 +155,7 @@ const systemFields = () => ({
  * fields above are added here. Checking what the user typed is the form's
  * job, not this file's.
  */
-export const createLedger = (payload) => api.post(LEDGER_URL, { ...payload, ...systemFields() })
+export const createLedger = (payload) => api.post(LEDGER_URL, { ...toApiLedger(payload), ...systemFields() })
 
 /**
  * Changes a ledger.
@@ -163,7 +165,7 @@ export const createLedger = (payload) => api.post(LEDGER_URL, { ...payload, ...s
  * `ledger_obj_id` - see getLedgerId) and company plus whatever the user
  * actually edited.
  */
-export const updateLedger = (payload) => api.put(LEDGER_URL, { ...payload, ...systemFields() })
+export const updateLedger = (payload) => api.put(LEDGER_URL, { ...toApiLedger(payload), ...systemFields() })
 
 /**
  * Gives a ledger its SAC number - the same update as the Ledger Form's edit,
@@ -234,20 +236,20 @@ export const TALLY_LEDGER_ALTER_MODULE = 'tally_ledger_alter'
 
 /** The ledger fields Tally takes, in the `data` of its payload. */
 const TALLY_LEDGER_FIELDS = [
-  'ledeger_guid',
-  'ledeger_group_name',
-  'ledeger_name',
-  'ledeger_state',
-  // The country and city either side of the state, under the names the
-  // backend uses for them - see the Ledger Form's location fields.
+  'ledger_guid',
+  'ledger_group_name',
+  'ledger_name',
+  'ledger_state',
+  // The country and city either side of the state - see the Ledger Form's
+  // location fields.
   'ledger_country',
   'ledger_city',
   'ledger_gst_reg_type',
-  'ledeger_address',
-  'ledeger_email',
-  'ledeger_phone',
-  'ledeger_gstin',
-  'ledeger_website',
+  'ledger_address',
+  'ledger_email',
+  'ledger_phone',
+  'ledger_gstin',
+  'ledger_website',
   'ledger_sac',
   'ledger_bank',
   'ledger_ifsc',
@@ -266,7 +268,8 @@ const TALLY_LEDGER_FIELDS = [
  *                  "data": { ...the ledger fields, created_by, platform } } }
  *
  * `ledger` holds the form's values; `created_by` and `platform` are the
- * session fields every ledger save sends (systemFields).
+ * session fields every ledger save sends (systemFields). The fields go out
+ * under the names the Tally EXE reads (toApiLedger - see ledgerFields).
  */
 export const buildTallyLedgerMessage = (moduleName, companyName, ledger) => {
   const { created_by, platform } = systemFields()
@@ -280,7 +283,7 @@ export const buildTallyLedgerMessage = (moduleName, companyName, ledger) => {
     payload: {
       module_name: moduleName,
       company_name: companyName,
-      data: { ...data, created_by, platform },
+      data: { ...toApiLedger(data), created_by, platform },
     },
   }
 }
@@ -357,8 +360,8 @@ export { default as LEDGER_CSV_FORMAT_CONTENT } from '@/Assets/format/LedgerForm
  *   intelligere   the ledgers are created there and then, and the reply is
  *                 { msg: "5 ledger created successfully" }
  *   tally         nothing is created yet: the reply is the parsed rows,
- *                 [{ ledeger_name, ledeger_group, ... }], which the screen
- *                 then sends to Tally over the WebSocket (see below).
+ *                 named as the backend names its ledger fields, which the
+ *                 screen sends on to Tally over the WebSocket (see below).
  *
  * `erpType` is 'tally' or 'intelligere', read by the screen from the profile
  * in the store - never from here, so there is one ERP answer in the app.
@@ -397,22 +400,25 @@ const BULK_LEDGER_OMITTED_FIELDS = ['company', 'company_name']
  *                  "company_name": "<active company>",
  *                  "data": [ { ...ledger }, { ...ledger } ] } }
  *
- * `ledgers` is the import endpoint's reply, used as it came - the backend
- * has already parsed and named the fields, so nothing is rebuilt here.
+ * `ledgers` is the import endpoint's reply, or ledgers the app built with
+ * its own field names (useAutoPartyLedgers). Either way each goes out under
+ * the names the Tally EXE reads (toApiLedger - see ledgerFields); the
+ * import's rows already carry them, so they pass through as they came.
  *
  * Only `company` and `company_name` are dropped from each row: the company
  * is named once, at the top of the payload, and Tally does not take it again
- * inside every ledger. Every other field is passed through untouched,
- * misspellings and all, because that is what Tally expects.
+ * inside every ledger.
  */
 export const buildBulkLedgerMessage = (companyName, ledgers) => ({
   payload: {
     module_name: BULK_LEDGER_CREATE_MODULE,
     company_name: companyName,
     data: (Array.isArray(ledgers) ? ledgers : []).map((ledger) =>
-      Object.fromEntries(
-        Object.entries(ledger ?? {}).filter(
-          ([field]) => !BULK_LEDGER_OMITTED_FIELDS.includes(field),
+      toApiLedger(
+        Object.fromEntries(
+          Object.entries(ledger ?? {}).filter(
+            ([field]) => !BULK_LEDGER_OMITTED_FIELDS.includes(field),
+          ),
         ),
       ),
     ),

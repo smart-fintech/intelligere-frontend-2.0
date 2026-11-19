@@ -43,7 +43,7 @@
  *   framed      true (the default) draws the form in its titled card, as the
  *               Ledger page does. false leaves the card off, for a dialog
  *               that already has a heading of its own - see LedgerActions.
- *   defaults    a new ledger only: fields to start filled in ({ ledeger_name })
+ *   defaults    a new ledger only: fields to start filled in ({ ledger_name })
  *               - the Sales Invoice's missing GST ledger suggests its name
  */
 
@@ -89,24 +89,26 @@ import {
 const TALLY_SAVE_TIMEOUT_MS = 2 * 60 * 1000
 
 /**
- * The fields the form owns, named exactly as the backend names them (the
- * misspelling of "ledeger" is the API's, not ours), so the payload is the
- * form with nothing renamed on the way out.
+ * The fields the form owns, under the app's ledger field names - the same
+ * names the ledger list's rows arrive with, so an edit fills the form from
+ * the row field for field. createLedger / updateLedger send them under the
+ * backend's names (Services/Ledger/ledgerFields).
  */
 const EMPTY_FORM = {
-  ledeger_guid: '',
-  ledeger_name: '',
+  ledger_guid: '',
+  ledger_name: '',
   ledger_gst_reg_type: 'Regular',
-  ledeger_group_name: '',
+  ledger_group_name: '',
   ledger_sac: '',
-  ledeger_address: '',
-  ledeger_email: '',
-  ledeger_phone: '',
-  ledeger_website: '',
-  ledeger_gstin: '',
-  ledeger_state: '',
-  // Country and city sit either side of the state, and are saved under the
-  // names the backend uses for them.
+  ledger_address: '',
+  ledger_email: '',
+  ledger_phone: '',
+  ledger_website: '',
+  ledger_gstin: '',
+  ledger_state: '',
+  // Country and city sit either side of the state. Like the rest, they are
+  // the names the list's rows carry, so an edit opens on the ledger's own
+  // country and city, and a save stores them.
   ledger_country: DEFAULT_COUNTRY,
   ledger_city: '',
   ledger_pincode: '',
@@ -115,6 +117,12 @@ const EMPTY_FORM = {
   ledger_accno: '',
   ledger_ifsc: '',
   credit_period_days: '',
+}
+
+/** Names as dropdown options, with `current` first when the names lack it. */
+const toOptions = (names, current) => {
+  const list = current && !names.includes(current) ? [current, ...names] : names
+  return list.map((name) => ({ value: name, label: name }))
 }
 
 export default function LedgerForm({
@@ -156,8 +164,8 @@ export default function LedgerForm({
     // The group dropdown's options are the group list's names, so the row's
     // group is matched by ID to get exactly that spelling; the name the row
     // carries is the fallback.
-    const group = groups.find((entry) => entry.id === ledger.ledeger_group)
-    filled.ledeger_group_name = group?.user_show_group ?? filled.ledeger_group_name
+    const group = groups.find((entry) => entry.id === ledger.ledger_group)
+    filled.ledger_group_name = group?.user_show_group ?? filled.ledger_group_name
 
     /* A ledger saved before the form had a country field has a state but no
        country, and a state dropdown with no country would have nothing in it
@@ -226,9 +234,19 @@ export default function LedgerForm({
     [countryData, form.ledger_country],
   )
   const cities = useMemo(
-    () => getCities(countryData, form.ledger_country, form.ledeger_state),
-    [countryData, form.ledger_country, form.ledeger_state],
+    () => getCities(countryData, form.ledger_country, form.ledger_state),
+    [countryData, form.ledger_country, form.ledger_state],
   )
+
+  /* The dropdowns' options. A value the ledger already holds is always one of
+     them, even when the country list spells it differently or does not carry
+     it (a city Tally sent, say): the select only shows a value it has an
+     option for, so without this a saved country, state or city would look
+     empty. Changing the country or state clears what sits below it, so only
+     a value that still belongs is ever added. */
+  const countryOptions = useMemo(() => toOptions(countries, form.ledger_country), [countries, form.ledger_country])
+  const stateOptions = useMemo(() => toOptions(states, form.ledger_state), [states, form.ledger_state])
+  const cityOptions = useMemo(() => toOptions(cities, form.ledger_city), [cities, form.ledger_city])
 
   useEffect(() => {
     dispatch(fetchCountries()).then((result) => {
@@ -250,16 +268,16 @@ export default function LedgerForm({
     setForm((previous) => ({
       ...previous,
       ledger_country: value,
-      ledeger_state: '',
+      ledger_state: '',
       ledger_city: '',
     }))
-    setErrors((previous) => ({ ...previous, ledeger_state: undefined }))
+    setErrors((previous) => ({ ...previous, ledger_state: undefined }))
   }
 
   /** Same reasoning one level down: a new state, so the city goes. */
   const handleStateChange = (value) => {
-    setForm((previous) => ({ ...previous, ledeger_state: value, ledger_city: '' }))
-    setErrors((previous) => ({ ...previous, ledeger_state: undefined }))
+    setForm((previous) => ({ ...previous, ledger_state: value, ledger_city: '' }))
+    setErrors((previous) => ({ ...previous, ledger_state: undefined }))
   }
 
   /* ---------------------------------------------------------------- */
@@ -365,12 +383,12 @@ export default function LedgerForm({
    * API has nowhere to store them, so no form field is invented for them.
    */
   const runGstLookup = async () => {
-    const result = await gst.lookup(form.ledeger_gstin, {
+    const result = await gst.lookup(form.ledger_gstin, {
       successMessage: 'Details filled in from GSTIN.',
     })
 
     if (result.fieldError) {
-      setErrors({ ledeger_gstin: result.fieldError })
+      setErrors({ ledger_gstin: result.fieldError })
       return
     }
 
@@ -382,23 +400,23 @@ export default function LedgerForm({
     setForm((previous) => ({
       ...previous,
       // What was searched for, tidied to the canonical form.
-      ledeger_gstin: details.gstNumber || previous.ledeger_gstin.trim().toUpperCase(),
+      ledger_gstin: details.gstNumber || previous.ledger_gstin.trim().toUpperCase(),
       // A ledger names the party as registered, so the legal name leads and
       // the trade name stands in when there is no legal name.
-      ledeger_name: details.legalName || details.name || previous.ledeger_name,
+      ledger_name: details.legalName || details.name || previous.ledger_name,
       // The ledger has no city field, so the district goes on the end of the
       // address - where it would be written on an envelope anyway.
-      ledeger_address:
+      ledger_address:
         [details.address, details.district].filter(Boolean).join(', ') ||
-        previous.ledeger_address,
+        previous.ledger_address,
       ledger_pincode: details.pincode || previous.ledger_pincode,
-      ledeger_state: details.state || previous.ledeger_state,
+      ledger_state: details.state || previous.ledger_state,
       // A GSTIN is an Indian registration, so its state belongs to India -
       // and a city chosen under the previous state does not belong to this
       // one, so it goes. (Nothing is lost: the record carries no city, which
       // is why the district goes on the address line above.)
       ledger_country: DEFAULT_COUNTRY,
-      ledger_city: details.state && details.state !== previous.ledeger_state
+      ledger_city: details.state && details.state !== previous.ledger_state
         ? ''
         : previous.ledger_city,
       // Only taken when it is one of the values the dropdown offers -
@@ -434,17 +452,17 @@ export default function LedgerForm({
   const validate = () => {
     const found = {}
 
-    if (!form.ledeger_name.trim()) found.ledeger_name = 'Ledger name is required'
-    if (!form.ledeger_group_name) found.ledeger_group_name = 'Please select a ledger group'
+    if (!form.ledger_name.trim()) found.ledger_name = 'Ledger name is required'
+    if (!form.ledger_group_name) found.ledger_group_name = 'Please select a ledger group'
 
-    const email = form.ledeger_email.trim()
+    const email = form.ledger_email.trim()
     if (email && !/^\S+@\S+\.\S+$/.test(email)) {
-      found.ledeger_email = 'Enter a valid email address'
+      found.ledger_email = 'Enter a valid email address'
     }
 
-    const phone = form.ledeger_phone.trim()
+    const phone = form.ledger_phone.trim()
     if (phone && !/^\d{10}$/.test(phone)) {
-      found.ledeger_phone = 'Enter a valid 10-digit phone number'
+      found.ledger_phone = 'Enter a valid 10-digit phone number'
     }
 
     const pincode = form.ledger_pincode.trim()
@@ -452,9 +470,9 @@ export default function LedgerForm({
       found.ledger_pincode = 'Enter a valid 6-digit pincode'
     }
 
-    const gstin = form.ledeger_gstin.trim()
+    const gstin = form.ledger_gstin.trim()
     if (gstin && !isValidGstNumber(gstin.toUpperCase())) {
-      found.ledeger_gstin = 'Enter a valid 15-character GSTIN'
+      found.ledger_gstin = 'Enter a valid 15-character GSTIN'
     }
 
     return found
@@ -581,19 +599,19 @@ export default function LedgerForm({
              are about to be filled in, so they are not waiting for input.
              Enter in this box fetches, the same as the button. */
           <Field
-            id="ledeger_gstin_lookup"
+            id="ledger_gstin_lookup"
             label="GSTIN"
             required
             maxLength={15}
             autoFocus
             placeholder="24BAUPS2722Q2ZV"
-            value={form.ledeger_gstin}
-            error={errors.ledeger_gstin}
+            value={form.ledger_gstin}
+            error={errors.ledger_gstin}
             disabled={looking}
             inputClassName="uppercase"
             // Typed in lower case, stored in upper - no holding shift for
             // fifteen characters.
-            onChange={(e) => setField('ledeger_gstin', e.target.value.toUpperCase())}
+            onChange={(e) => setField('ledger_gstin', e.target.value.toUpperCase())}
           />
         ) : (
           <>
@@ -614,13 +632,13 @@ export default function LedgerForm({
             <FormGrid>
               {/* ---- Row 1: Name | GST Registration Type ---- */}
               <Field
-                id="ledeger_name"
+                id="ledger_name"
                 label="Name"
                 required
-                value={form.ledeger_name}
-                error={errors.ledeger_name}
+                value={form.ledger_name}
+                error={errors.ledger_name}
                 disabled={submitting}
-                onChange={(e) => setField('ledeger_name', e.target.value)}
+                onChange={(e) => setField('ledger_name', e.target.value)}
               />
 
               <SelectField
@@ -639,14 +657,14 @@ export default function LedgerForm({
                   and what is sent - the payload's group field is the name, not
                   the id. */}
               <SelectField
-                id="ledeger_group_name"
+                id="ledger_group_name"
                 label="Select Ledger Group"
                 required
                 placeholder={groups.length === 0 ? 'Loading...' : 'Select Ledger Group'}
-                value={form.ledeger_group_name}
-                error={errors.ledeger_group_name}
+                value={form.ledger_group_name}
+                error={errors.ledger_group_name}
                 disabled={submitting || groups.length === 0}
-                onValueChange={(value) => setField('ledeger_group_name', value)}
+                onValueChange={(value) => setField('ledger_group_name', value)}
                 options={groups.map((group) => ({
                   value: group.user_show_group,
                   label: group.user_show_group,
@@ -668,59 +686,59 @@ export default function LedgerForm({
 
               {/* ---- Row 3: Address, full width ---- */}
               <TextareaField
-                id="ledeger_address"
+                id="ledger_address"
                 label="Address"
                 rows={3}
                 className="sm:col-span-2"
-                value={form.ledeger_address}
+                value={form.ledger_address}
                 disabled={submitting}
-                onChange={(e) => setField('ledeger_address', e.target.value)}
+                onChange={(e) => setField('ledger_address', e.target.value)}
               />
 
               {/* ---- Row 4: Email | Phone ---- */}
               <Field
-                id="ledeger_email"
+                id="ledger_email"
                 label="Email"
                 type="email"
-                value={form.ledeger_email}
-                error={errors.ledeger_email}
+                value={form.ledger_email}
+                error={errors.ledger_email}
                 disabled={submitting}
-                onChange={(e) => setField('ledeger_email', e.target.value)}
+                onChange={(e) => setField('ledger_email', e.target.value)}
               />
 
               <Field
-                id="ledeger_phone"
+                id="ledger_phone"
                 label="Phone"
                 inputMode="numeric"
                 maxLength={10}
-                value={form.ledeger_phone}
-                error={errors.ledeger_phone}
+                value={form.ledger_phone}
+                error={errors.ledger_phone}
                 disabled={submitting}
                 // Anything that is not a digit is dropped as it is typed, so the
                 // field cannot hold a value validation would reject.
-                onChange={(e) => setField('ledeger_phone', e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => setField('ledger_phone', e.target.value.replace(/\D/g, ''))}
               />
 
               {/* ---- Row 5: Website | GSTIN ----
                   A plain field here. Looking a number up is the "Fill from
                   GSTIN" mode above, which has its own box and button. */}
               <Field
-                id="ledeger_website"
+                id="ledger_website"
                 label="Website"
-                value={form.ledeger_website}
+                value={form.ledger_website}
                 disabled={submitting}
-                onChange={(e) => setField('ledeger_website', e.target.value)}
+                onChange={(e) => setField('ledger_website', e.target.value)}
               />
 
               <Field
-                id="ledeger_gstin"
+                id="ledger_gstin"
                 label="GSTIN"
                 maxLength={15}
-                value={form.ledeger_gstin}
-                error={errors.ledeger_gstin}
+                value={form.ledger_gstin}
+                error={errors.ledger_gstin}
                 disabled={submitting}
                 inputClassName="uppercase"
-                onChange={(e) => setField('ledeger_gstin', e.target.value.toUpperCase())}
+                onChange={(e) => setField('ledger_gstin', e.target.value.toUpperCase())}
               />
 
               {/* ---- Row 6: Country | State ----
@@ -737,11 +755,11 @@ export default function LedgerForm({
                 value={form.ledger_country}
                 disabled={submitting || countries.length === 0}
                 onValueChange={handleCountryChange}
-                options={countries.map((name) => ({ value: name, label: name }))}
+                options={countryOptions}
               />
 
               <SelectField
-                id="ledeger_state"
+                id="ledger_state"
                 label="State"
                 searchable
                 searchPlaceholder="Search state"
@@ -752,10 +770,10 @@ export default function LedgerForm({
                       ? 'Select a country first'
                       : 'Select State'
                 }
-                value={form.ledeger_state}
+                value={form.ledger_state}
                 disabled={submitting || states.length === 0}
                 onValueChange={handleStateChange}
-                options={states.map((name) => ({ value: name, label: name }))}
+                options={stateOptions}
               />
 
               {/* ---- Row 7: City | Pincode ----
@@ -768,7 +786,7 @@ export default function LedgerForm({
                 searchable
                 searchPlaceholder="Search city"
                 placeholder={
-                  !form.ledeger_state
+                  !form.ledger_state
                     ? 'Select a state first'
                     : cities.length === 0
                       ? 'No cities available for this state'
@@ -777,7 +795,7 @@ export default function LedgerForm({
                 value={form.ledger_city}
                 disabled={submitting || cities.length === 0}
                 onValueChange={(value) => setField('ledger_city', value)}
-                options={cities.map((name) => ({ value: name, label: name }))}
+                options={cityOptions}
               />
 
               <Field

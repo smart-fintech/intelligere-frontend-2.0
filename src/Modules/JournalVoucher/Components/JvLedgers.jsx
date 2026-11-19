@@ -53,8 +53,8 @@ export default function JvLedgers({ companyId, jvLedgers, ledgers, onClose }) {
   const addable = useMemo(
     () =>
       companyLedgers
-        .filter((row) => row.ledger_obj_id !== undefined && row.ledeger_name && !currentIds.has(String(row.ledger_obj_id)))
-        .map((row) => ({ value: String(row.ledger_obj_id), label: row.ledeger_name }))
+        .filter((row) => row.ledger_obj_id !== undefined && row.ledger_name && !currentIds.has(String(row.ledger_obj_id)))
+        .map((row) => ({ value: String(row.ledger_obj_id), label: row.ledger_name }))
         .sort((a, b) => a.label.localeCompare(b.label)),
     [companyLedgers, currentIds],
   )

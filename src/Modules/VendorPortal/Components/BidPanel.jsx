@@ -7,6 +7,7 @@ import { Button } from '@/Components/ui/button'
 import { toast } from '@/Library/toast'
 import { VendorHistory } from '@/Modules/Procurement/Components/ProductVendors'
 import { showAmount } from '@/Modules/Procurement/procurement'
+import { currencySymbol, fromBaseAmount, plainAmount } from '@/Modules/Procurement/vendorCurrency'
 import {
   BID_FORM_ERROR,
   bidErrors,
@@ -14,7 +15,9 @@ import {
   bidRules,
   buildBidBody,
   canBid,
+  convertedBid,
   emptyBidForm,
+  showOwnAmount,
 } from '@/Modules/VendorPortal/vendorPortal'
 import { placeVendorBid } from '@/Services/Procurement/vendorPortalService'
 
@@ -23,6 +26,11 @@ import { placeVendorBid } from '@/Services/Procurement/vendorPortalService'
  * notes, and - while the Bid runs - the form to bid again, change its delivery
  * days or add a note. A bid is confirmed before it is sent; the rules it is
  * checked against are vendorPortal's bidRules.
+ *
+ * A vendor with a currency on this auction types its bid in that currency; the
+ * box says which, and under it what the bid comes to once converted (the
+ * company's currency, at the auction's rate). The form keeps only what was
+ * typed - the conversion is done once, by buildBidBody.
  */
 export default function BidPanel({ event, product, mine, onPlaced }) {
   const [form, setForm] = useState(emptyBidForm)
@@ -33,6 +41,11 @@ export default function BidPanel({ event, product, mine, onPlaced }) {
   const open = canBid(event)
   const rules = bidRules(event, product, mine)
   const idPrefix = `vendor-bid-${event.id}-${product.sr_no}`
+  const { currency } = rules
+  const ownNow = currency ? fromBaseAmount(rules.own, currency.rate).value : rules.own
+  const converted = currency && !errors.amount ? convertedBid(form.amount, rules) : null
+  const conversionText = (amount) =>
+    `${plainAmount(amount)} converted at 1 ${currency.code} = ${currency.rate}`
 
   const setField = (field, value) => {
     setForm((previous) => ({ ...previous, [field]: value }))
@@ -79,12 +92,14 @@ export default function BidPanel({ event, product, mine, onPlaced }) {
           <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
             <Field
               id={`${idPrefix}-amount`}
-              label="Your Bid (₹)"
+              label={currency ? `Your Bid (${currency.code})` : 'Your Bid (₹)'}
               type="number"
               min="0"
               step="0.01"
               inputMode="decimal"
-              placeholder={rules.own ? `Now ${rules.own}` : 'Amount'}
+              prefix={currency ? <bdi className="font-semibold text-brand">{currencySymbol(currency.code)}</bdi> : null}
+              style={currency ? { paddingLeft: `calc(1.25rem + ${[...currencySymbol(currency.code)].length}ch)` } : undefined}
+              placeholder={ownNow ? `Now ${ownNow}` : 'Amount'}
               value={form.amount}
               error={errors.amount}
               disabled={placing || rules.max === 0}
@@ -121,6 +136,11 @@ export default function BidPanel({ event, product, mine, onPlaced }) {
               </Button>
             </div>
           </div>
+          {converted > 0 ? (
+            <p className="text-xs font-medium text-brand tabular-nums" aria-live="polite">
+              = {conversionText(converted)}
+            </p>
+          ) : null}
           <p className="text-xs text-muted-foreground">{bidLimitText(rules)}</p>
           {errors[BID_FORM_ERROR] ? (
             <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive">
@@ -132,7 +152,7 @@ export default function BidPanel({ event, product, mine, onPlaced }) {
       ) : null}
 
       <div className="overflow-hidden rounded-md border border-border bg-card">
-        <VendorHistory vendor={mine ?? {}} showAmounts />
+        <VendorHistory vendor={mine ?? {}} showAmounts currency={currency} lead="own" />
       </div>
 
       <ConfirmDialog
@@ -141,7 +161,11 @@ export default function BidPanel({ event, product, mine, onPlaced }) {
           if (!next && !placing) setConfirming(false)
         }}
         title="Submit this bid?"
-        description={`${showAmount(form.amount)} for ${product.product_name || 'this product'}${
+        description={`${
+          currency
+            ? `${showOwnAmount(form.amount, rules)} (${conversionText(convertedBid(form.amount, rules))})`
+            : showAmount(form.amount)
+        } for ${product.product_name || 'this product'}${
           String(form.delivery_days).trim() ? `, delivery in ${String(form.delivery_days).trim()} days` : ''
         }. A bid cannot be withdrawn.`}
         confirmLabel="Submit Bid"

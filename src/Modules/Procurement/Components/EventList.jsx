@@ -14,7 +14,18 @@ import EventCard from '@/Modules/Procurement/Components/EventCard'
 
 const SEARCH_FIELDS = ['Auction_no']
 
-export default function EventList({ events, kind, stage, onView, onEdit, onCancel, onChat, onExpire }) {
+export default function EventList({
+  events,
+  kind,
+  stage,
+  onView,
+  onEdit,
+  onCancel,
+  onChat,
+  onExpire,
+  onCertificateVerified,
+  onCreateBid,
+}) {
   const view = useListView(events, {
     searchFields: SEARCH_FIELDS,
     initialSort: { field: 'opens_at', direction: stage === EVENT_STAGE.COMPLETED ? 'desc' : 'asc' },
@@ -49,6 +60,8 @@ export default function EventList({ events, kind, stage, onView, onEdit, onCance
                   onCancel={onCancel}
                   onChat={onChat}
                   onExpire={onExpire}
+                  onCertificateVerified={onCertificateVerified}
+                  onCreateBid={onCreateBid}
                 />
               </li>
             ))}

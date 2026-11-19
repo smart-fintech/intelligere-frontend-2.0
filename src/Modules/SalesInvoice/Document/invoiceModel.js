@@ -35,9 +35,17 @@ import {
   stateCodeOf,
   supplyTypesOf,
 } from '@/Modules/SalesInvoice/salesInvoiceForm'
+import { fromBaseAmount } from '@/Modules/Procurement/vendorCurrency'
 import { gstChargesByLedger } from '@/Utils/gstLedgers'
 
 const rupees = (paise) => Math.round(paise || 0) / 100
+
+/** What the sheet prints of a foreign party's currency - null for none. */
+const currencyOf = (pair, base, total) => {
+  const rate = Number(pair?.conversion_rate)
+  if (!pair?.currency || !(rate > 0)) return null
+  return { code: pair.currency, rate, base, total: fromBaseAmount(total, rate).value }
+}
 const labelOf = (options, value) => options.find((option) => option.value === value)?.label ?? value ?? ''
 
 /**
@@ -51,8 +59,13 @@ const labelOf = (options, value) => options.find((option) => option.value === va
  * @param ledgersById    Map of the ledgers, for charge names and SAC codes
  * @param bank           the chosen bank account record, or null
  * @param images         { logo, signature, paymentQr } - data URLs, or null
+ * @param currency       { currency, conversion_rate } of a party from another
+ *                       country (documentCurrencyOf, or as saved), or null -
+ *                       printed under the amount in words: the total in that
+ *                       currency at that rate (fromBaseAmount)
+ * @param baseCode       the company's own currency code, the sheet's amounts'
  */
-export function toInvoiceModel({ form, figures, gst, productsByKey, ledgersById, bank, images }) {
+export function toInvoiceModel({ form, figures, gst, productsByKey, ledgersById, bank, images, currency = null, baseCode = 'INR' }) {
   const { seller, buyer, document } = form
   const interState = figures.tax.interState
   const ledgerOf = (id) => (id ? ledgersById.get(String(id)) : null)
@@ -78,7 +91,7 @@ export function toInvoiceModel({ form, figures, gst, productsByKey, ledgersById,
         kind: 'product',
         sr: index + 1,
         id: line.id,
-        name: service ? (ledgerOf(line.ledgerId)?.ledeger_name ?? '') : [product?.name, variant?.skuCode].filter(Boolean).join(' - '),
+        name: service ? (ledgerOf(line.ledgerId)?.ledger_name ?? '') : [product?.name, variant?.skuCode].filter(Boolean).join(' - '),
         // A challan prints the product and its SKU code in columns of their own.
         service,
         productName: service ? '' : (product?.name ?? ''),
@@ -106,7 +119,7 @@ export function toInvoiceModel({ form, figures, gst, productsByKey, ledgersById,
       return {
         kind: 'charge',
         id: charge.id,
-        name: ledgerOf(charge.ledgerId)?.ledeger_name ?? '',
+        name: ledgerOf(charge.ledgerId)?.ledger_name ?? '',
         hsn: ledgerOf(charge.ledgerId)?.ledger_sac ?? '',
         gst: interState ? row.igst : row.cgst + row.sgst,
         taxable: rupees(row.amountPaise),
@@ -116,7 +129,7 @@ export function toInvoiceModel({ form, figures, gst, productsByKey, ledgersById,
       }
     })
 
-  const ledgerName = (section, fallback) => ledgerOf(form[section].ledgerId)?.ledeger_name || fallback
+  const ledgerName = (section, fallback) => ledgerOf(form[section].ledgerId)?.ledger_name || fallback
 
   /* ---- the goods table's row stream ---- */
   const rows = [
@@ -271,6 +284,7 @@ export function toInvoiceModel({ form, figures, gst, productsByKey, ledgersById,
       paymentQr: images.paymentQr,
     },
     other: { note: form.note },
+    currency: currencyOf(currency, baseCode, rupees(figures.totalPaise)),
     bank: bank ? { bankName: bank.bank_name ?? '', ifsc: bank.ifsc_code ?? '', accountNo: bank.account_no ?? '' } : null,
     lines: [...lines, ...charges],
     rows,

@@ -151,7 +151,7 @@ export const INVENTORY_SECTIONS = [
  * That is for a user with Inventory Management. Without it there is no
  * Master Details to land on, so the page opens on the product list instead.
  */
-export const INVENTORY_DEFAULT_SECTION = 'inventory-master'
+export const INVENTORY_DEFAULT_SECTION = 'product'
 export const INVENTORY_DEFAULT_SECTION_WITHOUT_INVENTORY = 'product'
 
 /**

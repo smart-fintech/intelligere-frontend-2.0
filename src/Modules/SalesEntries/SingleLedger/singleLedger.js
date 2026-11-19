@@ -19,6 +19,10 @@
 import { renamerOf } from '@/Modules/SalesEntries/shared/keywordMapping'
 import { readLedgerList, readLines, renameLedgerList, text, toNumber } from '@/Modules/SalesEntries/shared/ledgerLists'
 import { rowKey } from '@/Modules/SalesEntries/shared/entryBatch'
+import { toApiLedgerKey } from '@/Services/Ledger/ledgerFields'
+
+/** The party address's key in the backend's entry rows (see ledgerFields). */
+const ADDRESS_KEY = toApiLedgerKey('ledger_address')
 
 const TAX_LISTS = Object.freeze([
   ['CGST', 'cgst_ledger'],
@@ -42,7 +46,7 @@ export const readSingleEntry = (raw, { mapping, ledgerNames }) => {
     gstin: text(raw?.gstno),
     partyGstin: text(raw?.gstin),
     state: text(raw?.state),
-    address: text(raw?.ledeger_address),
+    address: text(raw?.[ADDRESS_KEY]),
     total: toNumber(raw?.total),
     taxable: toNumber(raw?.taxable_amount),
     // Only the invoice's own party can be missing - the view's is picked from the company's ledgers.
@@ -78,7 +82,7 @@ export const toSingleLedgerRow = (entry, party, salesLedger) => ({
   Vouchetype: 'Sales',
   Vouchernumber: entry.invoiceNo,
   buyer_gstin: entry.gstin,
-  ledeger_address: entry.address,
+  [ADDRESS_KEY]: entry.address,
   buyer_state: entry.state,
 })
 

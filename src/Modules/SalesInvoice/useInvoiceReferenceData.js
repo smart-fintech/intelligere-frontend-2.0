@@ -102,15 +102,15 @@ export default function useInvoiceReferenceData(companyId) {
   const ledgerLookups = useMemo(() => {
     const usable = ledgersMine.filter((ledger) => getLedgerId(ledger) !== null)
     return {
-      options: usable.map((ledger) => ({ value: String(getLedgerId(ledger)), label: ledger.ledeger_name || '(no name)' })),
+      options: usable.map((ledger) => ({ value: String(getLedgerId(ledger)), label: ledger.ledger_name || '(no name)' })),
       byId: new Map(usable.map((ledger) => [String(getLedgerId(ledger)), ledger])),
       // What the GST ledgers are found among (Utils/gstLedgers) - the named
       // ones, and only this company's (a row that says another company_id is
       // never a candidate, whatever the list it came in).
       named: usable
-        .filter((ledger) => String(ledger.ledeger_name ?? '').trim())
+        .filter((ledger) => String(ledger.ledger_name ?? '').trim())
         .filter((ledger) => ledger.company_id === undefined || ledger.company_id === null || String(ledger.company_id) === String(companyId))
-        .map((ledger) => ({ id: String(getLedgerId(ledger)), name: String(ledger.ledeger_name).trim() })),
+        .map((ledger) => ({ id: String(getLedgerId(ledger)), name: String(ledger.ledger_name).trim() })),
     }
   }, [ledgersMine, companyId])
 

@@ -18,6 +18,9 @@
  *   PUT    procurement/pre_bid_create/   { id, auction_no, product: [...], technical_bid }
  *   DELETE procurement/pre_bid_create/   { pre_bid_cancel: true, auction_no, id }
  *
+ *   POST   procurement/pre_bid_certificate_verify/   PLACEHOLDER - see CERTIFICATE_VERIFY_URL
+ *          { pre_bid_id, pre_bid_no, vendor_email, "<certificate_name>": true }
+ *
  *   POST   procurement/pre_bid_chat/     { pre_bid_id }  -> { "<vendor email>": [message] }
  *   POST   procurement/pre_bid_chat/     { pre_bid_id, vendor_email, send_by, send_to, message }
  *   WS     ws/pre_bid_chat/<pre_bid_id>/?token=<access token>   (see preBidChatSocketUrl)
@@ -38,6 +41,13 @@ import { MULTIPART } from '@/Services/Global/apiHelpers'
 
 const PRE_BID_CHAT_URL = 'procurement/pre_bid_chat/'
 
+/*
+ * PLACEHOLDER ENDPOINT - the backend has no certificate verify API yet
+ * (checked 2026-11-18). Replace this URL (and the method below, if it differs)
+ * with the real one when the backend finalises it; nothing else needs to change.
+ */
+const CERTIFICATE_VERIFY_URL = 'procurement/pre_bid_certificate_verify/'
+
 // Named so axios sends the FormData as it is - see Services/Company/bankService.
 
 const urlOf = (kind) => EVENT_KINDS[kind].url
@@ -54,6 +64,25 @@ export const cancelEvent = (kind, { id, auctionNo, companyId }) =>
   api.delete(urlOf(kind), {
     data: { [EVENT_KINDS[kind].cancelKey]: true, auction_no: auctionNo, id, company_id: companyId },
   })
+
+/**
+ * Marks one of a vendor's certificates verified for one pre bid. The
+ * certificate is named by its `certificate_name` exactly as the vendor's
+ * profile spells it ("ISO-9365"), set to true:
+ *   { pre_bid_id: 12, pre_bid_no: "PB-01", vendor_email: "a@v.in", "ISO-9365": true }
+ */
+const VERIFY_RESERVED = new Set(['pre_bid_id', 'pre_bid_no', 'vendor_email'])
+export const verifyCertificate = ({ preBidId, preBidNo, vendorEmail, certificateName }) => {
+  if (!certificateName || VERIFY_RESERVED.has(certificateName)) {
+    return Promise.reject(new Error('This certificate has no name that can be verified.'))
+  }
+  return api.post(CERTIFICATE_VERIFY_URL, {
+    pre_bid_id: preBidId,
+    pre_bid_no: preBidNo,
+    vendor_email: vendorEmail,
+    [certificateName]: true,
+  })
+}
 
 export const getPreBidChats = (preBidId) => api.post(PRE_BID_CHAT_URL, { pre_bid_id: preBidId })
 

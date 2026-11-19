@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom'
 
 import { NAV_SECTIONS } from '@/Constants/navigation'
+import useModuleVisibility from '@/Hooks/useModuleVisibility'
 import { cn } from '@/Library/utils'
 
 /**
@@ -28,6 +29,10 @@ import { cn } from '@/Library/utils'
  *   - small screens: open = slides over the page, closed = off screen
  */
 export default function Sidebar({ open, onClose }) {
+  // A product module the user's type is denied has no row (useModuleVisibility);
+  // the other rows' keys are never module keys, so they are never hidden.
+  const { isHidden } = useModuleVisibility()
+
   return (
     <>
       {/* ---------- Dimmed backdrop, small screens only ----------
@@ -84,7 +89,7 @@ export default function Sidebar({ open, onClose }) {
                   section.nested && open && 'border-l border-border',
                 )}
               >
-                {section.items.map((item) => (
+                {section.items.filter((item) => !isHidden(item.key)).map((item) => (
                   <SidebarItem key={item.key} item={item} open={open} onClose={onClose} />
                 ))}
               </div>

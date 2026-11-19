@@ -8,6 +8,7 @@ import { Panel } from '@/Components/Common/Panel'
 import { Button } from '@/Components/ui/button'
 import { TICKET_DESCRIPTION_MAX } from '@/Constants/support'
 import { useActiveCompany } from '@/Hooks/useActiveCompany'
+import useModuleVisibility from '@/Hooks/useModuleVisibility'
 import { toast } from '@/Library/toast'
 import { ATTACHMENT_ACCEPT, attachmentProblem, moduleOptionsOf, refreshTickets } from '@/Modules/Support/support'
 import { createTicket } from '@/Services/Support/supportService'
@@ -45,7 +46,9 @@ export default function TicketForm({ storedEmail, onRaised }) {
   // Read synchronously, so a second click in the same instant sends nothing.
   const savingRef = useRef(false)
 
-  const moduleOptions = moduleOptionsOf(activeCompany)
+  // A module the user's type is denied is not one a ticket can be about (useModuleVisibility).
+  const { isNameHidden } = useModuleVisibility()
+  const moduleOptions = moduleOptionsOf(activeCompany).filter((option) => !isNameHidden(option.value))
   // A module the active company no longer offers is no choice at all.
   const chosenModule = moduleOptions.some((option) => option.value === moduleName) ? moduleName : ''
   const companiesLoading = (companyStatus === 'idle' || companyStatus === 'loading') && !activeCompany

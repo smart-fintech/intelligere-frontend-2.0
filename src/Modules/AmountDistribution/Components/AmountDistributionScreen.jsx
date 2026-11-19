@@ -77,7 +77,7 @@ export default function AmountDistributionScreen({ companyName, companyId }) {
 
   const ledgerOptions = useMemo(
     () =>
-      [...new Set(ledgers.map((ledger) => ledger.ledeger_name).filter(Boolean))]
+      [...new Set(ledgers.map((ledger) => ledger.ledger_name).filter(Boolean))]
         .sort((a, b) => a.localeCompare(b))
         .map((name) => ({ value: name, label: name })),
     [ledgers],

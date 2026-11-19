@@ -20,6 +20,7 @@
 import { EVENT_KIND, EVENT_KINDS, EVENT_STAGE, EVENT_STAGES } from '@/Constants/procurementAutomation'
 import { QUERY } from '@/Constants/queryKeys'
 import { invalidateQueries } from '@/Library/queryCache'
+import { formatTime, isOnStep, parseTime, showTime12 } from '@/Library/timeOfDay'
 import { isHtmlEmpty, sanitizeHtml, toRichText } from '@/Utils/richText'
 
 const asList = (value) => (Array.isArray(value) ? value : [])
@@ -150,6 +151,49 @@ export const applyBidUpdate = (events, update) => {
   return applied && !unknown ? next : null
 }
 
+/**
+ * A pre bid list (readEvents) with one vendor's certificate marked verified -
+ * after the verify call succeeds, so the screen shows it without reading the
+ * list again. Every entry of that vendor (by email) in that pre bid gets it;
+ * the certificate is matched by name as the profile spells it. Null when the
+ * list has no such certificate, so the caller reads the list instead.
+ */
+export const markCertificateVerified = (events, { eventId, vendorEmail, certificateName }) => {
+  if (!events) return null
+  const email = asText(vendorEmail).toLowerCase()
+  const name = asText(certificateName).toLowerCase()
+  let marked = false
+  const markProfile = (profile) => {
+    if (!profile || typeof profile !== 'object' || !Array.isArray(profile.technical_certifications)) return profile
+    return {
+      ...profile,
+      technical_certifications: profile.technical_certifications.map((certificate) => {
+        if (asText(certificate?.certificate_name).toLowerCase() !== name) return certificate
+        marked = true
+        return { ...certificate, certificate_verified: true }
+      }),
+    }
+  }
+  const next = Object.fromEntries(
+    Object.entries(events).map(([stage, list]) => [
+      stage,
+      list.map((event) => {
+        if (event.kind !== EVENT_KIND.PRE_BID || asText(event.id) !== asText(eventId)) return event
+        return {
+          ...event,
+          product: event.product.map((product) => ({
+            ...product,
+            vendor: asList(product.vendor).map((vendor) =>
+              asText(vendor?.email).toLowerCase() === email ? { ...vendor, Profile: markProfile(vendor.Profile) } : vendor,
+            ),
+          })),
+        }
+      }),
+    ]),
+  )
+  return marked ? next : null
+}
+
 /** After a create, an edit or a cancel - the list on screen is read again at once. */
 export const refreshEvents = (companyId, kind) =>
   invalidateQueries(QUERY.PROCUREMENT_EVENTS, { whose: [companyId, kind], refetchActive: true })
@@ -178,6 +222,9 @@ const readVendorOption = (raw, companyId) => {
     whatsapp: asText(raw?.whatsapp),
     address: asText(raw?.address),
     gst_no: asText(raw?.gst_no),
+    // Where it is - for its currency on a Bid (Modules/Procurement/vendorCurrency); never stored on the event.
+    country: asText(raw?.country),
+    state: asText(raw?.state),
     rating: raw?.rating?.[companyId] ?? null,
     deleted: details?.is_deleted === true,
   }
@@ -267,7 +314,12 @@ export const creationBlocker = ({ products, vendorCount, label = 'Bid' }) => {
   return null
 }
 
-/** What an event stores of a vendor - the vendor as it was when it was invited. */
+/**
+ * What an event stores of a vendor - the vendor as it was when it was invited.
+ * Its country is not one of them: it is the vendor master's. A foreign
+ * vendor's `currency` and `conversion_rate` are added on save
+ * (withVendorCurrencies, Modules/Procurement/vendorCurrency).
+ */
 export const toEventVendor = (option) => {
   const vendor = { id: option.id, name: option.name, email: option.email }
   ;['company', 'contact', 'whatsapp', 'address', 'gst_no'].forEach((field) => {
@@ -300,6 +352,8 @@ export const emptyMaster = () => ({
   hide_lowest_bid_amount: false,
   add_extra_time: false,
   extra_time: '',
+  // Pre Bid only: minutes before the Technical Bid Start that vendors are emailed a reminder ('' = none).
+  vendor_email_reminder: '',
 })
 
 /**
@@ -323,6 +377,7 @@ export const masterFromEvent = (event) => ({
   hide_lowest_bid_amount: event?.hide_lowest_bid_amount === true,
   add_extra_time: event?.add_extra_time === true && Number(event?.extra_time) > 0,
   extra_time: Number(event?.extra_time) > 0 ? asText(event.extra_time) : '',
+  vendor_email_reminder: isWholePositive(event?.vendor_email_reminder) ? asText(event.vendor_email_reminder) : '',
 })
 
 const isPositive = (value) => asText(value) !== '' && Number(value) > 0
@@ -331,16 +386,56 @@ const isWholePositive = (value) => isPositive(value) && Number.isInteger(Number(
 /** A minute's grace, so a start picked for "now" is not already past by the time Save is pressed. */
 const PAST_GRACE_MS = 60 * 1000
 
-/** One window's four boxes - each filled, the start not past, the close after it. */
+/** Start and close times go in whole steps of this many minutes - 4:00, 4:15, 4:30, 4:45 ... */
+export const TIME_STEP_MINUTES = 15
+
+/** True for a time off the step (an old saved 4:05); the picker only offers on-step times, so this is a backstop. */
+const offTimeStep = (time) => parseTime(time) !== null && !isOnStep(time, TIME_STEP_MINUTES)
+
+/** One window's four boxes - each filled and on a TIME_STEP_MINUTES step, the start not past, the close after it. */
 const checkWindow = (errors, master, start, close, now) => {
   ;[`${start}_date`, `${start}_time`, `${close}_date`, `${close}_time`].forEach((field) => {
     if (!master[field]) errors[field] = field.endsWith('_date') ? 'Choose a date.' : 'Choose a time.'
+    else if (field.endsWith('_time') && offTimeStep(master[field])) {
+      errors[field] = `Pick a time in ${TIME_STEP_MINUTES}-minute steps.`
+    }
   })
   const opens = inputMoment(master[`${start}_date`], master[`${start}_time`])
   const closes = inputMoment(master[`${close}_date`], master[`${close}_time`])
-  if (opens !== null && opens < now - PAST_GRACE_MS) errors[`${start}_time`] = 'This time is already past.'
-  if (opens !== null && closes !== null && closes <= opens) errors[`${close}_time`] = 'Must be after the start.'
+  if (opens !== null && opens < now - PAST_GRACE_MS && !errors[`${start}_time`]) {
+    errors[`${start}_time`] = 'This time is already past.'
+  }
+  if (opens !== null && closes !== null && closes <= opens && !errors[`${close}_time`]) {
+    errors[`${close}_time`] = 'Must be after the start.'
+  }
   return { opens, closes }
+}
+
+/**
+ * The vendor email reminder's message (Pre Bid), or null when it is fine:
+ * empty for none, or whole minutes above 0, and the moment it would be sent -
+ *
+ *   reminder = Technical Bid Start (date AND time) - the minutes
+ *
+ * - must still be ahead of now. The start is read as every window's is
+ * (inputMoment: the browser's local time), and the minutes are taken off the
+ * full timestamp, so a reminder that falls on the day before, or across noon,
+ * comes out right (10:00 AM - 120 = 8:00 AM; 00:30 - 60 = 11:30 PM the day
+ * before). Without a Technical Bid Start yet there is nothing to time it from,
+ * and only the minutes are checked. The form runs this as either box changes,
+ * and again on Save (validateMaster).
+ */
+export const vendorReminderError = (master, now = Date.now()) => {
+  const text = asText(master?.vendor_email_reminder)
+  if (text === '') return null
+  if (!/^\d+$/.test(text) || Number(text) <= 0) return 'Enter whole minutes above 0, or leave it empty.'
+  const start = inputMoment(master.pre_starting_date, master.pre_starting_time)
+  if (start === null) return null
+  const sendAt = new Date(start - Number(text) * 60000)
+  if (sendAt.getTime() > now) return null
+  const day = `${String(sendAt.getDate()).padStart(2, '0')}-${String(sendAt.getMonth() + 1).padStart(2, '0')}-${sendAt.getFullYear()}`
+  const clock = showTime12(formatTime(sendAt.getHours(), sendAt.getMinutes()))
+  return `The reminder would go out at ${clock} on ${day}, which is already past. Enter fewer minutes or a later Technical Bid Start.`
 }
 
 /** { field: message } - empty when the master details can be saved. Only a new event is checked: an edit cannot change them. */
@@ -354,6 +449,8 @@ export const validateMaster = (master, kind, now = Date.now()) => {
     if (technical.closes !== null && bid.opens !== null && bid.opens < technical.closes && !errors.starting_time) {
       errors.starting_time = 'The bid must start after the technical bid closes.'
     }
+    const reminder = vendorReminderError(master, now)
+    if (reminder) errors.vendor_email_reminder = reminder
   }
 
   if (!isPositive(master.gap)) errors.gap = 'Enter a bid gap above 0.'
@@ -390,6 +487,7 @@ const buildMaster = (master, kind) => {
     pre_starting_time: master.pre_starting_time,
     pre_closing_date: toApiDate(master.pre_closing_date),
     pre_closing_time: master.pre_closing_time,
+    vendor_email_reminder: asText(master.vendor_email_reminder),
   }
 }
 
@@ -420,6 +518,88 @@ export const rowsFromEvent = (event) =>
       product: { ...product, sr_no: product?.sr_no ?? index + 1, vendor: vendors },
     }
   })
+
+/* ------------------------------------------------------------------ */
+/* A Bid created from a Pre Bid (Create Bid)                          */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Once a Pre Bid's technical bid has closed (Completed, not cancelled), its
+ * Financial Bid is created as an ordinary Bid - the Add Bid form and its save
+ * (procurement/auction_create/), prefilled from the Pre Bid. Nothing links the
+ * two on the backend; the Bid simply starts with the Pre Bid's number,
+ * financial window, master options, products and vendors. It can be created
+ * until the Pre Bid's Financial Bid Start has passed.
+ */
+
+/** True for a Pre Bid whose technical bid has closed - Create Bid is offered on it. */
+export const canCreateBidFrom = (event) =>
+  event?.kind === EVENT_KIND.PRE_BID && event.stage === EVENT_STAGE.COMPLETED && !event.cancelled
+
+/** The Pre Bid's Financial Bid Start as a timestamp, or null. */
+export const financialStartOf = (event) => momentOf(event?.starting_date, event?.starting_time)
+
+/** The Bid's master details from the Pre Bid: its number, financial window and options (no technical window, no reminder). */
+export const masterFromPreBid = (event) => ({
+  ...masterFromEvent(event),
+  pre_starting_date: '',
+  pre_starting_time: '',
+  pre_closing_date: '',
+  pre_closing_time: '',
+  vendor_email_reminder: '',
+})
+
+/** The Pre Bid's products as new rows of the Bid - each can be changed or taken out, as a row added in Add Bid. */
+export const rowsFromPreBid = (event) =>
+  rowsFromEvent(event).map((row) => ({ ...row, locked: false, lockedVendorKeys: [] }))
+
+/**
+ * The Pre Bid's vendors for the Create Bid checklist, once each:
+ * [{ key, vendor, entries }] - `entries` is each row (by its key) the vendor was
+ * on, with the entry as the Pre Bid saved it, so ticking it again puts it back
+ * where it was.
+ */
+export const preBidVendorChoices = (rows) => {
+  const found = new Map()
+  rows.forEach((row) =>
+    asList(row.product.vendor).forEach((vendor) => {
+      const key = vendorKey(vendor)
+      if (!key) return
+      if (!found.has(key)) found.set(key, { key, vendor, entries: new Map() })
+      found.get(key).entries.set(row.key, vendor)
+    }),
+  )
+  return [...found.values()]
+}
+
+/** Whether a checklist vendor is in the Bid - on at least one of its products. */
+export const isVendorChosen = (rows, choice) =>
+  rows.some((row) => asList(row.product.vendor).some((vendor) => vendorKey(vendor) === choice.key))
+
+/**
+ * The rows with a checklist vendor ticked or unticked: unticked, it is taken
+ * off every product; ticked, it is put back on each of its Pre Bid products
+ * still in the form (one taken out stays out).
+ */
+export const chooseVendor = (rows, choice, on) =>
+  rows.map((row) => {
+    const vendors = asList(row.product.vendor)
+    const has = vendors.some((vendor) => vendorKey(vendor) === choice.key)
+    if (!on) {
+      return has ? { ...row, product: { ...row.product, vendor: vendors.filter((vendor) => vendorKey(vendor) !== choice.key) } } : row
+    }
+    const entry = choice.entries.get(row.key)
+    return entry && !has ? { ...row, product: { ...row.product, vendor: [...vendors, entry] } } : row
+  })
+
+/** The Create Bid form's vendor check - its own key in the flat error map. */
+export const SELECTED_VENDORS_ERROR = 'selectedVendors'
+
+/** The message when no product of the Bid has a vendor left, or null. */
+export const selectedVendorsError = (rows) =>
+  collectVendors(rows.map((row) => row.product)).length === 0
+    ? 'Please select at least one vendor to create the Financial Bid.'
+    : null
 
 /** The next free sr_no - after the highest any row has. */
 export const nextSrNo = (rows) => rows.reduce((highest, row) => Math.max(highest, Number(row.product.sr_no) || 0), 0) + 1
@@ -457,6 +637,7 @@ export const hasProduct = (rows, name, skuCode) =>
  *   products     PRODUCTS_ERROR - no product at all
  *   a row        rowErrorKey(row.key, 'qty' | 'delivery_days' | 'vendor' | 'product')
  *   technical    technicalErrorKey('certification', index) / ('faq', index, 'question' | 'answer')
+ *                / ('meeting', 'date' | 'time' | 'link')
  */
 export const PRODUCTS_ERROR = 'products'
 export const rowErrorKey = (rowKey, field) => `${rowKey}.${field}`
@@ -502,20 +683,123 @@ const toSavedProducts = (rows) =>
 /* The form: technical bid (pre bid only)                             */
 /* ------------------------------------------------------------------ */
 
-export const emptyTechnicalBid = () => ({ required_certifications: [], faqs: [], note: '' })
+/*
+ * The pre bid meeting lives in the technical bid, as `meeting_details` - the
+ * object this module has always kept on an update. The backend stores the
+ * technical bid as it is sent, so nothing else is needed for it:
+ *
+ *   technical_bid.meeting_details = {
+ *     meeting_date: "23-11-2026",   the API's date format, as master's dates
+ *     meeting_time: "16:30",        24-hour, as master's times
+ *     meeting_link: "https://meet.google.com/abc-defg-hij",
+ *   }
+ *
+ * Any one of the three may be left empty; with all three empty no
+ * meeting_details is sent. Read back, `date` / `time` / `link` / `url` are
+ * accepted too, and any other key of a saved meeting_details is kept.
+ */
+const MEETING_KEYS = {
+  date: ['meeting_date', 'date'],
+  time: ['meeting_time', 'time'],
+  link: ['meeting_link', 'link', 'url'],
+}
+const MEETING_KEY_NAMES = Object.values(MEETING_KEYS).flat()
+
+const firstOf = (source, keys) => {
+  const key = keys.find((name) => asText(source[name]) !== '')
+  return key ? asText(source[key]) : ''
+}
+
+/** The meeting as the form edits it - { date: "2026-11-23" (the date box's format), time: "16:30", link }. */
+export const emptyMeeting = () => ({ date: '', time: '', link: '' })
+
+const readMeeting = (details) => {
+  if (!details || typeof details !== 'object') return emptyMeeting()
+  const date = firstOf(details, MEETING_KEYS.date)
+  const time = parseTime(firstOf(details, MEETING_KEYS.time))
+  return {
+    date: fromApiDate(date) || (/^\d{4}-\d{2}-\d{2}$/.test(date) ? date : ''),
+    time: time ? formatTime(time.hours, time.minutes) : '',
+    link: firstOf(details, MEETING_KEYS.link),
+  }
+}
+
+/**
+ * A meeting link that is safe to open: an http(s) address with a real host, as
+ * { href, host, label } - a bare "meet.google.com/abc" is read as https. Null
+ * for anything else (a "javascript:" link, plain words), which is never linked.
+ */
+const PROVIDERS = [
+  [/(^|\.)meet\.google\.com$/, 'Google Meet'],
+  [/(^|\.)zoom\.(us|com)$/, 'Zoom'],
+  [/(^|\.)teams\.(microsoft|live)\.com$/, 'Microsoft Teams'],
+  [/(^|\.)webex\.com$/, 'Webex'],
+  [/(^|\.)skype\.com$/, 'Skype'],
+]
+export const meetingLink = (text) => {
+  const raw = asText(text)
+  if (!raw || /\s/.test(raw)) return null
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : /^[\w-]+(\.[\w-]+)+([/?#:]|$)/.test(raw) ? `https://${raw}` : ''
+  if (!withScheme) return null
+  let url
+  try {
+    url = new URL(withScheme)
+  } catch {
+    return null
+  }
+  if (!['http:', 'https:'].includes(url.protocol) || !url.hostname.includes('.') || url.username || url.password) {
+    return null
+  }
+  const host = url.hostname.replace(/^www\./, '')
+  const provider = PROVIDERS.find(([pattern]) => pattern.test(host))
+  return { href: url.href, host, label: provider ? provider[1] : host }
+}
+
+/** Same day and time - a new link on a meeting that is already past does not make it "past" again. */
+const sameMoment = (a, b) => a.date === b.date && a.time === b.time
+
+/** What is saved for the form's meeting: the stored meeting_details, or null when there is no meeting. */
+const buildMeeting = (form) => {
+  const saved = form.meeting_details && typeof form.meeting_details === 'object' ? form.meeting_details : null
+  if (!form.meeting) return saved // not edited by this form - kept as it came
+  const meeting = form.meeting
+  const time = parseTime(meeting.time)
+  const link = asText(meeting.link)
+  const value = {
+    meeting_date: toApiDate(meeting.date),
+    meeting_time: time ? formatTime(time.hours, time.minutes) : '',
+    meeting_link: link ? (meetingLink(link)?.href ?? link) : '',
+  }
+  const others = saved ? Object.fromEntries(Object.entries(saved).filter(([key]) => !MEETING_KEY_NAMES.includes(key))) : {}
+  const empty = !value.meeting_date && !value.meeting_time && !value.meeting_link
+  if (empty) return Object.keys(others).length > 0 ? others : null
+  return { ...others, ...value }
+}
+
+export const emptyTechnicalBid = () => ({
+  required_certifications: [],
+  faqs: [],
+  meeting: emptyMeeting(),
+  savedMeeting: emptyMeeting(),
+  note: '',
+})
 
 /**
  * The note is rich text, HTML as the old module stored it ("<p>Send <b>samples</b></p>");
- * a plain-text note keeps its line breaks. A meeting the old module saved is not
- * edited here but kept, so an update does not drop it.
+ * a plain-text note keeps its line breaks. `meeting` is what the form edits,
+ * `savedMeeting` what it opened with (a saved meeting already past is not
+ * flagged), `meeting_details` the stored object, whose other keys are kept.
  */
 export const readTechnicalBid = (event) => {
   const source = event?.technical_bid ?? {}
+  const meeting = readMeeting(source.meeting_details)
   const technical = {
     required_certifications: asList(source.required_certifications).map((entry) =>
       typeof entry === 'string' ? entry : asText(entry?.name),
     ),
     faqs: asList(source.faqs).map((faq) => ({ question: asText(faq?.question), answer: asText(faq?.answer) })),
+    meeting,
+    savedMeeting: { ...meeting },
     note: toRichText(source.note),
   }
   if (source.meeting_details && typeof source.meeting_details === 'object') technical.meeting_details = source.meeting_details
@@ -523,21 +807,43 @@ export const readTechnicalBid = (event) => {
 }
 
 /**
+ * The meeting as it is shown - { date: "23-11-2026", time: "16:30", link
+ * (meetingLink, or null), linkText (what was saved, shown unlinked when it is
+ * not a safe link), at (a timestamp when date and time are both known) } -
+ * or null when there is no meeting.
+ */
+const showMeeting = (meeting) => {
+  const date = toApiDate(meeting.date)
+  const linkText = asText(meeting.link)
+  if (!date && !meeting.time && !linkText) return null
+  return {
+    date,
+    time: meeting.time,
+    link: meetingLink(linkText),
+    linkText,
+    at: momentOf(date, meeting.time),
+  }
+}
+
+/**
  * What a technical bid has to show (readTechnicalBid, blanks left out):
- * { certifications, faqs, note, hasNote, isEmpty } - every certification the
- * API lists is a required one.
+ * { certifications, faqs, meeting, note, hasNote, isEmpty } - every
+ * certification the API lists is a required one; `meeting` is null when none
+ * was set (showMeeting).
  */
 export const readTechnicalDetails = (event) => {
   const technical = readTechnicalBid(event)
   const certifications = technical.required_certifications.map(asText).filter(Boolean)
   const faqs = technical.faqs.filter((faq) => faq.question || faq.answer)
+  const meeting = showMeeting(technical.meeting)
   const hasNote = !isHtmlEmpty(technical.note)
   return {
     certifications,
     faqs,
+    meeting,
     note: technical.note,
     hasNote,
-    isEmpty: certifications.length === 0 && faqs.length === 0 && !hasNote,
+    isEmpty: certifications.length === 0 && faqs.length === 0 && !meeting && !hasNote,
   }
 }
 
@@ -559,15 +865,45 @@ export const buildTechnicalBid = (form) => {
   const repeated = certifications.find((_, index) => lower.indexOf(lower[index]) !== index)
   if (repeated) return { value: null, error: `Certification "${repeated}" is listed more than once.` }
 
+  if (form.meeting && asText(form.meeting.link) && !meetingLink(form.meeting.link)) {
+    return { value: null, error: 'Enter the meeting link as a web address, such as https://meet.google.com/abc-defg-hij.' }
+  }
+
   const note = isHtmlEmpty(form.note) ? '' : sanitizeHtml(form.note).trim()
   const value = { required_certifications: certifications, faqs, note }
-  if (form.meeting_details) value.meeting_details = form.meeting_details
+  const meeting = buildMeeting(form)
+  if (meeting) value.meeting_details = meeting
   return { value, error: null }
 }
 
+/**
+ * The meeting's boxes: a time needs its date, a link must be a web address,
+ * and a date or time set or changed here cannot be already past (a saved one
+ * is left alone, so an old pre bid can still be updated).
+ */
+const meetingErrors = (errors, form, now) => {
+  const meeting = form.meeting
+  if (!meeting) return
+  if (asText(meeting.link) && !meetingLink(meeting.link)) {
+    errors[technicalErrorKey('meeting', 'link')] = 'Enter a web address, such as https://meet.google.com/abc-defg-hij.'
+  }
+  if (meeting.time && !meeting.date) errors[technicalErrorKey('meeting', 'date')] = 'Choose the date of the meeting.'
+  if (!meeting.date || (form.savedMeeting && sameMoment(meeting, form.savedMeeting))) return
+  const today = new Date(now)
+  today.setHours(0, 0, 0, 0)
+  const day = inputMoment(meeting.date, '00:00')
+  if (day !== null && day < today.getTime()) {
+    errors[technicalErrorKey('meeting', 'date')] = 'This date is already past.'
+    return
+  }
+  const at = inputMoment(meeting.date, meeting.time)
+  if (at !== null && at < now - PAST_GRACE_MS) errors[technicalErrorKey('meeting', 'time')] = 'This time is already past.'
+}
+
 /** { key: message } for the technical bid's boxes, by their place in the form - empty when buildTechnicalBid accepts it. */
-export const technicalBidErrors = (form) => {
+export const technicalBidErrors = (form, now = Date.now()) => {
   const errors = {}
+  meetingErrors(errors, form, now)
   asList(form.faqs).forEach((faq, index) => {
     const question = asText(faq.question)
     const answer = asText(faq.answer)

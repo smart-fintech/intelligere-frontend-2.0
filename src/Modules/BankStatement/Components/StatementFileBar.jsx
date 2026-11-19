@@ -71,7 +71,7 @@ export default function StatementFileBar({ statement, view, views, onViewChange 
           disabled={busy}
           onFileSelect={statement.setFile}
         >
-          {statement.file ? 'Change File' : 'Select File'}
+          {statement.file ? 'Change File' : 'Choose File'}
         </CsvUploadButton>
       ) : null}
 

@@ -3,17 +3,19 @@
  * ledgers and products to map, and the ones chosen sent on:
  *
  *   POST invoice/app-ledger-product/   { company_name, document_type }   ('Sales Invoice' | 'Purchase Invoice')
- *        -> { ledger: [{ ledger_obj_id, ledeger_name, ledeger_group_name, platform }],
+ *        -> { ledger: [{ ledger_obj_id, ledger_name, ledger_group_name, platform }],
  *             product: [{ product_id, product_name, group, hsn_code, per_unit, gst_rate,
  *                         selling_rate, category, product_ids }] }
  *   PUT  invoice/app-ledger-product/   { company_name, ledger: [ledger_obj_id...], product: [product_id...] }
  *        -> { msg: "Send To Tally Successfully" }
  *
- * The backend's own names are read as sent (`ledeger_name` included).
+ * The ledger rows' field names are the app's (fromApiLedger - see
+ * Services/Ledger/ledgerFields); everything else is read as sent.
  */
 
 import { api } from '@/Services/Global/apiService'
 import { text } from '@/Services/Global/apiHelpers'
+import { fromApiLedger } from '@/Services/Ledger/ledgerFields'
 
 const APP_LEDGER_PRODUCT_URL = 'invoice/app-ledger-product/'
 
@@ -35,8 +37,9 @@ export const readAppLedgerProducts = (reply) => {
   const rows = (list) => (Array.isArray(list) ? list.filter((row) => row && typeof row === 'object') : [])
   return {
     ledgers: rows(data.ledger)
+      .map(fromApiLedger)
       .filter((row) => hasId(row.ledger_obj_id))
-      .map((row) => ({ id: row.ledger_obj_id, name: text(row.ledeger_name), group: text(row.ledeger_group_name), platform: text(row.platform) })),
+      .map((row) => ({ id: row.ledger_obj_id, name: text(row.ledger_name), group: text(row.ledger_group_name), platform: text(row.platform) })),
     products: rows(data.product)
       .filter((row) => hasId(row.product_id))
       .map((row) => ({

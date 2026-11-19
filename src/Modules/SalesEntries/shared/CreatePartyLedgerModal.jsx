@@ -49,11 +49,11 @@ export default function CreatePartyLedgerModal({ entry, companyId, companyName, 
           key={entry.key}
           ledger={null}
           defaults={{
-            ledeger_name: entry.partyLedger,
-            ledeger_gstin: entry.gstin,
-            ledeger_state: entry.state,
-            ledeger_address: entry.address,
-            ledeger_group_name: group,
+            ledger_name: entry.partyLedger,
+            ledger_gstin: entry.gstin,
+            ledger_state: entry.state,
+            ledger_address: entry.address,
+            ledger_group_name: group,
           }}
           companyId={companyId}
           companyName={companyName}

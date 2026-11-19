@@ -526,6 +526,11 @@ export const createInvoiceForm = (company) => ({
   roundOff: { ledgerId: '' },
   tcs: { ledgerId: '', amount: '' },
   note: '',
+
+  // The ledger party's currency, when it is from another country (documentCurrency):
+  // what was typed, by party, and what the document was saved with.
+  currency: {},
+  savedCurrency: null,
 })
 
 /** The Document Details every type has - its number and date. */
@@ -603,7 +608,7 @@ export const emptyAddress = () => ({ ...EMPTY_PARTY_ADDRESS })
 
 /**
  * The Buyer Details a ledger fills in, from the ledger row as
- * tally/create-ledger/ lists it (the API's own spelling - "ledeger").
+ * tally/create-ledger/ lists it (with the app's field names - ledgerFields).
  *
  * EVERY buyer field is replaced, a missing value with '' - so nothing of the
  * previous buyer is left behind. The user may edit any of it afterwards.
@@ -613,7 +618,7 @@ export const emptyAddress = () => ({ ...EMPTY_PARTY_ADDRESS })
  * no country but an Indian state is in India; with neither, the default.
  */
 export const buyerFromLedger = (ledger, ledgerId, { countryNames = [], stateNamesOf = () => [] } = {}) => {
-  const rawState = textOf(ledger?.ledeger_state)
+  const rawState = textOf(ledger?.ledger_state)
   const rawCountry = textOf(ledger?.ledger_country) || (rawState && findStateByName(rawState) ? DEFAULT_COUNTRY : '') || DEFAULT_COUNTRY
   const country = matchName(countryNames, rawCountry)
   const stateNames = stateNamesOf(country)
@@ -621,15 +626,15 @@ export const buyerFromLedger = (ledger, ledgerId, { countryNames = [], stateName
 
   return {
     ledgerId,
-    name: textOf(ledger?.ledeger_name),
-    phone: textOf(ledger?.ledeger_phone).replace(/\D/g, ''),
-    email: textOf(ledger?.ledeger_email),
-    address: textOf(ledger?.ledeger_address).slice(0, ADDRESS_MAX_LENGTH),
-    website: textOf(ledger?.ledeger_website),
+    name: textOf(ledger?.ledger_name),
+    phone: textOf(ledger?.ledger_phone).replace(/\D/g, ''),
+    email: textOf(ledger?.ledger_email),
+    address: textOf(ledger?.ledger_address).slice(0, ADDRESS_MAX_LENGTH),
+    website: textOf(ledger?.ledger_website),
     country,
     state,
     pincode: textOf(ledger?.ledger_pincode).replace(/\D/g, ''),
-    gstin: textOf(ledger?.ledeger_gstin).toUpperCase(),
+    gstin: textOf(ledger?.ledger_gstin).toUpperCase(),
     regType: textOf(ledger?.ledger_gst_reg_type),
   }
 }
@@ -1409,6 +1414,8 @@ export const validateFormWith = (partyChecks) => (entered, context, step = null)
   const form = applicableForm(entered)
 
   partyChecks.forEach((check) => check(form, found, context))
+  // The ledger party's currency, on its own step (documentCurrency) - where the screen gives the rules for it.
+  context?.checkCurrency?.(form, found)
   validateDocumentStep(form, found, context)
   validateProductsStep(form, found, context)
   checkPortalRequirements(found, form)

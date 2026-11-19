@@ -176,11 +176,11 @@ export default function PurchaseSellerStep({ invoice, ledgers, countries, disabl
           <Field
             id="seller-gstin"
             label="Seller GSTN"
-            required
+            // required
             maxLength={15}
             inputClassName="uppercase"
             value={seller.gstin}
-            error={errors['seller.gstin']}
+            // error={errors['seller.gstin']}
             disabled={disabled}
             onChange={onText('gstin', (value) => value.toUpperCase())}
           />
