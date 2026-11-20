@@ -200,28 +200,38 @@ const twoUpRows = (cells) => {
   return rows
 }
 
-/** The document details beside the parties, two to a row, blanks removed (twoUpRows). */
+/**
+ * Whether the sheet prints a Document Details field (its form key) - not one
+ * hidden now (invoice.hiddenFields: E-Way Bill unticked on Sales Invoice /
+ * Credit Note / Debit Note). A hidden cell is dropped like a blank one.
+ */
+export const printsField = (invoice, key) => !key || !(invoice?.hiddenFields ?? []).includes(key)
+const printed = (invoice, cells) => cells.filter((cell) => printsField(invoice, cell.field))
+
+/** The document details beside the parties, two to a row, blanks (and hidden fields) removed (twoUpRows). */
 export const headerMetaRows = (invoice) =>
-  twoUpRows([
-    // The type's own labels ("Sales Order No") - an invoice's when not given.
-    { label: invoice.numberLabel || 'Invoice No', value: invoice.invoiceNo },
-    { label: invoice.dateLabel || 'Invoice Date', value: formatSheetDate(invoice.invoiceDate) },
-    // The invoice a Credit / Debit Note adjusts.
-    { label: 'Invoice No', value: invoice.linkedInvoiceNo },
-    { label: 'Invoice Date', value: formatSheetDate(invoice.linkedInvoiceDate) },
-    { label: 'Reference No', value: invoice.referenceNo },
-    { label: 'Reference Date', value: formatSheetDate(invoice.referenceDate) },
-    { label: 'PO No', value: invoice.poNo },
-    { label: 'PO Date', value: formatSheetDate(invoice.poDate) },
-    { label: 'Delivery Note', value: invoice.deliveryNote },
-    { label: 'Delivery Note Date', value: formatSheetDate(invoice.deliveryNoteDate) },
-    { label: 'Reason For Transport', value: invoice.transportReason },
-    { label: 'Dispatch Through', value: invoice.dispatchThrough },
-    { label: 'Mode/Terms of Payment', value: invoice.paymentTerms },
-    { label: 'Freight Terms of Payment', value: invoice.freightTerms },
-    { label: 'BL / LR-RR No', value: invoice.lrNo },
-    { label: 'LR-RR Date', value: formatSheetDate(invoice.lrDate) },
-  ])
+  twoUpRows(
+    printed(invoice, [
+      // The type's own labels ("Sales Order No") - an invoice's when not given.
+      { label: invoice.numberLabel || 'Invoice No', value: invoice.invoiceNo },
+      { label: invoice.dateLabel || 'Invoice Date', value: formatSheetDate(invoice.invoiceDate) },
+      // The invoice a Credit / Debit Note adjusts.
+      { label: 'Invoice No', value: invoice.linkedInvoiceNo, field: 'challanInvoiceNo' },
+      { label: 'Invoice Date', value: formatSheetDate(invoice.linkedInvoiceDate), field: 'challanInvoiceDate' },
+      { label: 'Reference No', value: invoice.referenceNo, field: 'referenceNo' },
+      { label: 'Reference Date', value: formatSheetDate(invoice.referenceDate), field: 'referenceDate' },
+      { label: 'PO No', value: invoice.poNo, field: 'poNo' },
+      { label: 'PO Date', value: formatSheetDate(invoice.poDate), field: 'poDate' },
+      { label: 'Delivery Note', value: invoice.deliveryNote, field: 'deliveryNote' },
+      { label: 'Delivery Note Date', value: formatSheetDate(invoice.deliveryNoteDate), field: 'deliveryNoteDate' },
+      { label: 'Reason For Transport', value: invoice.transportReason, field: 'transportReason' },
+      { label: 'Dispatch Through', value: invoice.dispatchThrough, field: 'transporter' },
+      { label: 'Mode/Terms of Payment', value: invoice.paymentTerms, field: 'termsOfPayment' },
+      { label: 'Freight Terms of Payment', value: invoice.freightTerms, field: 'freightTerms' },
+      { label: 'BL / LR-RR No', value: invoice.lrNo, field: 'lrNo' },
+      { label: 'LR-RR Date', value: formatSheetDate(invoice.lrDate), field: 'lrDate' },
+    ]),
+  )
 
 /**
  * The transport rows under them, blanks removed: Transporter ID | Vehicle No,
@@ -230,16 +240,16 @@ export const headerMetaRows = (invoice) =>
 export const transportRows = (invoice) =>
   [
     [
-      { label: 'Transporter ID', value: invoice.transporterId },
-      { label: 'Vehicle No', value: invoice.vehicleNo },
+      { label: 'Transporter ID', value: invoice.transporterId, field: 'transporterId' },
+      { label: 'Vehicle No', value: invoice.vehicleNo, field: 'vehicleNo' },
     ],
     [
-      { label: 'Distance', value: invoice.distance },
-      { label: 'Supply', value: invoice.supply },
-      { label: 'Delivery Mode', value: invoice.deliveryMode },
+      { label: 'Distance', value: invoice.distance, field: 'distance' },
+      { label: 'Supply', value: invoice.supply, field: 'supplyType' },
+      { label: 'Delivery Mode', value: invoice.deliveryMode, field: 'deliveryMode' },
     ],
   ]
-    .map((row) => row.filter((cell) => has(cell.value)))
+    .map((row) => printed(invoice, row).filter((cell) => has(cell.value)))
     .filter((row) => row.length > 0)
 
 /**

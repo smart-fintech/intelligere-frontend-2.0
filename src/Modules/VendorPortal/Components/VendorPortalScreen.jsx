@@ -22,8 +22,8 @@ import { VENDOR_STAGES } from '@/Modules/VendorPortal/vendorPortal'
  */
 
 const KIND_OPTIONS = [
-  { value: EVENT_KIND.BID, label: 'Bids' },
-  { value: EVENT_KIND.PRE_BID, label: 'Pre Bids' },
+  { value: EVENT_KIND.BID, label: 'Financial Bids' },
+  { value: EVENT_KIND.PRE_BID, label: 'Technical Bids' },
 ]
 
 export default function VendorPortalScreen({ email, lists }) {
@@ -59,7 +59,7 @@ export default function VendorPortalScreen({ email, lists }) {
           <StateMessage
             icon={AlertCircle}
             tone="error"
-            title={`Could not load your ${label.toLowerCase()}s`}
+            title={`Could not load your ${label}s`}
             action={<RetryButton onClick={reload} />}
           >
             {list.error}
@@ -88,9 +88,9 @@ export default function VendorPortalScreen({ email, lists }) {
         />
 
         {events.length === 0 ? (
-          <StateMessage icon={Inbox} title={`No ${stage.toLowerCase()} ${label.toLowerCase()}s`}>
+          <StateMessage icon={Inbox} title={`No ${stage.toLowerCase()} ${label}s`}>
             {stage === EVENT_STAGE.ONGOING
-              ? `A ${label.toLowerCase()} you are invited to shows up here once it starts.`
+              ? `A ${label} you are invited to shows up here once it starts.`
               : `${label}s you took part in show up here once they close.`}
           </StateMessage>
         ) : (
@@ -115,7 +115,7 @@ export default function VendorPortalScreen({ email, lists }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-brand sm:text-2xl">Your Bids</h1>
+        <h1 className="text-xl font-semibold text-brand sm:text-2xl">Your Financial &amp; Technical Bids</h1>
         <ViewSwitch
           options={KIND_OPTIONS}
           value={kind}
@@ -123,14 +123,14 @@ export default function VendorPortalScreen({ email, lists }) {
             setKind(next)
             setChatWith(null)
           }}
-          label="Bids or Pre Bids"
+          label="Financial Bids or Technical Bids"
           idPrefix="vendor-kind"
         />
       </div>
 
       <Panel
         title={`${label}s`}
-        meta={running ? 'Updates every 20 seconds while a bid runs' : undefined}
+        meta={running ? 'Updates every 20 seconds while a Financial Bid runs' : undefined}
         actions={
           <Button
             type="button"

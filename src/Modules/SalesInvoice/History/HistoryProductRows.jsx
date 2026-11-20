@@ -3,7 +3,8 @@ import { formatIndianCurrency } from '@/Utils/currency'
 
 /**
  * One line's columns - S.No., Product, HSN/SAC, Qty, Rate, Disc. %, Taxable
- * Amount, GST %, GST Amount - the SAME template for the headings and every
+ * Amount, GST (CGST + SGST, or IGST - each with its rate and amount), GST
+ * Amount - the SAME template for the headings and every
  * line, so they always line up. Each column has a floor its heading and usual
  * values fit in, and shares out the room above that (Product the most); the
  * grid is never narrower than the floors added up, and below that it scrolls
@@ -11,7 +12,7 @@ import { formatIndianCurrency } from '@/Utils/currency'
  * (CELL) - it never runs into the next one.
  */
 const GRID =
-  'grid min-w-[60rem] grid-cols-[2.5rem_minmax(12rem,3fr)_minmax(6rem,1fr)_minmax(6.5rem,1fr)_minmax(7rem,1fr)_minmax(4.5rem,0.6fr)_minmax(8rem,1.2fr)_minmax(4.5rem,0.6fr)_minmax(7.5rem,1.1fr)] gap-x-3'
+  'grid min-w-[64rem] grid-cols-[2.5rem_minmax(12rem,3fr)_minmax(6rem,1fr)_minmax(6.5rem,1fr)_minmax(7rem,1fr)_minmax(4.5rem,0.6fr)_minmax(8rem,1.2fr)_minmax(9rem,1.2fr)_minmax(7.5rem,1.1fr)] gap-x-3'
 const CELL = 'min-w-0 [overflow-wrap:anywhere]'
 const HEADINGS = [
   ['S.No.'],
@@ -21,7 +22,7 @@ const HEADINGS = [
   ['Rate', true],
   ['Disc. %', true],
   ['Taxable Amount', true],
-  ['GST %', true],
+  ['GST', true],
   ['GST Amount', true],
 ]
 
@@ -63,7 +64,17 @@ export default function HistoryProductRows({ products, documentNo }) {
           <span className={cn(CELL, 'text-right tabular-nums')}>{rupees(line.ratePaise)}</span>
           <span className={cn(CELL, 'text-right tabular-nums')}>{percent(line.discount)}</span>
           <span className={cn(CELL, 'text-right font-medium tabular-nums')}>{rupees(line.taxablePaise)}</span>
-          <span className={cn(CELL, 'text-right tabular-nums')}>{percent(line.gstRate)}</span>
+          {/* The taxes it was charged, as saved: CGST and SGST, or IGST - never a 0 one. */}
+          <span className={cn(CELL, 'text-right tabular-nums')} data-testid="history-product-taxes">
+            {line.taxes.length === 0
+              ? '--'
+              : line.taxes.map((entry) => (
+                  <span key={entry.tax} className="block whitespace-nowrap">
+                    {entry.tax} {percent(entry.rate ?? 0)}
+                    {entry.paise !== null ? <span className="text-muted-foreground">: {rupees(entry.paise)}</span> : null}
+                  </span>
+                ))}
+          </span>
           <span className={cn(CELL, 'text-right tabular-nums')}>{rupees(line.gstPaise)}</span>
         </div>
       ))}

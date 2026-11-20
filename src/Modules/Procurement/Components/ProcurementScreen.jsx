@@ -18,6 +18,7 @@ import PreBidChatModal from '@/Modules/Procurement/Components/PreBidChatModal'
 import {
   creationBlocker,
   eventsKey,
+  inScreenTerms,
   markCertificateVerified,
   readEvents,
   refreshEvents,
@@ -39,8 +40,8 @@ import { cancelEvent, getEvents } from '@/Services/Procurement/procurementAutoma
  */
 
 const KIND_OPTIONS = [
-  { value: EVENT_KIND.BID, label: 'Bid' },
-  { value: EVENT_KIND.PRE_BID, label: 'Pre Bid' },
+  { value: EVENT_KIND.BID, label: 'Financial Bid' },
+  { value: EVENT_KIND.PRE_BID, label: 'Technical Bid' },
 ]
 
 export default function ProcurementScreen({ companyId, companyName }) {
@@ -88,11 +89,11 @@ export default function ProcurementScreen({ companyId, companyName }) {
     setCancelling(true)
     try {
       const reply = await cancelEvent(kind, { id: current.id, auctionNo: current.Auction_no, companyId })
-      toast.success(reply?.msg || `${label} cancelled.`)
+      toast.success(inScreenTerms(reply?.msg, label) || `${label} cancelled.`)
       close()
       refreshEvents(companyId, kind)
     } catch (failure) {
-      toast.error(failure.message)
+      toast.error(inScreenTerms(failure.message, label))
     } finally {
       setCancelling(false)
     }
@@ -105,7 +106,7 @@ export default function ProcurementScreen({ companyId, companyName }) {
           <StateMessage
             icon={AlertCircle}
             tone="error"
-            title={`Could not load the ${label.toLowerCase()}s`}
+            title={`Could not load the ${label}s`}
             action={<RetryButton onClick={list.reload} />}
           >
             {list.error}
@@ -164,7 +165,7 @@ export default function ProcurementScreen({ companyId, companyName }) {
             setKind(next)
             setOpen(null)
           }}
-          label="Bid or Pre Bid"
+          label="Financial Bid or Technical Bid"
           idPrefix="procurement-kind"
         />
       </div>
@@ -242,7 +243,7 @@ export default function ProcurementScreen({ companyId, companyName }) {
         onOpenChange={(next) => {
           if (!next && !cancelling) close()
         }}
-        title={`Cancel ${label.toLowerCase()}?`}
+        title={`Cancel ${label}?`}
         description={`Cancel ${current?.Auction_no ?? ''}? Its vendors will be told it is cancelled. This cannot be undone.`}
         confirmLabel={`Cancel ${label}`}
         cancelLabel="Keep it"

@@ -50,6 +50,39 @@ const YES_NO = ['Yes', 'No']
 
 const SOURCING_OPTIONS = ['In-house', 'Outsourced', 'Both']
 
+const pad = (number) => String(number).padStart(2, '0')
+
+/**
+ * A date as a date input keeps it (YYYY-MM-DD), and a real one - nothing
+ * looser, since a browser happily reads "5" as a date.
+ */
+export const isInputDate = (value) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(asText(value))
+  if (!match) return false
+  const [year, month, day] = match.slice(1).map(Number)
+  const date = new Date(year, month - 1, day)
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
+}
+
+/** Today as YYYY-MM-DD by this device's clock - the latest a `past` date field takes. */
+export const todayInputDate = (today = new Date()) =>
+  `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+
+/**
+ * Business Start From is kept in `years_in_business` (a text column on the
+ * backend's Vendor row, up to 20 characters), which once held a count of years
+ * ("5") or a year ("2018"). Such an older value is read as that, never as a
+ * date, and is kept as it is until the vendor picks the date. Null for a date
+ * or for nothing.
+ */
+export const olderBusinessStart = (value) => {
+  const text = asText(value)
+  if (!text || isInputDate(text)) return null
+  if (/^\d{4}$/.test(text)) return `Started in ${text}`
+  if (/^\d+$/.test(text)) return `${text} ${text === '1' ? 'year' : 'years'} in business`
+  return text
+}
+
 const CERTIFICATE_SCOPE_OPTIONS = ['Quality', 'Environmental', 'Occupational Safety', 'Industry-specific', 'Other']
 
 export const QUALITY_CONTROL_OPTIONS = [
@@ -69,7 +102,8 @@ export const QUALITY_CONTROL_OPTIONS = [
 /**
  * A field is { key, label, type, wide?, options?, itemLabel?, addLabel?, fields? }:
  *
- *   text | number | textarea | date | select    one value
+ *   text | number | textarea | date | select    one value (a `past` date: not after today;
+ *                                               `older` reads a value saved before it was a date)
  *   multiselect                                 several of `options`
  *   list                                        an open-ended set of plain values
  *   repeat                                      an open-ended set of records of `fields`
@@ -86,7 +120,14 @@ export const VENDOR_PROFILE_SECTIONS = [
     fields: [
       { key: 'vendor_company_name', label: 'Vendor Company Name' },
       { key: 'constitution', label: 'Constitution', type: 'select', options: CONSTITUTION_OPTIONS },
-      { key: 'years_in_business', label: 'Years in Business', type: 'number' },
+      // The key stays the backend's; the value is now the start date (olderBusinessStart).
+      {
+        key: 'years_in_business',
+        label: 'Business Start From',
+        type: 'date',
+        past: true,
+        older: olderBusinessStart,
+      },
       { key: 'pan_no', label: 'PAN No.', fromVendor: true },
       { key: 'gst_no', label: 'GST No.', fromVendor: true },
       { key: 'manufacturing_location', label: 'Manufacturing Location' },
@@ -397,9 +438,12 @@ const THIS_YEAR = new Date().getFullYear()
 export const vendorProfileErrors = (form) => {
   const errors = {}
   const company = form.company_information ?? {}
-  const years = asText(company.years_in_business)
-  if (years && !(/^\d+$/.test(years) && Number(years) <= 200)) {
-    errors[profileErrorKey('company_information', 'years_in_business')] = 'Whole years, 0 to 200.'
+  // An older value (olderBusinessStart) is kept as it is; a date must be a real one, not after today.
+  const started = asText(company.years_in_business)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(started)) {
+    const key = profileErrorKey('company_information', 'years_in_business')
+    if (!isInputDate(started)) errors[key] = 'Pick a valid date.'
+    else if (started > todayInputDate()) errors[key] = 'Cannot be after today.'
   }
   const gst = asText(company.gst_no)
   if (gst && !/^[0-9A-Z]{15}$/i.test(gst))

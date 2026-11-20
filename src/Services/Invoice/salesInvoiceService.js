@@ -569,6 +569,30 @@ export const buildCompanyUpdatePayload = (companyId, form, baseline) => {
   return payload
 }
 
+/** The company record's file fields the Seller step uploads - form field -> company field. */
+const SELLER_COMPANY_FILES = { logo: 'logo', signature: 'signature' }
+
+/**
+ * The Seller Logo / Signature picked on this step - a File, never the one the
+ * company already has ({ url }) nor one already saved (`baseline`) - as
+ * { logo, signature } under the company's names; null when none is new.
+ */
+export const companyFilesOf = (seller, baseline) => {
+  const files = {}
+  Object.entries(SELLER_COMPANY_FILES).forEach(([field, key]) => {
+    const value = seller?.[field]
+    if (value instanceof Blob && value !== baseline?.[field]) files[key] = value
+  })
+  return Object.keys(files).length > 0 ? files : null
+}
+
+/**
+ * PUT tally/user-companies-list/ as FORM DATA - { company_id, ...changed
+ * Seller Details, logo?, signature? } - when a logo or signature goes up
+ * (companyFilesOf); the same fields as buildCompanyUpdatePayload's otherwise.
+ */
+export const buildCompanyFilesUpdate = (companyId, payload, files) => toFormData({ ...(payload ?? { company_id: companyId }), ...files })
+
 /** Saves the Seller Details to the company (updateCompany - Services/Company/companyService). */
 export const saveSellerCompany = (payload) => updateCompany(payload)
 

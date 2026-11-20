@@ -4,9 +4,10 @@ import { AlertCircle, Gavel } from 'lucide-react'
 import { ConfirmDialog } from '@/Components/Common/ConfirmDialog'
 import { Field } from '@/Components/Common/FormFields'
 import { Button } from '@/Components/ui/button'
+import { EVENT_KIND, EVENT_KINDS } from '@/Constants/procurementAutomation'
 import { toast } from '@/Library/toast'
 import { VendorHistory } from '@/Modules/Procurement/Components/ProductVendors'
-import { showAmount } from '@/Modules/Procurement/procurement'
+import { inScreenTerms, showAmount } from '@/Modules/Procurement/procurement'
 import { currencySymbol, fromBaseAmount, plainAmount } from '@/Modules/Procurement/vendorCurrency'
 import {
   BID_FORM_ERROR,
@@ -67,7 +68,7 @@ export default function BidPanel({ event, product, mine, onPlaced }) {
       setConfirming(false)
       onPlaced()
     } catch (failure) {
-      toast.error(failure.message)
+      toast.error(inScreenTerms(failure.message, EVENT_KINDS[EVENT_KIND.BID].label))
       setConfirming(false)
       onPlaced()
     } finally {

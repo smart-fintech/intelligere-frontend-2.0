@@ -197,3 +197,6 @@ export const SUPPLY_TYPES = {
 /** What a new invoice starts on - an ordinary sale. */
 export const DEFAULT_SUPPLY = SUPPLY.OUTWARD
 export const DEFAULT_SUPPLY_TYPE = 'supply-Regular'
+
+/** The Supply Type a Supply starts on when it is chosen - Outward: Supply Regular, Inward: Import. */
+export const DEFAULT_SUPPLY_TYPE_OF = Object.freeze({ [SUPPLY.OUTWARD]: DEFAULT_SUPPLY_TYPE, [SUPPLY.INWARD]: 'Import' })

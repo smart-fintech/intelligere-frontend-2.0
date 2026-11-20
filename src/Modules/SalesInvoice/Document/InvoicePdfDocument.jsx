@@ -9,6 +9,7 @@ import {
   hasConsignee,
   hasDispatch,
   headerMetaRows,
+  printsField,
   partyLines,
   plainLines,
   sellerLines,
@@ -73,6 +74,9 @@ const s = StyleSheet.create({
   cRate: { width: '11%', textAlign: 'right', borderRightWidth: 1, borderColor: B },
   cPer: { width: '7%', textAlign: 'center', borderRightWidth: 1, borderColor: B },
   cAmt: { width: '15%', textAlign: 'right' },
+  // With Discount (model.showDiscount): Disc. % before Amount, taken from Description - as the sheet's has-disc.
+  cDescDisc: { width: '31%' },
+  cDisc: { width: '8%', textAlign: 'center', borderRightWidth: 1, borderColor: B },
   filler: { flexDirection: 'row', borderLeftWidth: 1, borderRightWidth: 1, borderColor: B },
   itemName: { fontSize: 9, fontFamily: 'Helvetica-Bold' },
   col12: { fontSize: 9 },
@@ -154,7 +158,7 @@ function fitLines(text, widthPt, pt = META_PT, bold = true) {
 // inside the column the same way, after a comma where possible.
 const GOODS_INNER = 565.28 - 2
 const columnWidth = (percent) => (GOODS_INNER * percent) / 100 - 3 * 2 - 1
-const COLUMN_WIDTH = { hsn: columnWidth(13), qty: columnWidth(10), rate: columnWidth(11), amt: columnWidth(15) }
+const COLUMN_WIDTH = { hsn: columnWidth(13), qty: columnWidth(10), rate: columnWidth(11), disc: columnWidth(8), amt: columnWidth(15) }
 const fitColumn = (text, column, bold) => fitLines(text, COLUMN_WIDTH[column], 9, bold)
 
 /* ------------------------------------------------------------------ */
@@ -238,7 +242,10 @@ function HeaderView({ model, minHeight }) {
 /* Goods table                                                        */
 /* ------------------------------------------------------------------ */
 
-function GoodsRowView({ row, minHeight }) {
+/** Description's style - narrower while the Disc. % column is there. */
+const descOf = (discount) => (discount ? [s.cDesc, s.cDescDisc] : [s.cDesc])
+
+function GoodsRowView({ row, minHeight, discount = false }) {
   if (!row) return null
   // At least the height measured on screen, so the table keeps the sheet's
   // geometry; a row that wraps differently here grows rather than overlaps.
@@ -249,7 +256,7 @@ function GoodsRowView({ row, minHeight }) {
     return (
       <View style={[s.tRow, fixed]} wrap={false}>
         <Cell style={s.cNo}>{row.sr}</Cell>
-        <View style={[s.cell, s.cDesc]}>
+        <View style={[s.cell, ...descOf(discount)]}>
           <Text style={s.itemName}>{line.name}</Text>
           {has(line.description) ? <Text style={s.itemDesc}>{line.description}</Text> : null}
         </View>
@@ -259,6 +266,7 @@ function GoodsRowView({ row, minHeight }) {
         </Cell>
         <Cell style={[s.cRate, s.col12]}>{fitColumn(formatAmount(line.rate), 'rate', false)}</Cell>
         <Cell style={[s.cPer, s.col12]}>{line.per}</Cell>
+        {discount ? <Cell style={[s.cDisc, s.col12]}>{fitColumn(line.discount, 'disc', false)}</Cell> : null}
         <Cell style={[s.cAmt, s.col12]} bold>
           {fitColumn(formatAmount(line.taxable), 'amt', true)}
         </Cell>
@@ -270,7 +278,7 @@ function GoodsRowView({ row, minHeight }) {
   return (
     <View style={[s.tRow, fixed]} wrap={false}>
       <Cell style={s.cNo} />
-      <Cell style={[s.cDesc, { textAlign: 'right', paddingRight: 6 }, s.charge]}>
+      <Cell style={[...descOf(discount), { textAlign: 'right', paddingRight: 6 }, s.charge]}>
         {row.label}
         {/* The same red "No Ledger" as the sheet, for a GST row with no ledger. */}
         {row.missingLedger ? (
@@ -284,6 +292,7 @@ function GoodsRowView({ row, minHeight }) {
       <Cell style={s.cQty} />
       <Cell style={s.cRate} />
       <Cell style={s.cPer} />
+      {discount ? <Cell style={s.cDisc} /> : null}
       <Cell style={[s.cAmt, s.col12, s.charge]} bold>
         {fitColumn(formatAmount(row.amount), 'amt', true)}
       </Cell>
@@ -292,14 +301,15 @@ function GoodsRowView({ row, minHeight }) {
 }
 
 /** The empty stretch that carries the column rules down to the foot of the goods box. */
-const FillerView = () => (
+const FillerView = ({ discount = false }) => (
   <View style={[s.filler, { flexGrow: 1, minHeight: 4 }]}>
     <View style={s.cNo} />
-    <View style={s.cDesc} />
+    <View style={descOf(discount)} />
     <View style={s.cHsn} />
     <View style={s.cQty} />
     <View style={s.cRate} />
     <View style={s.cPer} />
+    {discount ? <View style={s.cDisc} /> : null}
     <View style={s.cAmt} />
   </View>
 )
@@ -494,7 +504,7 @@ function PayDeclarationView({ model }) {
           ) : null}
           {showNote ? <Text style={[s.payRow, last]}>Note : {other.note}</Text> : null}
         </View>
-        {invoice.paymentQr ? (
+        {invoice.paymentQr && printsField(invoice, 'paymentQr') ? (
           <View style={s.payQr}>
             <Text style={{ fontSize: 6.4, paddingBottom: 2 }}>Payment QR</Text>
             <Image style={{ width: 56, height: 56 }} src={invoice.paymentQr} />
@@ -587,21 +597,22 @@ export default function InvoicePdfDocument({ model, pages, rowsByKey, rowPx = {}
             <>
               <View style={s.tHead}>
                 <Cell style={s.cNo}>No.</Cell>
-                <Cell style={[s.cDesc, { textAlign: 'center' }]}>Description of Goods</Cell>
+                <Cell style={[...descOf(model.showDiscount), { textAlign: 'center' }]}>Description of Goods</Cell>
                 <Cell style={[s.cHsn, s.col12]}>HSN/SAC</Cell>
                 <Cell style={[s.cQty, s.col12]}>Quantity</Cell>
                 <Cell style={[s.cRate, s.col12, { textAlign: 'center' }]}>Rate</Cell>
                 <Cell style={[s.cPer, s.col12]}>Per</Cell>
+                {model.showDiscount ? <Cell style={[s.cDisc, s.col12]}>Disc. %</Cell> : null}
                 <Cell style={[s.cAmt, s.col12, { textAlign: 'center' }]}>Amount</Cell>
               </View>
               {page.keys.map((key) => (
-                <GoodsRowView key={key} row={rowsByKey[key]} minHeight={pt(rowPx[key])} />
+                <GoodsRowView key={key} row={rowsByKey[key]} minHeight={pt(rowPx[key])} discount={model.showDiscount} />
               ))}
-              <FillerView />
+              <FillerView discount={model.showDiscount} />
               {page.isLast ? (
                 <View style={s.totalRow}>
                   <Cell style={s.cNo} />
-                  <Cell style={[s.cDesc, { textAlign: 'right', paddingRight: 6 }]} bold>
+                  <Cell style={[...descOf(model.showDiscount), { textAlign: 'right', paddingRight: 6 }]} bold>
                     Total
                   </Cell>
                   <Cell style={s.cHsn} />
@@ -610,6 +621,7 @@ export default function InvoicePdfDocument({ model, pages, rowsByKey, rowPx = {}
                   </Cell>
                   <Cell style={s.cRate} />
                   <Cell style={s.cPer} />
+                  {model.showDiscount ? <Cell style={s.cDisc} /> : null}
                   <Cell style={s.cAmt} bold>
                     {formatAmount(model.totals.grandTotal)}
                   </Cell>

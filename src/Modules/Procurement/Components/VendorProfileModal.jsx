@@ -28,6 +28,8 @@ import {
   extraSections,
   filledSections,
   isBlank,
+  isInputDate,
+  olderBusinessStart,
   readVendorProfile,
   requiredCertificationRows,
   sectionField,
@@ -129,6 +131,9 @@ function FieldValue({ field, value }) {
   if (isBlank(value)) return <NotProvided />
   if (field.type === 'list' || field.type === 'multiselect')
     return <Chips items={value.filter((item) => !isBlank(item))} />
+  // A value saved before the field was a date ("5" years) - said as that, not read as a date.
+  const older = field.older?.(value)
+  if (older) return older
   if (field.type === 'date') return formatDate(value)
   return <span className="whitespace-pre-line">{String(value)}</span>
 }
@@ -355,10 +360,11 @@ const initialsOf = (name) =>
 function Summary({ vendor, profile }) {
   const company = profile.company_information ?? {}
   const displayName = company.vendor_company_name || vendor?.name || 'Vendor'
-  const years = String(company.years_in_business ?? '').trim()
+  // years_in_business holds the Business Start From date; an older profile, its years (olderBusinessStart).
+  const started = company.years_in_business
   const facts = [
     company.constitution,
-    years ? `${years} ${years === '1' ? 'year' : 'years'} in business` : null,
+    isInputDate(started) ? `In business since ${formatDate(started)}` : olderBusinessStart(started),
   ].filter((fact) => !isBlank(fact))
   const filled = filledSections(profile)
   const total = VENDOR_PROFILE_SECTIONS.length

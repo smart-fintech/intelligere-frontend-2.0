@@ -76,7 +76,13 @@ export default function useHistoryDocumentPdf(company) {
       const figures = invoiceFigures(applicable)
       const gst = documentProfile(form).gst ? gstByRate(figures) : []
       const bank = banks.list.find((entry) => String(entry.id) === String(applicable.document.bankId)) ?? null
-      const paymentQr = await readFileDataUrl(applicable.document.paymentQr)
+      // The company's saved logo and signature (sellerFromCompany), as the document printed them.
+      const [paymentQr, logo, signature] = await Promise.all([
+        readFileDataUrl(applicable.document.paymentQr),
+        // Their backend URLs as they are - the PDF reads them once (invoicePdf).
+        readFileDataUrl(applicable.seller.logo, { linked: true }),
+        readFileDataUrl(applicable.seller.signature, { linked: true }),
+      ])
       return {
         form,
         model: toInvoiceModel({
@@ -86,7 +92,7 @@ export default function useHistoryDocumentPdf(company) {
           productsByKey: products.byKey,
           ledgersById: ledgers.byId,
           bank,
-          images: { logo: null, signature: null, paymentQr },
+          images: { logo, signature, paymentQr },
           // The currency it was saved with (documentCurrency) - printed as when it was saved.
           currency: applicable.savedCurrency,
         }),

@@ -124,6 +124,9 @@
 .inv-goods .c-rate  { width: 11%; text-align: right; }
 .inv-goods .c-per   { width: 7%;  text-align: center; }
 .inv-goods .c-amt   { width: 15%; text-align: right; }
+/* With Discount: Disc. % before Amount, taken from Description (InvoicePdfDocument's the same). */
+.inv-goods.has-disc .c-desc { width: 31%; }
+.inv-goods .c-disc  { width: 8%;  text-align: center; overflow-wrap: anywhere; }
 
 .inv-item-name { font-weight: 700; font-size: 12px; }
 .inv-item-desc { font-size: 10px; color: #333; padding-top: 1px; }
@@ -134,8 +137,8 @@
 
 /* HSN/SAC, Quantity, Rate, Per and Amount at 12px - column head and line values
    (the Total row keeps its own 10px) */
-.inv-goods thead :is(.c-hsn, .c-qty, .c-rate, .c-per, .c-amt),
-.inv-goods .inv-item-row :is(.c-hsn, .c-qty, .c-rate, .c-per, .c-amt),
+.inv-goods thead :is(.c-hsn, .c-qty, .c-rate, .c-per, .c-disc, .c-amt),
+.inv-goods .inv-item-row :is(.c-hsn, .c-qty, .c-rate, .c-per, .c-disc, .c-amt),
 .inv-goods .inv-meta-line .c-amt { font-size: 12px; }
 /* a figure too wide for its column wraps inside it instead of running into the next */
 .inv-goods :is(.c-hsn, .c-qty, .c-rate, .c-amt) { overflow-wrap: anywhere; }

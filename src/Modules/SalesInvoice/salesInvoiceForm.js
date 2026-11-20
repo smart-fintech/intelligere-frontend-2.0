@@ -33,7 +33,7 @@
  */
 
 import { GST_RATES, gstBreakdown } from '@/Constants/gst'
-import { INDIAN_STATES, findStateByGstNumber, findStateByName } from '@/Constants/indianStates'
+import { INDIAN_STATES, findStateByName } from '@/Constants/indianStates'
 import {
   ADDRESS_MAX_LENGTH,
   DEFAULT_SUPPLY,
@@ -50,8 +50,8 @@ import {
 } from '@/Constants/salesInvoice'
 import { percentOf, toPaise } from '@/Modules/Payment/pricing'
 import { savedValue } from '@/Modules/Dashboard/productList'
-import { isValidGstNumber } from '@/Services/Gst/gstService'
 import { getLedgerSac } from '@/Services/Ledger/ledgerService'
+import { fileUrlOf } from '@/Services/Global/apiHelpers'
 import { DEFAULT_COUNTRY } from '@/Services/Global/locationService'
 import { toInputDate } from '@/Utils/date'
 import { isValidEmail, isValidPan, isValidPhone, isValidPincode, isValidWebsite } from '@/Utils/validation'
@@ -101,15 +101,6 @@ export const canonicalStateName = (name) => findStateByName(name)?.name ?? textO
 /** The 2-digit GST code of an Indian state by name - '' when it is not one. */
 export const stateCodeOf = (stateName) => findStateByName(stateName)?.code ?? ''
 
-/**
- * Where a party is, as a GST state code. A valid GSTIN is the registration
- * itself, so its first two digits win; otherwise the state chosen.
- */
-const partyStateCode = (party) => {
-  const gstin = textOf(party?.gstin).toUpperCase()
-  if (gstin && isValidGstNumber(gstin)) return findStateByGstNumber(gstin)?.code ?? ''
-  return stateCodeOf(party?.state)
-}
 
 /**
  * `options` with `value` added when it is not one of them, so a dropdown can
@@ -354,6 +345,39 @@ export const documentProfile = (form) => DOCUMENT_PROFILES[form?.documentType] ?
 /** Whether this type's Document Details show `field` (a form document key). */
 export const showsDocumentField = (form, field) => documentProfile(form).fields.some(([key]) => key === field)
 
+/**
+ * E-WAY BILL UNTICKED - Sales Invoice, Credit Note and Debit Note show (in
+ * Step 3, the preview and the PDF) only these of their Document Details,
+ * besides their own number and date: Reference No. / Date, Mode/Terms of
+ * Payment, PO No. / Date, Select Bank - and a note's Invoice No. / Date (the
+ * invoice it adjusts). Ticked, every field is shown again. Visibility only:
+ * a hidden field keeps its value, its checks and its place in the payload.
+ */
+const EWAY_BILL_GATED_TYPES = Object.freeze([DOCUMENT_TYPE_INVOICE, 'Credit Note', 'Debit Note'])
+const WITHOUT_EWAY_BILL_FIELDS = Object.freeze([
+  'challanInvoiceNo',
+  'challanInvoiceDate',
+  'referenceNo',
+  'referenceDate',
+  'termsOfPayment',
+  'poNo',
+  'poDate',
+  'bankId',
+])
+
+/** The Document Details shown now - [key, label, extra] in the type's order (see WITHOUT_EWAY_BILL_FIELDS). */
+export const visibleDocumentFields = (form) => {
+  const { fields } = documentProfile(form)
+  if (!EWAY_BILL_GATED_TYPES.includes(form?.documentType) || settingsOf(form).eWayBill) return fields
+  return fields.filter(([key]) => WITHOUT_EWAY_BILL_FIELDS.includes(key))
+}
+
+/** The type's Document Details hidden now (visibleDocumentFields) - their keys; [] when all are shown. */
+export const hiddenDocumentFields = (form) => {
+  const shown = new Set(visibleDocumentFields(form).map(([key]) => key))
+  return documentProfile(form).fields.map(([key]) => key).filter((key) => !shown.has(key))
+}
+
 /** Whether this type's Other Details have `section` ('charges' | 'discount' | 'tcs' | 'roundOff' | 'note'). */
 export const hasOtherDetail = (form, section) => documentProfile(form).other.includes(section)
 
@@ -415,9 +439,29 @@ export const newInvoiceLine = (kind = LINE_KIND.PRODUCT) => ({
 export const newChargeRow = () => ({ id: newRowId('charge'), ledgerId: '', amount: '', gstRate: '' })
 
 /**
+ * A file the company record already holds (its `logo` / `signature`) as a
+ * file box holds one already on the server - { url, name } (useFileDataUrl
+ * reads it for the sheet) - null for none.
+ */
+const savedCompanyFile = (path, fallbackName) => {
+  const url = fileUrlOf(path)
+  if (!url) return null
+  const fileName = () => {
+    try {
+      return /^data:/i.test(url) ? '' : decodeURIComponent(url.split('?')[0].split('/').pop() || '')
+    } catch {
+      return ''
+    }
+  }
+  return { url, name: fileName() || fallbackName, fromCompany: true }
+}
+
+/**
  * The seller, as the company record from tally/user-companies-list/ holds
  * it - the same fields the Company Details form edits (comp_*, pan_no, udyam,
- * category). A field the record does not carry starts empty.
+ * category), and its saved logo and signature ({ url, name }, until another
+ * file is picked - saved to the company on Step 1's Next). A field the record
+ * does not carry starts empty.
  */
 export const sellerFromCompany = (company) => ({
   name: textOf(company?.comp_name),
@@ -431,8 +475,8 @@ export const sellerFromCompany = (company) => ({
   pan: textOf(company?.pan_no).toUpperCase(),
   udyam: textOf(company?.udyam).toUpperCase(),
   category: textOf(company?.category),
-  logo: null,
-  signature: null,
+  logo: savedCompanyFile(company?.logo, 'Logo'),
+  signature: savedCompanyFile(company?.signature, 'Signature'),
 })
 
 /**
@@ -850,22 +894,19 @@ export const withDocumentDefaults = (form, reply, touched = new Set()) => {
 /* ------------------------------------------------------------------ */
 
 /**
- * WHICH GST APPLIES - worked out from where the parties are, never from the
- * "Same as" boxes:
+ * WHICH GST APPLIES - by STATE CODES (the State field's, stateCodeOf), never
+ * by comparing GSTINs:
  *
- *   supplier       the seller's state (its GSTIN's code first, else the state
- *                  chosen); the Dispatched From state only when the seller
- *                  has none
- *   place of supply  the buyer's (bill-to) state, by the same GSTIN-first
- *                  rule. On a bill-to / ship-to sale the goods go to the
- *                  shipping address on the buyer's instruction, and the place
- *                  of supply is the buyer's location (IGST Act s.10(1)(b)), so
- *                  the Shipping To state is used only when the buyer has none.
+ *   from   Dispatched From's state, when that card has one (its own while
+ *          "Same as Seller" is unticked - the seller's while ticked); else
+ *          the seller's
+ *   to     Shipping To's state, by the same rule ("Same as Buyer"); else the
+ *          buyer's
  *
  *   export (buyer outside India, or Supply Type Export)   IGST
  *   buyer registered as SEZ                               IGST
- *   supplier and place of supply in the same state        CGST + SGST
- *   in different states                                   IGST
+ *   the same state code                                   CGST + SGST
+ *   different state codes                                 IGST
  *   either not known yet                                  IGST, until it is -
  *                                                         the earlier screens'
  *                                                         default
@@ -880,8 +921,8 @@ export const taxTreatment = (form) => {
     return { interState: true, known: true, reason: 'Buyer is an SEZ unit - IGST applies' }
   }
 
-  const supplier = partyStateCode(form.seller) || partyStateCode(effectiveDispatch(form))
-  const place = partyStateCode(form.buyer) || partyStateCode(effectiveShipping(form))
+  const supplier = stateCodeOf(effectiveDispatch(form).state) || stateCodeOf(form.seller.state)
+  const place = stateCodeOf(effectiveShipping(form).state) || stateCodeOf(form.buyer.state)
 
   if (!supplier || !place) {
     return {
@@ -892,8 +933,8 @@ export const taxTreatment = (form) => {
   }
 
   return supplier === place
-    ? { interState: false, known: true, reason: 'Seller and buyer are in the same state - CGST + SGST' }
-    : { interState: true, known: true, reason: 'Seller and buyer are in different states - IGST' }
+    ? { interState: false, known: true, reason: 'Dispatched from and shipped to the same state - CGST + SGST' }
+    : { interState: true, known: true, reason: 'Dispatched from and shipped to different states - IGST' }
 }
 
 /* ------------------------------------------------------------------ */
@@ -1246,7 +1287,7 @@ const validateDocumentStep = (form, found, { allowedTypes }) => {
  * Add Product. `key(field)` is where each error goes. A product line needs
  * its product (and SKU); a service line its ledger - the rest is the same.
  */
-const checkLine = (found, line, key, { productsByKey, ledgersById, withDiscount, challan = false }) => {
+const checkLine = (found, line, key, { productsByKey, ledgersById, withDiscount, challan = false, reverseCharge = false }) => {
   if (isServiceLine(line)) {
     if (!line.ledgerId) found[key('ledgerId')] = 'Select the service ledger'
     else if (ledgersById && !ledgersById.has(String(line.ledgerId))) found[key('ledgerId')] = 'This ledger is no longer in the list'
@@ -1268,7 +1309,8 @@ const checkLine = (found, line, key, { productsByKey, ledgersById, withDiscount,
       found[key('rate')] = 'Enter the rate'
     }
     // The GST slab the invoice taxes this line at - 0 is a real slab, blank is not.
-    if (!textOf(line.gstRate)) found[key('gstRate')] = 'Select the GST slab'
+    // Under Reverse Charge no GST is charged on the document (ratesFor), and the slab is not shown.
+    if (!reverseCharge && !textOf(line.gstRate)) found[key('gstRate')] = 'Select the GST slab'
   }
   if (!challan && withDiscount && textOf(line.discount)) {
     const percent = Number(line.discount)
@@ -1292,7 +1334,13 @@ export const isEntryDirty = (entry) =>
 export const validateEntry = (form, { productsByKey, ledgersById }) => {
   const found = {}
   const withDiscount = applicableForm(form).withDiscount
-  checkLine(found, form.entry, (field) => `entry.${field}`, { productsByKey, ledgersById, withDiscount, challan: isChallan(form) })
+  checkLine(found, form.entry, (field) => `entry.${field}`, {
+    productsByKey,
+    ledgersById,
+    withDiscount,
+    challan: isChallan(form),
+    reverseCharge: settingsOf(form).reverseCharge,
+  })
   // An order's row goes on the document once - a second time is an edit of that line.
   const order = activeOrderOf(form.entry)
   if (order && form.lines.some((line) => line.id !== form.editingLineId && activeOrderOf(line)?.key === order.key)) {
@@ -1318,7 +1366,13 @@ const validateProductsStep = (form, found, { productsByKey, ledgersById, chargeS
   if (form.lines.length === 0) found.lines = documentProfile(form).services ? 'Add at least one product or service' : 'Add at least one product'
 
   form.lines.forEach((line) => {
-    checkLine(found, line, (field) => `lines.${line.id}.${field}`, { productsByKey, ledgersById, withDiscount: form.withDiscount, challan })
+    checkLine(found, line, (field) => `lines.${line.id}.${field}`, {
+      productsByKey,
+      ledgersById,
+      withDiscount: form.withDiscount,
+      challan,
+      reverseCharge: settingsOf(form).reverseCharge,
+    })
   })
 
   // A line typed in but never added would silently not be invoiced.

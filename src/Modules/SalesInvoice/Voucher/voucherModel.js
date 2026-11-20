@@ -85,13 +85,17 @@ export const numberOrNull = (value) => {
   return Number.isFinite(number) ? number : null
 }
 
-/** The GST rate a line or charge was taxed at - IGST's, else CGST + SGST - or null when it carries none. */
+/**
+ * The GST rate a line or charge was taxed at - IGST's, else CGST + SGST - or
+ * null when it carries none. A saved line keeps the tax not charged as 0, so
+ * IGST counts only above 0 ({ cgst: 9, sgst: 9, igst: 0 } -> 18).
+ */
 export const gstRateOf = (row) => {
   const igst = numberOrNull(row?.igst)
-  if (igst !== null) return igst
+  if (igst !== null && igst > 0) return igst
   const cgst = numberOrNull(row?.cgst)
   const sgst = numberOrNull(row?.sgst)
-  return cgst === null && sgst === null ? null : (cgst ?? 0) + (sgst ?? 0)
+  return cgst === null && sgst === null ? igst : (cgst ?? 0) + (sgst ?? 0)
 }
 
 /**
@@ -964,6 +968,7 @@ export const buildTallyVoucherPayload = ({ voucher: sourceVoucher, mapping, comp
         buyer_pincode: buyer.pincode,
         buyer_address: buyer.address,
         buyer_name: buyer.name,
+        buyer_gst_reg_type: buyer.ledger_gst_reg_type,
         ship_to: voucher.shipTo,
         dispatch_from: voucher.dispatchFrom,
         document_details: voucher.master,

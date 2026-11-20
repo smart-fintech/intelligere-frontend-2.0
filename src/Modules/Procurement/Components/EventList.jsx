@@ -2,7 +2,7 @@ import { SearchX } from 'lucide-react'
 
 import { StateMessage } from '@/Components/Common/DataList'
 import { TableFilters, TablePager } from '@/Components/Common/TableTools'
-import { EVENT_KIND, EVENT_STAGE } from '@/Constants/procurementAutomation'
+import { EVENT_KINDS, EVENT_STAGE } from '@/Constants/procurementAutomation'
 import { useListView } from '@/Hooks/useListView'
 import EventCard from '@/Modules/Procurement/Components/EventCard'
 
@@ -30,11 +30,10 @@ export default function EventList({
     searchFields: SEARCH_FIELDS,
     initialSort: { field: 'opens_at', direction: stage === EVENT_STAGE.COMPLETED ? 'desc' : 'asc' },
   })
-  const preBid = kind === EVENT_KIND.PRE_BID
 
   if (events.length === 0) {
     return (
-      <StateMessage icon={SearchX} title={`No ${stage.toLowerCase()} ${preBid ? 'pre bids' : 'bids'}`}>
+      <StateMessage icon={SearchX} title={`No ${stage.toLowerCase()} ${EVENT_KINDS[kind].label}s`}>
         {stage === EVENT_STAGE.COMPLETED ? 'Closed and cancelled ones are listed here.' : 'Create one with the Add button above.'}
       </StateMessage>
     )
@@ -42,7 +41,7 @@ export default function EventList({
 
   return (
     <>
-      <TableFilters view={view} searchPlaceholder="Search bid no" />
+      <TableFilters view={view} searchPlaceholder={`Search ${EVENT_KINDS[kind].label} No`} />
 
       {view.rows.length === 0 ? (
         <StateMessage icon={SearchX} title="Nothing matches">

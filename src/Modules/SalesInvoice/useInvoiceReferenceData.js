@@ -140,7 +140,8 @@ export default function useInvoiceReferenceData(companyId) {
         .filter((bank) => bank?.id !== null && bank?.id !== undefined)
         .map((bank) => ({
           value: String(bank.id),
-          label: [bank.bank_name, accountTail(bank.account_no)].filter(Boolean).join(' - ') || `Bank ${bank.id}`,
+          // The bank's ledger name (bankDetails' bank_ledger_name) - bank_name only for a row without one.
+          label: [String(bank.bank_ledger_name ?? '').trim() || bank.bank_name, accountTail(bank.account_no)].filter(Boolean).join(' - ') || `Bank ${bank.id}`,
         })),
       status: statusFor(bankStatus, banksFor, companyId),
       error: bankError,

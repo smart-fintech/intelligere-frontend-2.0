@@ -4,8 +4,10 @@ import { MapPin } from 'lucide-react'
 import { InlineAlert, RetryButton } from '@/Components/Common/DataList'
 import { CheckboxField, Field, FieldError, FieldLabel, FileField, SelectField } from '@/Components/Common/FormFields'
 import { Input } from '@/Components/ui/input'
+import { Tooltip } from '@/Components/ui/tooltip'
 import {
   CHALLAN_TYPES,
+  DEFAULT_SUPPLY_TYPE_OF,
   DELIVERY_MODES,
   INVOICE_NO_MAX_LENGTH,
   SUPPLY_OPTIONS,
@@ -18,6 +20,7 @@ import {
   portalSettingsOf,
   supplyTypesOf,
   toDecimalInput,
+  visibleDocumentFields,
 } from '@/Modules/SalesInvoice/salesInvoiceForm'
 import { paymentQrOfBank } from '@/Services/Invoice/salesInvoiceService'
 
@@ -45,6 +48,9 @@ import { paymentQrOfBank } from '@/Services/Invoice/salesInvoiceService'
  *   numberLocked    the document is already saved under this number (only
  *                   its PDF is still to go) - it can no longer change
  */
+
+/** The GST portal's PIN-to-PIN distance page - opened from the Distance field (Get Distance). */
+const GET_DISTANCE_URL = 'https://einvoice1.gst.gov.in/Others/GetPinCodeDistance'
 
 /** The invoice number as three parts with "/" between them. */
 function InvoiceNumberParts({ parts, error, disabled, onChange, className, label = 'Invoice No.' }) {
@@ -84,7 +90,18 @@ export default function DocumentStep({ invoice, banks, numbering, numberLocked, 
   // E-way bill makes Distance and Delivery Mode required (portalRequiredFields) - never on a Challan.
   const portalRequired = portalRequiredFields(portalSettingsOf(form), 'document')
   const profile = documentProfile(form)
-  const numberLabel = profile.number
+  // The last document of this type (invoice/last-document-number/'s document_no), beside the label - while it is a new one.
+  const lastDocumentNo = !numberLocked ? (numbering.lastDocumentNo ?? '') : ''
+  const numberLabel = lastDocumentNo ? (
+    <>
+      {profile.number}
+      <span className="ml-1.5 text-xs font-normal text-muted-foreground" data-testid="last-document-no">
+        (Last: {lastDocumentNo})
+      </span>
+    </>
+  ) : (
+    profile.number
+  )
   const set = (field) => (value) => setField(`document.${field}`, value)
   const onText = (field, transform = (value) => value) => (event) => set(field)(transform(event.target.value))
 
@@ -113,11 +130,16 @@ export default function DocumentStep({ invoice, banks, numbering, numberLocked, 
     setFields('document', { bankId, paymentQr: paymentQrOfBank(bank) })
   }
 
-  /** A new Supply offers other Supply Types - one it does not offer is cleared. */
+  /**
+   * Another Supply chosen: its Supply Type starts on that Supply's default
+   * (DEFAULT_SUPPLY_TYPE_OF - Outward: Supply Regular, Inward: Import), which
+   * can then be changed. Only on the user's own change - a saved document
+   * loads with the values it was saved with.
+   */
   const changeSupply = (supply) => {
     if (!supply || supply === document.supply) return
-    const keep = supplyTypesOf(supply).some((option) => option.value === document.supplyType)
-    setFields('document', { supply, supplyType: keep ? document.supplyType : '' })
+    const fallback = supplyTypesOf(supply).some((option) => option.value === document.supplyType) ? document.supplyType : ''
+    setFields('document', { supply, supplyType: DEFAULT_SUPPLY_TYPE_OF[supply] ?? fallback })
   }
 
   const bankPlaceholder =
@@ -168,16 +190,29 @@ export default function DocumentStep({ invoice, banks, numbering, numberLocked, 
       case 'vehicleNo':
         return <Fragment key={key}>{textField(key, label, { ...upper, placeholder: 'GJ01AB1234' })}</Fragment>
       case 'distance':
-        // The pin is a marker for now - working the distance out from the two
-        // addresses is a later phase, so it asks for nothing.
+        // The pin, inside the box on its right, opens the GST portal's distance
+        // page in a new tab (Get Distance) - the value is still typed here.
         return (
           <Fragment key={key}>
             {textField(key, label, {
               required: portalRequired.has('distance'),
-              icon: MapPin,
               inputMode: 'decimal',
               placeholder: '0',
               transform: toDecimalInput,
+              children: (
+                <Tooltip text="Get Distance">
+                  <a
+                    href={GET_DISTANCE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Get Distance"
+                    data-testid="get-distance"
+                    className="absolute inset-y-0 right-0 flex w-9 items-center justify-center rounded-r-md text-brand-light transition-colors outline-none hover:text-brand focus-visible:text-brand"
+                  >
+                    <MapPin className="size-4" aria-hidden="true" />
+                  </a>
+                </Tooltip>
+              ),
             })}
           </Fragment>
         )
@@ -310,7 +345,8 @@ export default function DocumentStep({ invoice, banks, numbering, numberLocked, 
       <InvoiceGrid>
         {numberField}
         {dateField('invoiceDate', profile.date, { required: true })}
-        {profile.fields.map(([key, label, extra]) => fieldFor(key, label, extra))}
+        {/* Sales Invoice / Credit Note / Debit Note without E-Way Bill: only some (visibleDocumentFields) - the rest keep their values. */}
+        {visibleDocumentFields(form).map(([key, label, extra]) => fieldFor(key, label, extra))}
       </InvoiceGrid>
     </InvoiceCard>
   )

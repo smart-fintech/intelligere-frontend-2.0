@@ -13,7 +13,7 @@ import StatementSummary from '@/Modules/BankStatement/Components/StatementSummar
 import StatementUpload from '@/Modules/BankStatement/Components/StatementUpload'
 import useBankStatement from '@/Modules/BankStatement/useBankStatement'
 import { selectLedgers, selectLedgersCompanyId } from '@/Store/Slices/ledgerSlice'
-import { selectIsTallyErp } from '@/Store/Slices/profileSlice'
+import { selectIsIntelligereErp, selectIsTallyErp } from '@/Store/Slices/profileSlice'
 
 const VIEW = { STATEMENT: 'statement', MAPPING: 'mapping' }
 
@@ -29,10 +29,11 @@ const VIEWS = [
  */
 export default function BankStatementScreen({ company, companyId, banks, onRestart }) {
   const isTally = useSelector(selectIsTallyErp)
+  const isIntelligere = useSelector(selectIsIntelligereErp)
   const allLedgers = useSelector(selectLedgers)
   const ledgersFor = useSelector(selectLedgersCompanyId)
 
-  const statement = useBankStatement({ company, companyId, banks, isTally })
+  const statement = useBankStatement({ company, companyId, banks, isTally, isIntelligere })
   const [view, setView] = useState(VIEW.STATEMENT)
 
   const { ledgerOptions, ledgerNames } = useMemo(() => {

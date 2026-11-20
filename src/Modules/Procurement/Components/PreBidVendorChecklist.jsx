@@ -28,7 +28,7 @@ export default function PreBidVendorChecklist({ choices, rows, error, disabled, 
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          Untick a vendor to leave it out of this Financial Bid. Ticked vendors keep the details they had on the Pre Bid.
+          Untick a vendor to leave it out of this Financial Bid. Ticked vendors keep the details they had on the Technical Bid.
         </p>
         <div className="flex items-center gap-3">
           <Button

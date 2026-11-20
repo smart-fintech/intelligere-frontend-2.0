@@ -59,8 +59,15 @@ import { selectIsErpKnown, selectIsTallyErp } from '@/Store/Slices/profileSlice'
  * What the user chooses for a voucher - ledgers, products, narration,
  * voucher type - is kept here, by company and document_id, so it survives
  * paging and switching type. The page goes back to the first voucher when
- * the type changes (a company change mounts this afresh). Paging asks the
- * server nothing.
+ * the type changes (a company change mounts this afresh), and the vouchers
+ * are read again then (useTallyVouchers' reload - one request, shared with
+ * any already on its way). Paging asks the server nothing.
+ *
+ * THE ACCOUNT LEDGER (Sales / Purchase Ledger) offers only the ledgers of the
+ * voucher's type - by name, without case (ACCOUNT_LEDGER_WORD: Sales Invoice
+ * "sales", Purchase Invoice "purchase", Credit Note "credit note", Debit Note
+ * "debit note") - and one chosen on a voucher is chosen on EVERY voucher of
+ * that type (never another type's).
  *
  * TWO SIDES: on the left the voucher card - its details, its actions at the
  * bottom of the card, and the pages (Previous / Next) under it; on the right,
@@ -95,6 +102,20 @@ const SALES_LABELS = Object.freeze({ account: 'Sales', party: 'Buyer' })
 
 const NO_ROWS = Object.freeze([])
 
+/** The word an account ledger's name must contain for each voucher type (compared without case). */
+const ACCOUNT_LEDGER_WORD = Object.freeze({
+  'Sales Invoice': 'sales',
+  'Purchase Invoice': 'purchase',
+  'Credit Note': 'credit note',
+  'Debit Note': 'debit note',
+})
+
+/** The ledger options a voucher type's account ledger may be - all of them for a type with no word. */
+const accountOptionsOf = (options, type) => {
+  const word = ACCOUNT_LEDGER_WORD[type]
+  return word ? options.filter((option) => String(option.label ?? '').toLowerCase().includes(word)) : options
+}
+
 /** Each voucher once, by its document_id (one without an id is kept as it is). */
 const uniqueVouchers = (vouchers) => {
   const seen = new Set()
@@ -126,9 +147,10 @@ const applyChoice = (current, change) => {
   return current
 }
 
-export default function TallyVouchers({ company, types = SALES_VOUCHER_TYPES, parties, labels = SALES_LABELS }) {
+export default function TallyVouchers({ company, types = SALES_VOUCHER_TYPES, parties, labels = SALES_LABELS, selection = 0 }) {
   const companyId = company.company_id
-  const vouchers = useTallyVouchers(companyId)
+  // `selection`: the times the screen's Voucher view was chosen - each asks for the latest (useTallyVouchers).
+  const vouchers = useTallyVouchers(companyId, true, selection)
   const { ledgers, products } = useInvoiceReferenceData(companyId)
   const voucherTypeList = useVoucherTypes(company.comp_name)
   const tally = useVoucherTallySend(companyId)
@@ -151,7 +173,26 @@ export default function TallyVouchers({ company, types = SALES_VOUCHER_TYPES, pa
 
   const [choices, setChoices] = useState({})
   const choiceKey = (entry) => `${companyId}:${entry.id ?? entry.documentNo}`
-  const choose = (entry, change) => setChoices((all) => ({ ...all, [choiceKey(entry)]: applyChoice(all[choiceKey(entry)] ?? EMPTY_CHOICES, change) }))
+  // The account ledger: only this type's (accountOptionsOf) - the same list for every voucher of it.
+  const accountOptions = useMemo(() => accountOptionsOf(ledgers.options ?? NO_ROWS, type), [ledgers.options, type])
+  const accountLedgers = useMemo(() => ({ ...ledgers, options: accountOptions }), [ledgers, accountOptions])
+  const choose = (entry, change) => {
+    if ('account' in change) {
+      // One of this type's ledgers only - then on every voucher of this type (rows), each keeping its other choices.
+      // (Radix can report '' on its own - nothing is cleared on every voucher for that.)
+      if (!change.account || !accountOptions.some((option) => option.value === String(change.account))) return
+      setChoices((all) => {
+        const next = { ...all }
+        ;[entry, ...rows].forEach((row) => {
+          const key = choiceKey(row)
+          next[key] = applyChoice(next[key] ?? EMPTY_CHOICES, change)
+        })
+        return next
+      })
+      return
+    }
+    setChoices((all) => ({ ...all, [choiceKey(entry)]: applyChoice(all[choiceKey(entry)] ?? EMPTY_CHOICES, change) }))
+  }
 
   // The voucher types of this document type's voucher_group (the only ones offered),
   // and the one this document type starts with - all from the one list.
@@ -266,6 +307,8 @@ export default function TallyVouchers({ company, types = SALES_VOUCHER_TYPES, pa
       setType(next)
       setPage(1)
       setPreviewing(null)
+      // The latest vouchers for the type chosen - one request (shared with any on its way).
+      vouchers.reload()
     })
   }
 
@@ -405,6 +448,7 @@ export default function TallyVouchers({ company, types = SALES_VOUCHER_TYPES, pa
                   mapping={mapping}
                   edits={(choices[choiceKey(voucher)] ?? EMPTY_CHOICES).edits ?? EMPTY_CHOICES.edits}
                   ledgers={ledgers}
+                  accountLedgers={accountLedgers}
                   products={products}
                   labels={labels}
                   voucherTypes={voucherTypes}

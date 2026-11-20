@@ -64,6 +64,8 @@ import { skuAttributes } from '@/Utils/skuAttributes'
  *   edits        what has been typed: { lines: { [index]: { field: text } },
  *                charges: { [key]: text }, gst: { [key]: text } }
  *   ledgers      { options } - the company's ledgers
+ *   accountLedgers   the same, with only the options the account ledger may be
+ *                (the voucher type's - TallyVouchers); `ledgers` when not given
  *   products     { list, options, byKey, status } - the company's products
  *                (inventory/product/, read by readProducts - useInvoiceReferenceData)
  *   labels       { account: 'Sales', party: 'Buyer' }
@@ -317,7 +319,7 @@ function SkuChoice({ id, slot, allSkus, onChoose, disabled = false }) {
   )
 }
 
-export default function VoucherCard({ voucher, mapping, edits, ledgers, products, labels, voucherTypes, editing = false, footer = null, onChoose }) {
+export default function VoucherCard({ voucher, mapping, edits, ledgers, accountLedgers = ledgers, products, labels, voucherTypes, editing = false, footer = null, onChoose }) {
   const key = `voucher-${voucher.id ?? voucher.documentNo}`
   // Every SKU of the product list, each with its product - for a line whose product is not found.
   const allSkus = useMemo(() => allSkusOf(products.list ?? []), [products.list])
@@ -375,7 +377,8 @@ export default function VoucherCard({ voucher, mapping, edits, ledgers, products
           id={`${key}-account`}
           label={`${labels.account} Ledger`}
           slot={mapping.account}
-          ledgers={ledgers}
+          // Only the ledgers of this voucher's type (TallyVouchers' accountOptionsOf).
+          ledgers={accountLedgers}
           onChange={(value) => onChoose({ account: value })}
           missingText={`Select the ${labels.account} ledger.`}
           // Products are posted to it; a voucher of services alone has their own ledgers.

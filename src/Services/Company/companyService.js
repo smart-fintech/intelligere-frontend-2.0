@@ -23,6 +23,7 @@
  */
 
 import { getEmail, getRole, setActiveCompanyId } from '@/Library/secureStorage'
+import { MULTIPART } from '@/Services/Global/apiHelpers'
 import { api } from '@/Services/Global/apiService'
 import { compareToToday, formatLongDate } from '@/Utils/date'
 
@@ -223,9 +224,11 @@ export const rememberSelectedCompany = (company) => {
 
 /**
  * Changes a company. The form sends its `company_id` and only the fields the
- * user actually edited; the company's name is never among them.
+ * user actually edited; the company's name is never among them. A FormData
+ * (one carrying files - the Seller step's logo / signature) goes as multipart.
  */
-export const updateCompany = (payload) => api.put(USER_COMPANIES_URL, payload)
+export const updateCompany = (payload) =>
+  api.put(USER_COMPANIES_URL, payload, typeof FormData !== 'undefined' && payload instanceof FormData ? MULTIPART : undefined)
 
 /**
  * Removes a company. A DELETE with a body goes under `data` for axios - see

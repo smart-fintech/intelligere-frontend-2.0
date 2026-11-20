@@ -83,8 +83,10 @@ import {
 import { MAPPING_DOCUMENT_TYPE } from '@/Services/Invoice/documentMappingService'
 import {
   buildBuyerLedgerPayload,
+  buildCompanyFilesUpdate,
   buildCompanyUpdatePayload,
   buildInvoiceSaveRequest,
+  companyFilesOf,
   createBusinessDocument,
   documentPdfFileName,
   getDocumentTypeAccess,
@@ -528,8 +530,9 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
   )
 
   /* ---- the live preview ---- */
-  const logo = useFileDataUrl(form.seller.logo)
-  const signature = useFileDataUrl(form.seller.signature)
+  // The company's saved logo / signature from their backend URL (nothing fetched); a picked file read from the disk.
+  const logo = useFileDataUrl(form.seller.logo, { linked: true })
+  const signature = useFileDataUrl(form.seller.signature, { linked: true })
   // A type with no bank or Payment QR field prints neither (applicable has them empty).
   const paymentQr = useFileDataUrl(applicable.document.paymentQr)
   const bank = banks.list.find((entry) => String(entry.id) === String(applicable.document.bankId)) ?? null
@@ -921,21 +924,31 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
    * The Seller and Buyer steps write back to where their details live, on
    * Next, and only when something changed - on a sale:
    *
-   *   Seller   PUT  tally/user-companies-list/   the company
+   *   Seller   PUT  tally/user-companies-list/   the company - as FormData
+   *                                              when a Seller Logo / Signature
+   *                                              was picked (companyFilesOf)
    *   Buyer    PUT  tally/create-ledger/         the buyer's ledger
    *
    * (a purchase the other way round - `flow.parties`). A failed save keeps
    * the user on the step (the message is the backend's own); nothing is sent
    * while typing. Completing the ledger's step is also what lets that
-   * ledger's earlier products be loaded.
+   * ledger's earlier products be loaded. Once either save succeeds, the
+   * company list (tally/user-companies-list/ - companySlice) is read again, so
+   * every screen has the company as it is now; nothing sent, nothing read.
    */
+  const refreshCompanies = () => {
+    // Its own failure is shown by AppLayout; the step was saved either way.
+    dispatch(fetchCompanies({ force: true })).catch(() => {})
+  }
   const saveStep = async () => {
     if (step.key === STEP_OF_PARTY[parties.company]) {
       const details = form[parties.company]
       const payload = buildCompanyUpdatePayload(companyId, { seller: details, settings: form.settings }, sellerBaseline)
-      if (!payload) return true
-      await saveSellerCompany(payload)
+      const files = companyFilesOf(details, sellerBaseline.seller)
+      if (!payload && !files) return true
+      await saveSellerCompany(files ? buildCompanyFilesUpdate(companyId, payload, files) : payload)
       setSellerBaseline({ seller: { ...details }, settings: { ...form.settings } })
+      refreshCompanies()
       return true
     }
 
@@ -959,6 +972,7 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
         }
         // The list is read again, so the next comparison is against what was saved.
         ledgers.retry()
+        refreshCompanies()
       }
       setConfirmedLedgerId(getLedgerId(ledger))
       return true

@@ -22,10 +22,12 @@
 
 import { useMemo, useState } from 'react'
 
+import { EVENT_KIND, EVENT_KINDS } from '@/Constants/procurementAutomation'
 import { QUERY } from '@/Constants/queryKeys'
 import { useQuery } from '@/Library/queryCache'
 import { toast } from '@/Library/toast'
 import { mergeLive, readSocketMessage, readThreads } from '@/Modules/Procurement/preBidChat'
+import { inScreenTerms } from '@/Modules/Procurement/procurement'
 import useLiveSocket from '@/Modules/Procurement/useLiveSocket'
 import { getPreBidChats, preBidChatSocketUrl, sendPreBidChat } from '@/Services/Procurement/procurementAutomationService'
 import { getVendorPreBidChat, sendVendorPreBidChat, vendorPreBidChatSocketUrl } from '@/Services/Procurement/vendorPortalService'
@@ -74,7 +76,7 @@ export default function usePreBidChat({ companyId, preBidId, vendorEmail = null 
       await chats.reload()
       return true
     } catch (failure) {
-      toast.error(failure.message)
+      toast.error(inScreenTerms(failure.message, EVENT_KINDS[EVENT_KIND.PRE_BID].label))
       return false
     } finally {
       setSending(false)

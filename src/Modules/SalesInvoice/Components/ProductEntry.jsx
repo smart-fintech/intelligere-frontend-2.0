@@ -69,6 +69,8 @@ export default function ProductEntry({
   ledgersById,
   ledgersLoading,
   challan = false,
+  // Reverse Charge Applicable: no GST is charged on the document - no GST Slab box.
+  reverseCharge = false,
   figures,
   withDiscount,
   errors,
@@ -212,8 +214,8 @@ export default function ProductEntry({
         </div>
       ) : null}
 
-      {/* Nor GST. */}
-      {challan ? null : (
+      {/* Nor GST - nor under Reverse Charge. */}
+      {challan || reverseCharge ? null : (
         <div style={NARROW}>
           <SelectField
             id={id('gst-slab')}

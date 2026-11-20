@@ -289,6 +289,8 @@ export default function ErpLedgerList({ companyName, companyId, companyAddress }
         vouchertype: row.vouchertype,
         module_name: row.module_name || '',
         object_id: row.object_id,
+        template_name: row.template_name || '',
+        voucher_id: row.voucher_id || ''
       })
       toast.success(reply?.msg || 'Entry deleted.')
       await erp.reload()

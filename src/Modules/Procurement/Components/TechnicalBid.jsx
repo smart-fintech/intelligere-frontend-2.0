@@ -646,7 +646,7 @@ export function TechnicalBidView({ event }) {
   return (
     <PreBidDetails
       event={event}
-      empty={<p className="text-sm text-muted-foreground">No technical bid details were added.</p>}
+      empty={<p className="text-sm text-muted-foreground">No technical details were added.</p>}
     />
   )
 }

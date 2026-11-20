@@ -14,7 +14,7 @@ import { Input } from '@/Components/ui/input'
 import { cn } from '@/Library/utils'
 import { DocumentButton } from '@/Modules/Procurement/Components/DocumentPreview'
 import { fileName } from '@/Modules/Procurement/procurement'
-import { emptyRecord, profileErrorKey } from '@/Modules/Procurement/vendorProfile'
+import { emptyRecord, profileErrorKey, todayInputDate } from '@/Modules/Procurement/vendorProfile'
 
 /**
  * One field of the vendor profile form, by its type (Modules/Procurement/
@@ -238,19 +238,35 @@ export default function ProfileField({ id, field, value, onChange, path, errors 
           onChange={(event) => onChange(event.target.value)}
         />
       )
-    default:
-      return (
+    default: {
+      // A value saved before the field was a date: the picker cannot show it, so it is said under it.
+      const older = field.older?.(value) ?? null
+      const hintId = older ? `${id}-older` : undefined
+      const input = (
         <Field
           id={id}
           label={field.label}
-          className={cn(wide, className)}
+          className={older ? undefined : cn(wide, className)}
           type={field.type === 'number' || field.type === 'date' ? field.type : 'text'}
           min={field.type === 'number' ? 0 : undefined}
+          max={field.type === 'date' && field.past ? todayInputDate() : undefined}
           value={value ?? ''}
           disabled={disabled}
           error={error}
+          // Only when there is a hint: otherwise the field's own (its error) stays.
+          {...(older ? { 'aria-describedby': [error ? `${id}-error` : null, hintId].filter(Boolean).join(' ') } : {})}
           onChange={(event) => onChange(event.target.value)}
         />
       )
+      if (!older) return input
+      return (
+        <div className={cn(wide, className)}>
+          {input}
+          <p id={hintId} className="mt-1 text-[11px] leading-4 text-muted-foreground">
+            Saved earlier as &ldquo;{older}&rdquo;. Pick the start date to replace it.
+          </p>
+        </div>
+      )
+    }
   }
 }

@@ -4,17 +4,16 @@
  *
  *   POST   bank_statement/bankstmnt-file/       the statement file (CSV, or a Tabula PDF)
  *   POST   bank_statement/bankstmnt-ai/         a PDF read server-side by the AI reader
- *   POST   bank_statement/bankstmnt-entry/      turns the uploaded file into its entries
- *   PUT    bank_statement/bankstmnt-entry/      marks rows verified (sent)
+ *   (POST  bank_statement/bankstmnt-entry/      disabled - no longer sent, for any ERP)
+ *   PUT    bank_statement/bankstmnt-entry/      marks rows verified - Intelligere only, never for Tally
  *   POST   bank_statement/interval-voucher/     one page of the entries
  *   POST   bank_statement/bank-ledger-mapping/  keyword -> ledger mappings: list / add
  *   DELETE bank_statement/bank-ledger-mapping/  removes one keyword
  *   POST   bank_statement/vouchers-to-excel/    the verified rows and their per-ledger summary
  *   POST   tally/receivable_payable/            outstanding invoices, for Agst Ref
  *
- * The upload is three steps, in this order: the file (either upload) leaves a
- * cleaned CSV on the server, createStatementEntry turns it into the entry, and
- * getStatementPage then reads that entry a page at a time.
+ * The upload: the file (either upload) goes to the server, and getStatementPage
+ * then reads the statement's entry a page at a time.
  *
  * Failures reach the caller as an Error carrying the backend's message
  * (authService).
@@ -62,8 +61,9 @@ export const uploadStatementAI = ({ companyId, bankDetailId, file, password = ''
   return api.post(AI_FILE_URL, body, MULTIPART)
 }
 
-/** Turns the file just uploaded into the statement's entries -> { data: [...] }. */
-export const createStatementEntry = (companyId) => api.post(ENTRY_URL, { company_id: companyId })
+// POST bankstmnt-entry/ is no longer sent, for any ERP - kept here, disabled.
+// /** Turns the file just uploaded into the statement's entries -> { data: [...] }. */
+// export const createStatementEntry = (companyId) => api.post(ENTRY_URL, { company_id: companyId })
 
 /* ------------------------------------------------------------------ */
 /* Reading the entries                                                */
@@ -179,11 +179,12 @@ export const BANK_STATEMENT_SOCKET_MODULE = 'bank_statement'
  * `bank` is the bank's ledger; the rows are built by toTallyRow
  * (Modules/BankStatement/bankStatementModel).
  */
-export const buildBankStatementSocketMessage = ({ companyName, bank, rows }) => (
+export const buildBankStatementSocketMessage = ({ companyName, bank, rows,entryId }) => (
   {
     payload: {
       company_name: companyName,
       bank_name: bank,
+      bankstmnt_entry_id: entryId,
       module_name: BANK_STATEMENT_SOCKET_MODULE,
       data: rows,
     }

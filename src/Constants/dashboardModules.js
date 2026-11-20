@@ -224,7 +224,7 @@ export const PRODUCT_MODULES = [
     name: 'Procurement Automation',
     icon: Workflow,
     status: MODULE_STATUS.AVAILABLE,
-    description: 'Run bids and pre bids with your vendors',
+    description: 'Run Technical Bids and Financial Bids with your vendors',
   },
   {
     key: 'Journal Voucher',

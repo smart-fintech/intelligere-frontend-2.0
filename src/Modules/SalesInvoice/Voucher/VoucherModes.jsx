@@ -27,13 +27,14 @@ import TallyVouchers from '@/Modules/SalesInvoice/Voucher/TallyVouchers'
  *   addModes        ['shared', 'ai'] (Purchase Invoice) or ['ai'] (Sales Invoice)
  *   aiDocumentType  AI Voucher's document_type - 'Purchase Invoice' | 'Sales Invoice'
  *   active          the voucher view is on screen (AI Voucher's progress is asked for only then)
+ *   selection       the times the Voucher view was chosen - TallyVouchers reads the latest each time
  */
 const ADD_MODES = Object.freeze({ shared: 'Add Voucher', ai: 'AI Voucher' })
 
 const segmentClass = (chosen) =>
   `flex cursor-pointer items-center gap-2 rounded-md px-3 py-1 text-xs transition-colors ${chosen ? 'bg-brand-soft font-semibold text-brand' : 'text-muted-foreground hover:text-brand'}`
 
-export default function VoucherModes({ company, parties, options, addModes = ['shared'], aiDocumentType, active = true }) {
+export default function VoucherModes({ company, parties, options, addModes = ['shared'], aiDocumentType, active = true, selection = 0 }) {
   const [mode, setMode] = useState('view')
   const [addMode, setAddMode] = useState(addModes[0])
   const [opened, setOpened] = useState({})
@@ -93,7 +94,7 @@ export default function VoucherModes({ company, parties, options, addModes = ['s
       </RadioGroup>
 
       <div hidden={mode !== 'view'}>
-        <TallyVouchers company={company} parties={parties} {...options} />
+        <TallyVouchers company={company} parties={parties} {...options} selection={selection} />
       </div>
       {opened.shared ? (
         <div hidden={!showing('shared')}>

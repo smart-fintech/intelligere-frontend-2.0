@@ -26,7 +26,7 @@ export const EVENT_KIND = Object.freeze({
  */
 export const EVENT_KINDS = Object.freeze({
   [EVENT_KIND.BID]: {
-    label: 'Bid',
+    label: 'Financial Bid',
     url: 'procurement/auction_create/',
     vendorListUrl: 'procurement/vendor_auction_list/',
     idKey: 'auction_id',
@@ -34,7 +34,7 @@ export const EVENT_KINDS = Object.freeze({
     listSuffix: 'Auction',
   },
   [EVENT_KIND.PRE_BID]: {
-    label: 'Pre Bid',
+    label: 'Technical Bid',
     url: 'procurement/pre_bid_create/',
     vendorListUrl: 'procurement/vendor_pre_bid_list/',
     idKey: 'pre_bid_id',

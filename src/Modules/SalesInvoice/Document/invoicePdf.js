@@ -27,6 +27,7 @@
  * a PDF is first made.
  */
 
+import { readFileDataUrl } from '@/Modules/SalesInvoice/Document/useFileDataUrl'
 import { createPdf } from '@/Utils/pdf'
 
 // Everything that imports them from here keeps working; they live in Utils/pdf.
@@ -35,8 +36,21 @@ export { downloadPdf, pdfBlob } from '@/Utils/pdf'
 /** react-pdf embeds PNG and JPEG; anything else (WebP, GIF, SVG...) is redrawn as PNG first. */
 const EMBEDDABLE = /^data:image\/(png|jpe?g);/i
 
-/** An image the PDF can embed - the same picture as PNG when it is another format; null when it cannot be read. */
-const embeddable = (src) =>
+/**
+ * An image the PDF can embed - the same picture as PNG when it is another
+ * format; null when it cannot be read. A link (the saved logo / signature's
+ * backend URL - the sheet shows it as it is) is read here, once, as the PDF
+ * is made: the PDF holds the picture itself.
+ */
+const embeddable = async (src) => {
+  if (/^https?:/i.test(src ?? '')) {
+    const read = await readFileDataUrl(src)
+    return read && read !== src ? redrawn(read) : null
+  }
+  return redrawn(src)
+}
+
+const redrawn = (src) =>
   new Promise((resolve) => {
     if (!src) return resolve(null)
     if (EMBEDDABLE.test(src)) return resolve(src)

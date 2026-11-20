@@ -293,7 +293,7 @@ export const vendorChoicesFor = (product, companyVendors, skuCode = '') => {
  *
  *   products      readProductOptions' list
  *   vendorCount   how many vendors the company's vendor master holds
- *   label         'Bid' or 'Pre Bid', for the sentence
+ *   label         'Financial Bid' or 'Technical Bid' (EVENT_KINDS), for the sentence
  *
  * A product with no vendor linked does not block the form - it shows that
  * product has nobody to invite (vendorChoicesFor).
@@ -301,8 +301,8 @@ export const vendorChoicesFor = (product, companyVendors, skuCode = '') => {
  * -> { message, create: ['product'] | ['vendor'] | ['product', 'vendor'] } - what
  *    to create to get past it.
  */
-export const creationBlocker = ({ products, vendorCount, label = 'Bid' }) => {
-  const noun = label.toLowerCase()
+export const creationBlocker = ({ products, vendorCount, label = EVENT_KINDS[EVENT_KIND.BID].label }) => {
+  const noun = label
   const hasProducts = products.length > 0
   const hasVendors = vendorCount > 0
 
@@ -441,13 +441,13 @@ export const vendorReminderError = (master, now = Date.now()) => {
 /** { field: message } - empty when the master details can be saved. Only a new event is checked: an edit cannot change them. */
 export const validateMaster = (master, kind, now = Date.now()) => {
   const errors = {}
-  if (!asText(master.Auction_no)) errors.Auction_no = 'Enter the bid number.'
+  if (!asText(master.Auction_no)) errors.Auction_no = `Enter the ${EVENT_KINDS[kind].label} number.`
 
   const bid = checkWindow(errors, master, 'starting', 'closing', now)
   if (kind === EVENT_KIND.PRE_BID) {
     const technical = checkWindow(errors, master, 'pre_starting', 'pre_closing', now)
     if (technical.closes !== null && bid.opens !== null && bid.opens < technical.closes && !errors.starting_time) {
-      errors.starting_time = 'The bid must start after the technical bid closes.'
+      errors.starting_time = 'The Financial Bid must start after the Technical Bid closes.'
     }
     const reminder = vendorReminderError(master, now)
     if (reminder) errors.vendor_email_reminder = reminder
@@ -921,21 +921,36 @@ export const technicalBidErrors = (form, now = Date.now()) => {
 }
 
 /**
+ * A backend reply in the screens' names. The backend calls a Financial Bid an
+ * "Auction" and a Technical Bid a "Pre Bid" (procurement/views.py); only the
+ * event's own name is changed - where it leads the message, or follows "a
+ * cancelled" / "this" - and nothing else of it. A message is matched on its
+ * original text (serverFieldErrors) before this is applied for showing.
+ *
+ *   label   the event's name (EVENT_KINDS' label)
+ */
+export const inScreenTerms = (message, label) =>
+  asText(message)
+    .replace(/^Pre Bid for Auction (No|Number)\b/i, `${label} $1`)
+    .replace(/^(Pre Bid|Auction)\b/i, label)
+    .replace(/\b(a cancelled|this) (pre bid|auction)\b/gi, `$1 ${label}`)
+
+/**
  * A refusal from the backend on the field it is about, where its message names
  * one (procurement/views.py) - null for anything else (a plan limit, a failed
  * upload), which the form shows as a whole.
  */
-export const serverFieldErrors = (message, rows) => {
+export const serverFieldErrors = (message, rows, label = EVENT_KINDS[EVENT_KIND.BID].label) => {
   const text = asText(message)
-  if (/^Pre Bid Starting Date Required/i.test(text)) return { pre_starting_date: text }
-  if (/^Starting Date Required/i.test(text)) return { starting_date: text }
-  if (/Auction (Number|No)\b.*(Required|already exists)/i.test(text)) return { Auction_no: text }
+  if (/^Pre Bid Starting Date Required/i.test(text)) return { pre_starting_date: inScreenTerms(text, label) }
+  if (/^Starting Date Required/i.test(text)) return { starting_date: inScreenTerms(text, label) }
+  if (/Auction (Number|No)\b.*(Required|already exists)/i.test(text)) return { Auction_no: inScreenTerms(text, label) }
   const duplicate = /^Duplicate product not added:\s*(.+)$/i.exec(text)
   if (duplicate) {
     const names = new Set(duplicate[1].split(',').map((name) => name.trim().toLowerCase()))
     const found = rows.filter((row) => names.has(asText(row.product.product_name).toLowerCase()))
     if (found.length > 0) {
-      return Object.fromEntries(found.map((row) => [rowErrorKey(row.key, 'product'), 'Already in this bid - added again.']))
+      return Object.fromEntries(found.map((row) => [rowErrorKey(row.key, 'product'), `Already in this ${label} - added again.`]))
     }
   }
   return null

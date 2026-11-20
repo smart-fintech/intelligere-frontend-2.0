@@ -107,13 +107,32 @@ export const inputDateOf = (value) => {
 /** A number the payload sent, as the form's text ("" for none). */
 const numberText = (value) => (value === null || value === undefined ? '' : textOf(value))
 
-/** The GST slab a line or charge was taxed at, from its saved rates - IGST's, or CGST + SGST - as the slab list writes it. */
+/** A saved rate as a number - null when none was saved (null, "", not a number). */
+const savedRate = (value) => (value === null || value === undefined || textOf(value) === '' || !Number.isFinite(Number(value)) ? null : Number(value))
+
+/**
+ * The GST slab a line or charge was taxed at, from its saved rates - IGST's,
+ * or CGST + SGST - as the slab list writes it. The server keeps all three
+ * (product rows store the tax not charged as 0), so IGST counts only when it
+ * is above 0: a CGST + SGST line is { cgst: 9, sgst: 9, igst: 0 } -> "18".
+ *
+ * product_data writes each half to two places (rateString), so a slab whose
+ * half is longer comes back rounded - 0.25 as { cgst: 0.13, sgst: 0.13 },
+ * adding up to 0.26. When CGST + SGST match no slab, the slab is the one
+ * whose halves round to the saved ones. IGST (written whole) is read as is.
+ */
+const twoPlaces = (value) => Number(Number(value).toFixed(2))
 const slabOfSaved = (row) => {
-  const igst = Number(row?.igst)
-  const split = Number(row?.cgst) + Number(row?.sgst)
-  const rate = row?.igst !== null && row?.igst !== undefined && Number.isFinite(igst) ? igst : Number.isFinite(split) ? split : null
+  const igst = savedRate(row?.igst)
+  const cgst = savedRate(row?.cgst)
+  const sgst = savedRate(row?.sgst)
+  const split = cgst === null && sgst === null ? null : (cgst ?? 0) + (sgst ?? 0)
+  const igstCharged = igst !== null && igst > 0
+  const rate = igstCharged ? igst : split !== null && split > 0 ? split : (igst ?? split)
   if (rate === null) return ''
-  return GST_RATES.find((slab) => Number(slab) === Number(rateText(rate))) ?? ''
+  const slab = GST_RATES.find((each) => Number(each) === Number(rateText(rate)))
+  if (slab !== undefined || igstCharged || !(split > 0)) return slab ?? ''
+  return GST_RATES.find((each) => twoPlaces(each / 2) === twoPlaces(cgst ?? 0) && twoPlaces(each / 2) === twoPlaces(sgst ?? 0)) ?? ''
 }
 
 /** The one { ledger name: amount } entry of a discount / tcs / round off section. */

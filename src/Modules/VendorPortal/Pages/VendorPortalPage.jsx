@@ -65,7 +65,7 @@ export default function VendorPortalPage() {
               size="sm"
               icon={IdCard}
               disabled={!record}
-              tooltip={record ? undefined : 'Your profile shows here once a company invites you to a bid.'}
+              tooltip={record ? undefined : 'Your profile shows here once a company invites you to a Financial Bid or Technical Bid.'}
               onClick={() => setProfileMode(PROFILE_VIEW)}
             >
               Profile

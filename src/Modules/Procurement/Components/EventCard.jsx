@@ -5,7 +5,7 @@ import { SkuDetailsTooltip } from '@/Components/Common/SkuDetailsTooltip'
 import { Button } from '@/Components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table'
 import { Tooltip } from '@/Components/ui/tooltip'
-import { EVENT_KIND, EVENT_STAGE } from '@/Constants/procurementAutomation'
+import { EVENT_KIND, EVENT_KINDS, EVENT_STAGE } from '@/Constants/procurementAutomation'
 import { cn } from '@/Library/utils'
 import { CancelledWatermark, EventStatusBadge } from '@/Modules/Procurement/Components/EventSummary'
 import ProductVendors from '@/Modules/Procurement/Components/ProductVendors'
@@ -144,7 +144,7 @@ function CreateBidButton({ event, onCreateBid }) {
       aria-describedby={passed ? `create-bid-${event.id}-why` : undefined}
       onClick={() => onCreateBid(event)}
     >
-      Create Bid
+      Create Financial Bid
     </Button>
   )
   if (!passed) return button
@@ -211,7 +211,7 @@ export function Windows({ event }) {
 function VendorsHidden() {
   return (
     <p className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-      <EyeOff className="size-3.5" /> Vendor details are hidden while this bid runs (Hide Vendor Details).
+      <EyeOff className="size-3.5" /> Vendor details are hidden while this Financial Bid runs (Hide Vendor Details).
     </p>
   )
 }
@@ -339,7 +339,7 @@ export default function EventCard({
   const [profileOf, setProfileOf] = useState(null)
 
   const preBid = event.kind === EVENT_KIND.PRE_BID
-  const label = preBid ? 'Pre Bid' : 'Bid'
+  const { label } = EVENT_KINDS[event.kind]
   const running = event.stage === EVENT_STAGE.ONGOING && !event.cancelled
   const upcoming = event.stage === EVENT_STAGE.UPCOMING && !event.cancelled
   const canChat = preBid && event.stage !== EVENT_STAGE.UPCOMING

@@ -1,9 +1,11 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 
 import { Button } from '@/Components/ui/button'
+import useMasterDetails from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import { formatINR } from '@/Modules/Payment/pricing'
 import { isServiceLine, lineVariant, rateText, textOf } from '@/Modules/SalesInvoice/salesInvoiceForm'
+import { isSkuManagementEnabled } from '@/Services/Inventory/inventoryService'
 
 /**
  * The two lists under the Product Details entry form:
@@ -23,11 +25,12 @@ const cell = 'px-2 py-1.5'
  *   productsByKey   Map of the products, for names and SKUs
  *   ledgersById     Map of the ledgers, for a service line's name
  *   challan         a Challan's lines - no Rate, GST or Amount columns
+ *   reverseCharge   Reverse Charge Applicable - no GST column (none is charged)
  *   figures         invoiceFigures(form).lines - each line's amounts
  *   editingLineId   the line loaded into the entry form, highlighted
  *   errors          the form's errors - a line with any is flagged
  */
-export function AddedProducts({ lines, productsByKey, ledgersById, figures, editingLineId, errors, disabled, onEdit, onRemove, challan = false }) {
+export function AddedProducts({ lines, productsByKey, ledgersById, figures, editingLineId, errors, disabled, onEdit, onRemove, challan = false, reverseCharge = false }) {
   if (lines.length === 0) {
     return (
       <p className="text-xs text-muted-foreground">
@@ -48,7 +51,7 @@ export function AddedProducts({ lines, productsByKey, ledgersById, figures, edit
             {challan ? null : (
               <>
                 <th className={cn(cell, 'text-right font-medium')}>Rate</th>
-                <th className={cn(cell, 'text-right font-medium')}>GST</th>
+                {reverseCharge ? null : <th className={cn(cell, 'text-right font-medium')}>GST</th>}
                 <th className={cn(cell, 'text-right font-medium')}>Amount</th>
               </>
             )}
@@ -84,7 +87,9 @@ export function AddedProducts({ lines, productsByKey, ledgersById, figures, edit
                 {challan ? null : (
                   <>
                     <td className={cn(cell, 'text-right tabular-nums')}>{line.rate}</td>
-                    <td className={cn(cell, 'text-right tabular-nums')}>{line.gstRate ? `${rateText(line.gstRate)}%` : '--'}</td>
+                    {reverseCharge ? null : (
+                      <td className={cn(cell, 'text-right tabular-nums')}>{line.gstRate ? `${rateText(line.gstRate)}%` : '--'}</td>
+                    )}
                     <td className={cn(cell, 'text-right tabular-nums')}>{formatINR(figures[line.id]?.taxablePaise)}</td>
                   </>
                 )}
@@ -137,46 +142,58 @@ export function BuyerProducts({ status, rows, disabled, onPick }) {
       <p className="text-xs font-semibold tracking-wide text-brand uppercase">This buyer&apos;s earlier products</p>
       {status === 'loading' ? <p className="text-xs text-muted-foreground">Loading...</p> : null}
       {status === 'failed' ? <p className="text-xs text-muted-foreground">They could not be loaded - products can still be chosen above.</p> : null}
-      {status === 'ready' && rows.length > 0 ? (
-        <div className="max-h-56 overflow-auto rounded-md border border-border">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-muted text-left text-xs text-muted-foreground">
-              <tr>
-                <th className={cn(cell, 'font-medium')}>Product Name</th>
-                <th className={cn(cell, 'font-medium')}>SKU Code</th>
-                <th className={cn(cell, 'font-medium')}>HSN/SAC</th>
-                <th className={cn(cell, 'w-10')}>
-                  <span className="sr-only">Add</span>
-                </th>
+      {status === 'ready' && rows.length > 0 ? <EarlierProductsTable rows={rows} disabled={disabled} onPick={onPick} /> : null}
+    </div>
+  )
+}
+
+/**
+ * The earlier products' table. SKU Code is a column only when the company
+ * manages SKUs - the Products page's own rule (isSkuManagementEnabled on the
+ * Master Details record, read once per company from the store); not while
+ * that is still unknown.
+ */
+function EarlierProductsTable({ rows, disabled, onPick }) {
+  const masterDetails = useMasterDetails()
+  const showSku = masterDetails.status === 'ready' && isSkuManagementEnabled(masterDetails.record)
+  return (
+    <div className="max-h-56 overflow-auto rounded-md border border-border">
+      <table className="w-full text-sm">
+        <thead className="sticky top-0 bg-muted text-left text-xs text-muted-foreground">
+          <tr>
+            <th className={cn(cell, 'font-medium')}>Product Name</th>
+            {showSku ? <th className={cn(cell, 'font-medium')}>SKU Code</th> : null}
+            <th className={cn(cell, 'font-medium')}>HSN/SAC</th>
+            <th className={cn(cell, 'w-10')}>
+              <span className="sr-only">Add</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => {
+            const name = textOf(row['Product Name'] ?? row.product_name ?? row.Products)
+            return (
+              <tr key={`${name}|${textOf(row.sku_code)}|${index}`} className="border-t border-border">
+                <td className={cell}>{name}</td>
+                {showSku ? <td className={cn(cell, 'text-xs')}>{textOf(row.sku_code) || '--'}</td> : null}
+                <td className={cell}>{textOf(row.hsn_sac_code ?? row.Hsn_code) || '--'}</td>
+                <td className={cn(cell, 'text-right')}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-xs"
+                    icon={Plus}
+                    tooltip="Fill the product form"
+                    aria-label={`Use ${name}`}
+                    disabled={disabled}
+                    onClick={() => onPick(row)}
+                  />
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, index) => {
-                const name = textOf(row['Product Name'] ?? row.product_name ?? row.Products)
-                return (
-                  <tr key={`${name}|${textOf(row.sku_code)}|${index}`} className="border-t border-border">
-                    <td className={cell}>{name}</td>
-                    <td className={cn(cell, 'text-xs')}>{textOf(row.sku_code) || '--'}</td>
-                    <td className={cell}>{textOf(row.hsn_sac_code ?? row.Hsn_code) || '--'}</td>
-                    <td className={cn(cell, 'text-right')}>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon-xs"
-                        icon={Plus}
-                        tooltip="Fill the product form"
-                        aria-label={`Use ${name}`}
-                        disabled={disabled}
-                        onClick={() => onPick(row)}
-                      />
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }

@@ -29,7 +29,9 @@ const labelOf = (type) => findDocumentType(type)?.label ?? type
  *                   chosen on Step 3 (OrderProducts)
  *
  * A type the company's plan does not include is listed but cannot be
- * chosen, and choosing it any other way is refused here too.
+ * chosen, and choosing it any other way is refused here too - in Document Type
+ * and in Prefill From alike (the same `enabled` of documentTypes): a source
+ * type outside the plan is listed "(not in plan)", disabled, never chosen.
  */
 export default function DocumentTypeCard({ invoice, documentTypes, locked, disabled, prefill = null, orderSource = null }) {
   const { form, errors, setField } = invoice
@@ -39,6 +41,8 @@ export default function DocumentTypeCard({ invoice, documentTypes, locked, disab
   const prefillChoices = offersPrefill ? prefill.sources : []
   const list = prefill?.list
   const sourceLabel = prefill?.sourceType ? labelOf(prefill.sourceType) : ''
+  // Document Type's own rule, for a source type too - one this flow does not list is not held back.
+  const inPlan = (type) => documentTypes.find((entry) => entry.value === type)?.enabled ?? true
 
   return (
     <InvoiceCard title="Document Type">
@@ -68,12 +72,21 @@ export default function DocumentTypeCard({ invoice, documentTypes, locked, disab
             id="prefill-source"
             label="Prefill From"
             placeholder="Select source document"
-            options={[{ value: NO_SOURCE, label: 'None' }, ...[...orderChoices, ...prefillChoices].map((type) => ({ value: type, label: labelOf(type) }))]}
+            options={[
+              { value: NO_SOURCE, label: 'None' },
+              ...[...orderChoices, ...prefillChoices].map((type) => ({
+                value: type,
+                label: inPlan(type) ? labelOf(type) : `${labelOf(type)} (not in plan)`,
+                disabled: !inPlan(type),
+                title: inPlan(type) ? undefined : "Not included in this company's premium modules",
+              })),
+            ]}
             value={(offersOrderSource && orderSource.choice) || prefill?.sourceType || (offersOrderSource ? NO_SOURCE : '')}
             disabled={disabled}
             onValueChange={(next) => {
               if (!next) return
               const type = next === NO_SOURCE ? '' : next
+              if (type && !inPlan(type)) return
               if (offersOrderSource) orderSource.chooseSource(orderChoices.includes(type) ? type : '')
               if (offersPrefill && (prefillChoices.includes(type) || prefill.sourceType)) prefill.chooseSource(prefillChoices.includes(type) ? type : '')
             }}

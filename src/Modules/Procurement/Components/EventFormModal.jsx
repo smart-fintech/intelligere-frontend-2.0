@@ -25,6 +25,7 @@ import {
   fileName,
   isRowErrorKey,
   isTechnicalErrorKey,
+  inScreenTerms,
   isVendorChosen,
   masterFromEvent,
   masterFromPreBid,
@@ -245,6 +246,7 @@ function OptionGroup({ id, title, children }) {
  */
 function MasterFields({ kind, master, errors, disabled, onField, attachments }) {
   const preBid = kind === EVENT_KIND.PRE_BID
+  const { label } = EVENT_KINDS[kind]
   const min = todayInput()
   const shared = { master, errors, disabled, onField }
 
@@ -253,7 +255,7 @@ function MasterFields({ kind, master, errors, disabled, onField, attachments }) 
       <div className="flex flex-wrap items-start gap-x-5 gap-y-3">
         <Field
           id="procurement-auction-no"
-          label="Bid No"
+          label={`${label} No`}
           required
           value={master.Auction_no}
           error={errors.Auction_no}
@@ -275,7 +277,7 @@ function MasterFields({ kind, master, errors, disabled, onField, attachments }) 
           className="w-full sm:w-36"
         />
         <BidGapField master={master} error={errors.gap} disabled={disabled} onField={onField} />
-        <OptionGroup id="procurement-visibility" title="While the bid runs">
+        <OptionGroup id="procurement-visibility" title={`While the ${label} runs`}>
           <CheckboxField
             id="procurement-hide-vendor"
             label="Hide vendor details"
@@ -340,13 +342,13 @@ function MasterFields({ kind, master, errors, disabled, onField, attachments }) 
           ) : null}
           <WhenField
             name="starting"
-            label={preBid ? 'Financial Bid Start' : 'Bid Start'}
+            label="Financial Bid Start"
             min={(preBid && master.pre_closing_date) || min}
             {...shared}
           />
           <WhenField
             name="closing"
-            label={preBid ? 'Financial Bid Close' : 'Bid Close'}
+            label="Financial Bid Close"
             min={master.starting_date || min}
             {...shared}
           />
@@ -356,7 +358,7 @@ function MasterFields({ kind, master, errors, disabled, onField, attachments }) 
             <div className="w-full sm:max-w-sm">
               <Field
                 id="procurement-reminder-minutes"
-                label="Vendor Email Reminder Before Bid Start (Minutes)"
+                label="Vendor Email Reminder Before Technical Bid Start (Minutes)"
                 type="number"
                 inputMode="numeric"
                 min="1"
@@ -629,14 +631,14 @@ export default function EventFormModal({ kind, event = null, fromPreBid = null, 
               files,
             }),
           )
-      toast.success(reply?.msg || `${label} saved.`)
+      toast.success(inScreenTerms(reply?.msg, label) || `${label} saved.`)
       refreshEvents(companyId, kind)
       onClose()
     } catch (failure) {
-      const onFields = serverFieldErrors(failure.message, rows)
+      const onFields = serverFieldErrors(failure.message, rows, label)
       if (onFields) setErrors(onFields)
-      else setProblem(failure.message)
-      toast.error(failure.message)
+      else setProblem(inScreenTerms(failure.message, label))
+      toast.error(inScreenTerms(failure.message, label))
     } finally {
       setSaving(false)
     }
@@ -653,7 +655,7 @@ export default function EventFormModal({ kind, event = null, fromPreBid = null, 
         editing
           ? `Edit ${label} ${event.Auction_no}`
           : createBid
-            ? `Create Bid from Pre Bid ${fromPreBid.Auction_no || ''}`.trim()
+            ? `Create Financial Bid from Technical Bid ${fromPreBid.Auction_no || ''}`.trim()
             : `Add ${label}`
       }
       closeOnBackdropClick={false}
@@ -672,18 +674,18 @@ export default function EventFormModal({ kind, event = null, fromPreBid = null, 
             Cancel
           </Button>
           <Button type="button" icon={Save} loading={saving} onClick={handleSave}>
-            {editing ? 'Update' : createBid ? 'Create Bid' : 'Save'}
+            {editing ? 'Update' : createBid ? 'Create Financial Bid' : 'Save'}
           </Button>
         </>
       }
     >
       <div className="space-y-3 pr-1">
         <Section
-          title="Bid Details"
+          title={`${label} Details`}
           aside={
             editing ? (
               <span className="text-xs text-muted-foreground">
-                Read only - cannot be changed once the {label.toLowerCase()} is created
+                Read only - cannot be changed once the {label} is created
               </span>
             ) : null
           }
@@ -702,8 +704,8 @@ export default function EventFormModal({ kind, event = null, fromPreBid = null, 
                   <FilePicker files={files} onChange={setFiles} disabled={saving} />
                   {createBid && fromPreBid.file.length > 0 ? (
                     <p className="text-[11px] leading-4 text-muted-foreground">
-                      The Pre Bid&apos;s {fromPreBid.file.length === 1 ? 'attachment is' : `${fromPreBid.file.length} attachments are`}{' '}
-                      not copied - select any file this Bid needs.
+                      The Technical Bid&apos;s {fromPreBid.file.length === 1 ? 'attachment is' : `${fromPreBid.file.length} attachments are`}{' '}
+                      not copied - select any file this Financial Bid needs.
                     </p>
                   ) : null}
                 </>
@@ -714,7 +716,7 @@ export default function EventFormModal({ kind, event = null, fromPreBid = null, 
 
         {createBid && start.vendorChoices.length > 0 ? (
           <Section
-            title="Pre Bid Vendors"
+            title="Technical Bid Vendors"
             aside={
               <span className="text-xs text-muted-foreground">
                 {start.vendorChoices.filter((choice) => isVendorChosen(rows, choice)).length} of {start.vendorChoices.length}{' '}
@@ -733,7 +735,7 @@ export default function EventFormModal({ kind, event = null, fromPreBid = null, 
         ) : null}
 
         {preBid ? (
-          <Section title="Technical Bid">
+          <Section title="Technical Details">
             <TechnicalBidFields value={technical} errors={errors} onChange={handleTechnical} disabled={saving} />
           </Section>
         ) : null}

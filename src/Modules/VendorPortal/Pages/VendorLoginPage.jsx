@@ -220,7 +220,7 @@ export default function VendorLoginPage() {
         </span>
         <div>
           <h2 className="text-lg font-semibold text-brand">Vendor Login</h2>
-          <p className="text-xs text-muted-foreground">Sign in with the email your bid invitation was sent to.</p>
+          <p className="text-xs text-muted-foreground">Sign in with the email your Financial Bid or Technical Bid invitation was sent to.</p>
         </div>
       </div>
 

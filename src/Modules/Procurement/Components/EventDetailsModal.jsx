@@ -47,7 +47,7 @@ export default function EventDetailsModal({ event, onClose }) {
         </Section>
 
         {preBid ? (
-          <Section title="Technical Bid">
+          <Section title="Technical Details">
             <TechnicalBidView event={event} />
           </Section>
         ) : null}

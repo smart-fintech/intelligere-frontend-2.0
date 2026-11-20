@@ -146,16 +146,20 @@ const numberOf = (value) => {
  *   ratePaise           'Selling Rate'
  *   discount            discount (%), null for none
  *   taxablePaise        product_amount - the line's taxable value
- *   gstRate             igst, else cgst + sgst (%), null when it has none
+ *   taxes               [{ tax: 'CGST' | 'SGST' | 'IGST', rate, paise }] - each tax
+ *                       the line was charged (cgst / sgst / igst and their
+ *                       _amount): CGST and SGST, or IGST. One saved as 0 (the
+ *                       tax not charged) is left out; [] when it has none
  *   gstPaise            cgst_amount + sgst_amount + igst_amount, null when none
  */
 export const readHistoryProducts = (value) =>
   listOf(value)
     .filter((line) => line && typeof line === 'object')
     .map((line, index) => {
-      const rates = ['igst', 'cgst', 'sgst'].map((field) => numberOf(line[field]))
       const amounts = ['cgst_amount', 'sgst_amount', 'igst_amount'].map((field) => numberOf(line[field])).filter((amount) => amount !== null)
-      const gstRate = rates[0] !== null ? rates[0] : rates[1] !== null || rates[2] !== null ? (rates[1] ?? 0) + (rates[2] ?? 0) : null
+      const taxes = [['CGST', 'cgst'], ['SGST', 'sgst'], ['IGST', 'igst']]
+        .map(([tax, field]) => ({ tax, rate: numberOf(line[field]), paise: toPaise(line[`${field}_amount`]) }))
+        .filter(({ rate, paise }) => (rate ?? 0) > 0 || (paise ?? 0) > 0)
       return {
         key: `${index}-${text(line['Product Name'])}`,
         name: text(line['Product Name']),
@@ -166,7 +170,7 @@ export const readHistoryProducts = (value) =>
         ratePaise: toPaise(line['Selling Rate']),
         discount: numberOf(line.discount) ? numberOf(line.discount) : null,
         taxablePaise: toPaise(line.product_amount),
-        gstRate,
+        taxes,
         gstPaise: amounts.length ? toPaise(amounts.reduce((sum, amount) => sum + amount, 0)) : null,
       }
     })

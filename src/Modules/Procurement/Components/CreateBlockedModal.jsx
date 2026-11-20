@@ -22,7 +22,7 @@ export default function CreateBlockedModal({ label, blocker, onClose }) {
       open
       onOpenChange={onClose}
       size="sm"
-      title={`Cannot create a ${label.toLowerCase()} yet`}
+      title={`Cannot create a ${label} yet`}
       description={blocker.message}
       footer={
         <>

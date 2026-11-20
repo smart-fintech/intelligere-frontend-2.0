@@ -324,6 +324,7 @@ export default function ProductsStep({
               figures={entryFigures}
               withDiscount={withDiscount}
               challan={challan}
+              reverseCharge={Boolean(settings.reverseCharge)}
               errors={errors}
               disabled={disabled}
               onUpdate={updateEntry}
@@ -342,6 +343,7 @@ export default function ProductsStep({
 
             <AddedProducts
               challan={challan}
+              reverseCharge={Boolean(settings.reverseCharge)}
               lines={form.lines}
               productsByKey={products.byKey}
               ledgersById={ledgers.byId}
@@ -417,21 +419,26 @@ export default function ProductsStep({
                       disabled={disabled}
                       onChange={(event) => updateCharge(charge.id, { amount: toDecimalInput(event.target.value) })}
                     />
-                    <SelectField
-                      id={`charge-${charge.id}-gst`}
-                      label="GST Slab"
-                      placeholder="None"
-                      className="[flex:1_1_6rem]"
-                      options={GST_RATE_OPTIONS}
-                      value={charge.gstRate}
-                      disabled={disabled}
-                      onValueChange={(value) => updateCharge(charge.id, { gstRate: value })}
-                    />
-                    <div className="[flex:1_1_6rem] pt-6 text-xs text-muted-foreground">
-                      {taxPaise > 0
-                        ? `${interState ? `IGST ${tax.igst}%` : `CGST ${tax.cgst}% + SGST ${tax.sgst}%`}: ${formatINR(taxPaise)}`
-                        : null}
-                    </div>
+                    {/* Under Reverse Charge no GST is charged - no slab, no tax line. */}
+                    {settings.reverseCharge ? null : (
+                      <>
+                        <SelectField
+                          id={`charge-${charge.id}-gst`}
+                          label="GST Slab"
+                          placeholder="None"
+                          className="[flex:1_1_6rem]"
+                          options={GST_RATE_OPTIONS}
+                          value={charge.gstRate}
+                          disabled={disabled}
+                          onValueChange={(value) => updateCharge(charge.id, { gstRate: value })}
+                        />
+                        <div className="[flex:1_1_6rem] pt-6 text-xs text-muted-foreground">
+                          {taxPaise > 0
+                            ? `${interState ? `IGST ${tax.igst}%` : `CGST ${tax.cgst}% + SGST ${tax.sgst}%`}: ${formatINR(taxPaise)}`
+                            : null}
+                        </div>
+                      </>
+                    )}
                   </div>
                   {chargeLedger && !getLedgerSac(chargeLedger) ? (
                     <ChargeLedgerSac

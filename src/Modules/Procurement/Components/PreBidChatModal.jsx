@@ -157,7 +157,7 @@ export default function PreBidChatModal({ event, companyId, vendorEmail = null, 
               <ListSkeleton rows={3} />
             ) : messages.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
-                No message yet. Start the conversation about this pre bid.
+                No message yet. Start the conversation about this Technical Bid.
               </p>
             ) : (
               messages.map((message) => {
@@ -213,12 +213,12 @@ export default function PreBidChatModal({ event, companyId, vendorEmail = null, 
             </div>
           ) : (
             <p className="mt-3 border-t border-border px-3 py-2.5 text-xs text-muted-foreground">
-              This pre bid is {event.cancelled ? 'cancelled' : 'closed'} - the chat is read only.
+              This Technical Bid is {event.cancelled ? 'cancelled' : 'closed'} - the chat is read only.
             </p>
           )}
         </>
       ) : conversations.length === 0 ? (
-        <p className="p-6 text-center text-sm text-muted-foreground">No vendor is attached to this pre bid yet.</p>
+        <p className="p-6 text-center text-sm text-muted-foreground">No vendor is attached to this Technical Bid yet.</p>
       ) : (
         <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto" aria-label="Vendors">
           {conversations.map((conversation) => {

@@ -249,7 +249,7 @@ export default function TechnicalBidFields({ value, errors = NO_ERRORS, onChange
       <RichTextEditor
         id="procurement-note"
         label="Note"
-        placeholder="Anything else vendors should know about this bid"
+        placeholder="Anything else vendors should know about this Technical Bid"
         value={value.note}
         disabled={disabled}
         onChange={(html) => set('note', html)}

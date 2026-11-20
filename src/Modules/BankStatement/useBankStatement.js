@@ -43,7 +43,6 @@ import {
   BANK_STATEMENT_SOCKET_MODULE,
   OUTSTANDING_SOURCE,
   buildBankStatementSocketMessage,
-  createStatementEntry,
   deleteLedgerMapping,
   getLedgerMappings,
   getOutstandingInvoices,
@@ -69,7 +68,7 @@ const tabulaOrigin = (() => {
   }
 })()
 
-export default function useBankStatement({ company, companyId, banks, isTally }) {
+export default function useBankStatement({ company, companyId, banks, isTally, isIntelligere }) {
   const companyName = text(company?.comp_name)
 
   /* ---- 1. choosing ---- */
@@ -193,7 +192,8 @@ export default function useBankStatement({ company, companyId, banks, isTally })
       } else {
         await uploadStatementFile({ companyId, bankDetailId: bank.id, file })
       }
-      await createStatementEntry(companyId)
+      // POST bankstmnt-entry/ is disabled for every ERP - the page is read straight after the upload.
+      // await createStatementEntry(companyId)
       // The keywords are a help, not a step: without them the entries still load.
       const keywords = await getLedgerMappings({ companyId, accountNo: bank.account_no }).catch(() => ({}))
       setMappings(keywords)
@@ -329,8 +329,12 @@ export default function useBankStatement({ company, companyId, banks, isTally })
   const [sendingIds, setSendingIds] = useState([])
   const pending = useRef(null)
 
+  // PUT bankstmnt-entry/ only for an Intelligere user - for Tally it is never called,
+  // and the sent rows just leave the page.
   const verify = async (list) => {
-    await verifyStatementRows({ companyId, entryId, rows: list.map((entry) => toVerifyRow(entry, remainingLedger)) })
+    if (isIntelligere) {
+      await verifyStatementRows({ companyId, entryId, rows: list.map((entry) => toVerifyRow(entry, remainingLedger)) })
+    }
     removeEntries(list.map((entry) => entry.sr_no))
   }
 
@@ -364,9 +368,12 @@ export default function useBankStatement({ company, companyId, banks, isTally })
       return toast.error('Choose how the remaining amount of an Agst Ref entry is booked.')
     }
 
+    // Neither ERP yet (the profile still loading): nothing is sent or verified.
+    if (!isTally && !isIntelligere) return toast.error('Your ERP is not known yet - please try again in a moment.')
+
     setSendingIds(list.map((entry) => entry.sr_no))
 
-    if (!isTally) {
+    if (isIntelligere) {
       try {
         await verify(list)
         toast.success(`${list.length} entr${list.length === 1 ? 'y' : 'ies'} verified.`)

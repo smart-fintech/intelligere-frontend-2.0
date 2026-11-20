@@ -7,6 +7,7 @@ import {
   hasConsignee,
   hasDispatch,
   headerMetaRows,
+  printsField,
   partyLines,
   plainLines,
   sellerLines,
@@ -195,10 +196,17 @@ function Figure({ value }) {
   ))
 }
 
-/** The empty cells of a row, by column - so every row draws the same column rules. */
+/**
+ * The empty cells of a row, by column - so every row draws the same column
+ * rules. With Discount adds Disc. % (c-disc) before Amount, and the goods
+ * table is then `goodsClass(true)` (a narrower Description) - the PDF's the same.
+ */
 const COLUMNS = ['c-no', 'c-desc', 'c-hsn', 'c-qty', 'c-rate', 'c-per', 'c-amt']
+const DISCOUNT_COLUMNS = ['c-no', 'c-desc', 'c-hsn', 'c-qty', 'c-rate', 'c-per', 'c-disc', 'c-amt']
+const columnsOf = (discount) => (discount ? DISCOUNT_COLUMNS : COLUMNS)
+const goodsClass = (discount) => (discount ? 'inv-goods has-disc' : 'inv-goods')
 
-function GoodsHead() {
+function GoodsHead({ discount = false }) {
   return (
     <thead>
       <tr>
@@ -208,13 +216,14 @@ function GoodsHead() {
         <th className="c-qty">Quantity</th>
         <th className="c-rate">Rate</th>
         <th className="c-per">Per</th>
+        {discount ? <th className="c-disc">Disc. %</th> : null}
         <th className="c-amt">Amount</th>
       </tr>
     </thead>
   )
 }
 
-function GoodsRow({ row }) {
+function GoodsRow({ row, discount = false }) {
   if (!row) return null
 
   if (row.type === 'product') {
@@ -232,6 +241,7 @@ function GoodsRow({ row }) {
           <Figure value={line.rate} />
         </td>
         <td className="c-per">{line.per}</td>
+        {discount ? <td className="c-disc">{line.discount}</td> : null}
         <td className="c-amt">
           <Figure value={line.taxable} />
         </td>
@@ -257,6 +267,7 @@ function GoodsRow({ row }) {
       <td className="c-qty" />
       <td className="c-rate" />
       <td className="c-per" />
+      {discount ? <td className="c-disc" /> : null}
       <td className="c-amt">
         <Figure value={row.amount} />
       </td>
@@ -265,10 +276,10 @@ function GoodsRow({ row }) {
 }
 
 /** The empty stretch that carries the goods box to the foot of its sheet. */
-function FillerRow({ height }) {
+function FillerRow({ height, discount = false }) {
   return (
     <tr className="inv-filler">
-      {COLUMNS.map((column, index) => (
+      {columnsOf(discount).map((column, index) => (
         <td key={column} className={column} style={index === 0 ? { height } : undefined} />
       ))}
     </tr>
@@ -276,10 +287,10 @@ function FillerRow({ height }) {
 }
 
 /** The foot of a non-final sheet. */
-function ContinuedRow({ nextPage }) {
+function ContinuedRow({ nextPage, discount = false }) {
   return (
     <tr className="inv-continued">
-      <td colSpan={COLUMNS.length}>Continue Page No. {nextPage}</td>
+      <td colSpan={columnsOf(discount).length}>Continue Page No. {nextPage}</td>
     </tr>
   )
 }
@@ -294,6 +305,7 @@ function TotalRow({ model }) {
       <td className="c-qty">{quantity}</td>
       <td className="c-rate" />
       <td className="c-per" />
+      {model.showDiscount ? <td className="c-disc" /> : null}
       <td className="c-amt">{formatAmount(model.totals.grandTotal)}</td>
     </tr>
   )
@@ -436,7 +448,7 @@ function PaySummaryBlock({ model }) {
         ) : null}
         {has(other.note) ? <div className="inv-pay-row inv-pay-note">Note : {other.note}</div> : null}
       </div>
-      {invoice.paymentQr ? (
+      {invoice.paymentQr && printsField(invoice, 'paymentQr') ? (
         <div className="inv-pay-qr">
           <div className="inv-pay-qr-label">Payment QR</div>
           <img src={invoice.paymentQr} alt="" />
@@ -495,16 +507,16 @@ export function InvoiceSheet({ model, page, pageNo, pageCount, rowsByKey }) {
       {pageNo === 1 && model.einvoice ? null : <TitleBlock model={model} pageNo={pageNo} />}
       <HeaderBlock model={model} />
       {parts.goods ? (
-        <table className="inv-goods">
-          <GoodsHead />
+        <table className={goodsClass(model.showDiscount)}>
+          <GoodsHead discount={model.showDiscount} />
           <tbody>
             {page.keys
               .filter((key) => rowsByKey[key])
               .map((key) => (
-                <GoodsRow key={key} row={rowsByKey[key]} />
+                <GoodsRow key={key} row={rowsByKey[key]} discount={model.showDiscount} />
               ))}
-            <FillerRow height={page.filler} />
-            {page.isLast ? <TotalRow model={model} /> : <ContinuedRow nextPage={pageNo + 1} />}
+            <FillerRow height={page.filler} discount={model.showDiscount} />
+            {page.isLast ? <TotalRow model={model} /> : <ContinuedRow nextPage={pageNo + 1} discount={model.showDiscount} />}
           </tbody>
         </table>
       ) : null}
@@ -523,10 +535,10 @@ export function InvoiceSheet({ model, page, pageNo, pageCount, rowsByKey }) {
 }
 
 /** One goods-table fragment, in its own table so the fixed column widths hold. */
-function Fragment({ measure, children }) {
+function Fragment({ measure, discount = false, children }) {
   return (
     <div ref={measure}>
-      <table className="inv-goods">{children}</table>
+      <table className={goodsClass(discount)}>{children}</table>
     </div>
   )
 }
@@ -551,24 +563,24 @@ export function MeasureHost({ model, register }) {
         <div ref={register('header')}>
           <HeaderBlock model={model} />
         </div>
-        <Fragment measure={register('thead')}>
-          <GoodsHead />
+        <Fragment measure={register('thead')} discount={model.showDiscount}>
+          <GoodsHead discount={model.showDiscount} />
         </Fragment>
         {model.rows.map((row) => (
-          <Fragment key={row.key} measure={register('row', row.key)}>
+          <Fragment key={row.key} measure={register('row', row.key)} discount={model.showDiscount}>
             <tbody>
-              <GoodsRow row={row} />
+              <GoodsRow row={row} discount={model.showDiscount} />
             </tbody>
           </Fragment>
         ))}
-        <Fragment measure={register('totalRow')}>
+        <Fragment measure={register('totalRow')} discount={model.showDiscount}>
           <tbody>
             <TotalRow model={model} />
           </tbody>
         </Fragment>
-        <Fragment measure={register('continued')}>
+        <Fragment measure={register('continued')} discount={model.showDiscount}>
           <tbody>
-            <ContinuedRow nextPage={2} />
+            <ContinuedRow nextPage={2} discount={model.showDiscount} />
           </tbody>
         </Fragment>
         <div ref={register('words')}>

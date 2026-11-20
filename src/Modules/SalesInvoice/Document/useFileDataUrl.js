@@ -10,6 +10,12 @@ import { useEffect, useState } from 'react'
  *                   not allow that (CORS), the link itself is used, which
  *                   the sheet can still show
  *
+ * With { linked: true } (the company's saved logo and signature -
+ * sellerFromCompany) a file already on the server is given as its own link
+ * (the full URL the backend sends), nothing fetched or converted: the sheet's
+ * <img> loads it, and the PDF reads it once when one is made (invoicePdf).
+ * A picked File is still read from the disk.
+ *
  * A data URL rather than a blob: URL because the PDF engine's browser
  * renderer serialises each sheet into an SVG foreignObject, and an image
  * inside one cannot load anything from outside it - a data URL travels with
@@ -26,13 +32,14 @@ const readAsDataUrl = (blob) =>
 /**
  * The same, once and without a component: a File, { url } or a plain URL as a
  * data URL - the link itself when the server allows no read (CORS), null for
- * nothing.
+ * nothing. `linked`: a server file as its link, unread (see above).
  */
-export const readFileDataUrl = async (file) => {
+export const readFileDataUrl = async (file, { linked = false } = {}) => {
   if (!file) return null
   if (file instanceof Blob) return readAsDataUrl(file).catch(() => null)
   const url = typeof file === 'string' ? file : file.url
   if (!url) return null
+  if (linked) return url
   try {
     const response = await fetch(url)
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -42,11 +49,13 @@ export const readFileDataUrl = async (file) => {
   }
 }
 
-export default function useFileDataUrl(file) {
+export default function useFileDataUrl(file, { linked = false } = {}) {
   const [read, setRead] = useState({ file: null, url: null })
+  // A server file shown from its own link (see above) - nothing to read.
+  const link = linked && file && !(file instanceof Blob) ? file.url || null : null
 
   useEffect(() => {
-    if (!file) return undefined
+    if (!file || link) return undefined
     let alive = true
     const done = (url) => {
       if (alive) setRead({ file, url })
@@ -66,8 +75,9 @@ export default function useFileDataUrl(file) {
     return () => {
       alive = false
     }
-  }, [file])
+  }, [file, link])
 
+  if (link) return link
   // A result for an earlier file (or after the file was removed) is not this one's.
   return file && read.file === file ? read.url : null
 }

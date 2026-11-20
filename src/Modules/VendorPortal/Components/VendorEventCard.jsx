@@ -258,7 +258,7 @@ function PreBidBody({ event }) {
         documents
         empty={
           <p className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
-            The buyer has not added certifications, FAQs, a meeting or a note to this pre bid.
+            The buyer has not added certifications, FAQs, a meeting or a note to this Technical Bid.
           </p>
         }
       />

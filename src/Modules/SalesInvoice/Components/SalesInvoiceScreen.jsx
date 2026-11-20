@@ -59,6 +59,8 @@ export default function SalesInvoiceScreen({ company, title = 'Sales Invoice', f
   const [historyOpened, setHistoryOpened] = useState(false)
   // Mounted - and so asked for - only once opened; kept mounted after, like History.
   const [voucherOpened, setVoucherOpened] = useState(false)
+  // Counts each time Voucher is chosen: every choice reads the latest vouchers (useTallyVouchers).
+  const [voucherSelection, setVoucherSelection] = useState(0)
   const [imsOpened, setImsOpened] = useState(false)
   // A new object per Edit press, so pressing Edit on the same row again reloads it.
   const [editRequest, setEditRequest] = useState(null)
@@ -77,6 +79,7 @@ export default function SalesInvoiceScreen({ company, title = 'Sales Invoice', f
 
   const choose = (next) => {
     if (!next) return
+    if (next === 'voucher' && view !== 'voucher') setVoucherSelection((count) => count + 1)
     setView(next)
     if (next === 'history') setHistoryOpened(true)
     if (next === 'voucher') setVoucherOpened(true)
@@ -124,9 +127,10 @@ export default function SalesInvoiceScreen({ company, title = 'Sales Invoice', f
               addModes={addModes}
               aiDocumentType={aiVoucher}
               active={view === 'voucher'}
+              selection={voucherSelection}
             />
           ) : (
-            <TallyVouchers company={company} parties={flow?.parties} {...voucherOptions} />
+            <TallyVouchers company={company} parties={flow?.parties} {...voucherOptions} selection={voucherSelection} />
           )}
         </div>
       ) : null}

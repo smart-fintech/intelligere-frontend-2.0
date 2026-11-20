@@ -260,8 +260,6 @@ export default function VendorDocumentsPanel({ vendor, event, onVerified }) {
     onVerify: () => verify(certificate),
   })
 
-  const label = preBid ? 'pre bid' : 'bid'
-
   return (
     <section aria-label={`Documents and certifications of ${vendor?.name || vendor?.email || 'vendor'}`} className="space-y-3 border-l-2 border-brand/40 bg-brand-soft/20 p-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -304,8 +302,8 @@ export default function VendorDocumentsPanel({ vendor, event, onVerified }) {
           ) : (
             <Empty>
               {asksForCertifications
-                ? `This ${label} does not ask for any certification.`
-                : `This ${label} has no technical bid, so it does not ask for specific certifications.`}
+                ? 'This Technical Bid does not ask for any certification.'
+                : 'This Technical Bid has no technical details, so it does not ask for specific certifications.'}
             </Empty>
           )}
         </Part>

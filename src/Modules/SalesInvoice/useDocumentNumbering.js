@@ -9,6 +9,9 @@
  *   numbering.retry()    asks again after a failure (the Retry button)
  *   numbering.status     'idle' (not asked for the current type) | 'loading'
  *                        | 'ready' | 'failed'
+ *   numbering.lastDocumentNo   the answer's own document_no (the last document
+ *                        of this type, "INV/34/25-26") - '' until answered, or
+ *                        when there is none - shown beside the number's label
  *
  * WHEN IT ASKS - only when the Buyer step's Next calls request(). Nothing is
  * asked when the screen opens, on a render, from an effect, on moving
@@ -37,7 +40,7 @@ import { getLastDocumentNumber, saveAutoIncrement } from '@/Services/Invoice/sal
 
 export default function useDocumentNumbering({ companyId, documentType, round, apply, setAutoIncrement }) {
   const key = JSON.stringify({ companyId, documentType, round })
-  const [answer, setAnswer] = useState({ key: null, status: 'idle' })
+  const [answer, setAnswer] = useState({ key: null, status: 'idle', documentNo: '' })
 
   // The key on screen now - an answer for another is dropped.
   const latest = useRef(key)
@@ -52,20 +55,21 @@ export default function useDocumentNumbering({ companyId, documentType, round, a
       if (!companyId || !documentType) return
       if (!force && asked.current === key) return
       asked.current = key
-      setAnswer({ key, status: 'loading' })
+      setAnswer({ key, status: 'loading', documentNo: '' })
 
       getLastDocumentNumber(companyId, documentType)
         .then((reply) => {
           if (latest.current !== key) return
           apply(reply)
-          setAnswer({ key, status: 'ready' })
+          const documentNo = reply && typeof reply === 'object' && reply.document_no != null ? String(reply.document_no).trim() : ''
+          setAnswer({ key, status: 'ready', documentNo })
         })
         .catch((failure) => {
           // A failure can be asked again - by Retry, or the next Step 2 Next.
           if (asked.current === key) asked.current = null
           if (latest.current !== key) return
           console.warn('[Sales Invoice] Last document number:', failure.message)
-          setAnswer({ key, status: 'failed' })
+          setAnswer({ key, status: 'failed', documentNo: '' })
         })
     },
     [key, companyId, documentType, apply],
@@ -96,5 +100,13 @@ export default function useDocumentNumbering({ companyId, documentType, round, a
     [companyId, setAutoIncrement, ask],
   )
 
-  return { status: answer.key === key ? answer.status : 'idle', request, retry, switching, setAutoIncrement: switchAutoIncrement }
+  const current = answer.key === key
+  return {
+    status: current ? answer.status : 'idle',
+    lastDocumentNo: current ? answer.documentNo : '',
+    request,
+    retry,
+    switching,
+    setAutoIncrement: switchAutoIncrement,
+  }
 }

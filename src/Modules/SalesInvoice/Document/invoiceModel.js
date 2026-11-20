@@ -26,6 +26,7 @@ import {
 import {
   documentProfile,
   effectiveDispatch,
+  hiddenDocumentFields,
   effectiveShipping,
   invoiceNumberOf,
   isServiceLine,
@@ -101,6 +102,8 @@ export function toInvoiceModel({ form, figures, gst, productsByKey, ledgersById,
         quantity: Number(line.quantity) || 0,
         rate: Number(line.rate) || 0,
         per: service ? '' : line.per,
+        // Its own Disc. % (With Discount) - "10%", '' for none; printed in the Disc. % column (showDiscount).
+        discount: row.discountPercent > 0 ? `${rateText(row.discountPercent)}%` : '',
         gst: interState ? row.igst : row.cgst + row.sgst,
         taxable: rupees(row.taxablePaise),
         // Less its share of the overall discount - what its GST is charged on.
@@ -282,12 +285,17 @@ export function toInvoiceModel({ form, figures, gst, productsByKey, ledgersById,
       supply: showsDocumentField(form, 'supplyType') ? labelOf(supplyTypesOf(document.supply), document.supplyType) || document.supply : '',
       deliveryMode: labelOf(DELIVERY_MODES, document.deliveryMode),
       paymentQr: images.paymentQr,
+      // Document Details not printed now (E-Way Bill unticked - hiddenDocumentFields): their
+      // form keys. Their values stay above (the E-Way Bill PDF reads them); the sheet skips them.
+      hiddenFields: hiddenDocumentFields(form),
     },
     other: { note: form.note },
     currency: currencyOf(currency, baseCode, rupees(figures.totalPaise)),
     bank: bank ? { bankName: bank.bank_name ?? '', ifsc: bank.ifsc_code ?? '', accountNo: bank.account_no ?? '' } : null,
     lines: [...lines, ...charges],
     rows,
+    // The goods table's Disc. % column - while With Discount is ticked on a type that offers it.
+    showDiscount: Boolean(profile.discount && form.withDiscount),
     totals: {
       grandTotal: rupees(figures.totalPaise),
       totalTax: rupees(figures.gstPaise),
