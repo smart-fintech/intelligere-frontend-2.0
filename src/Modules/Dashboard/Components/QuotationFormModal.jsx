@@ -33,6 +33,7 @@ import { SkuDetailsTooltip } from '@/Components/Common/SkuDetailsTooltip'
 import { Button } from '@/Components/ui/button'
 import { Input } from '@/Components/ui/input'
 import { toast } from '@/Library/toast'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import {
   MASTER_FIELDS,
@@ -117,6 +118,7 @@ function TermList({ id, title, items, onChange }) {
 }
 
 export default function QuotationFormModal({ open, onOpenChange, order, vendor, companyName, onSaved }) {
+  const showSku = useSkuManagement()
   const [form, setForm] = useState(() => quoteFormOf(order, vendor))
   const [submitting, setSubmitting] = useState(false)
   // Set at once, so a second click before the re-render is turned away.
@@ -237,7 +239,7 @@ export default function QuotationFormModal({ open, onOpenChange, order, vendor, 
                             {row.Description || '--'}
                           </span>
                         </SkuDetailsTooltip>
-                        {row.sku_code ? <span className="block text-xs text-muted-foreground">{row.sku_code}</span> : null}
+                        {showSku && row.sku_code ? <span className="block text-xs text-muted-foreground">{row.sku_code}</span> : null}
                       </td>
                       <td className="px-2 py-1.5">{row.Hsn_code || '--'}</td>
                       <td className="px-2 py-1.5">{row.Per || '--'}</td>

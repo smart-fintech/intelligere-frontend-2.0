@@ -39,7 +39,7 @@ import useSalesInvoiceForm from '@/Modules/SalesInvoice/useSalesInvoiceForm'
 import { formFromSavedDocument, formPrefilledFrom } from '@/Modules/SalesInvoice/documentPrefill'
 import useDocumentPrefill from '@/Modules/SalesInvoice/useDocumentPrefill'
 import useOrderProducts from '@/Modules/SalesInvoice/useOrderProducts'
-import { orderReference } from '@/Modules/SalesInvoice/orderProducts'
+import { orderReference, orderReferenceDate } from '@/Modules/SalesInvoice/orderProducts'
 import OrderProducts from '@/Modules/SalesInvoice/Components/OrderProducts'
 import InventoryBookingModal from '@/Modules/SalesInvoice/Components/InventoryBookingModal'
 import StockBookingModal from '@/Modules/SalesInvoice/Components/StockBookingModal'
@@ -55,6 +55,7 @@ import { PROCUREMENT_STATE, QUOTATION_STATES } from '@/Modules/SalesInvoice/proc
 import useProcurement from '@/Modules/SalesInvoice/useProcurement'
 import useTallyLedgerAlter from '@/Modules/SalesInvoice/useTallyLedgerAlter'
 import useInventoryAccess from '@/Hooks/useInventoryAccess'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { buildPrefillFrom, getPrefillDocumentDetails, readPrefillFrom } from '@/Services/Invoice/documentPrefillService'
 import { downloadTextFile } from '@/Utils/fileDownload'
 import { bookInventory, getStockSummary } from '@/Services/Inventory/inventoryBookingService'
@@ -536,6 +537,8 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
   // A type with no bank or Payment QR field prints neither (applicable has them empty).
   const paymentQr = useFileDataUrl(applicable.document.paymentQr)
   const bank = banks.list.find((entry) => String(entry.id) === String(applicable.document.bankId)) ?? null
+  // SKU codes are printed only for a company that manages SKUs.
+  const showSku = useSkuManagement() === true
 
   const model = useMemo(
     () =>
@@ -550,8 +553,9 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
         // A party from another country: its total in its currency, under the amount in words.
         currency: documentCurrency,
         baseCode: companyCurrency.base?.code ?? 'INR',
+        showSku,
       }),
-    [applicable, figures, gstLedgers, products.byKey, ledgers.byId, bank, logo, signature, paymentQr, documentCurrency, companyCurrency.base],
+    [applicable, figures, gstLedgers, products.byKey, ledgers.byId, bank, logo, signature, paymentQr, documentCurrency, companyCurrency.base, showSku],
   )
   // The preview's measured layout for the current model - what the PDF is drawn to.
   const layoutRef = useRef(null)
@@ -726,10 +730,12 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
     companyId,
     documentType: documentTypeValue,
     partyKey: ledgerParty.ledgerId,
-    // The ticked rows' one shared Reference No. goes into the document's; rows that differ leave it as it is.
+    // The ticked rows' one shared Reference No. / Date go into the document's; rows that differ leave them as they are.
     onCheckedChange: (rows) => {
       const reference = orderReference(rows)
       if (reference) setField('document.referenceNo', reference)
+      const referenceDate = orderReferenceDate(rows)
+      if (referenceDate) setField('document.referenceDate', referenceDate)
     },
   })
   // A NEW Purchase Invoice / Inbound Challan books its stock after it is created - not one prefilled from an Inbound Challan (needsStockBooking).

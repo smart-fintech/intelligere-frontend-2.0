@@ -7,6 +7,7 @@ import { SkuSelector } from '@/Components/Common/SkuSelector'
 import { Input } from '@/Components/ui/input'
 import { Label } from '@/Components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/Components/ui/radio-group'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import { formatAmount } from '@/Modules/SalesInvoice/Document/invoiceFormat'
 import { isSkuManaged, skuOptionValue, toDecimalInput } from '@/Modules/SalesInvoice/salesInvoiceForm'
@@ -324,9 +325,12 @@ export default function VoucherCard({ voucher, mapping, edits, ledgers, accountL
   // Every SKU of the product list, each with its product - for a line whose product is not found.
   const allSkus = useMemo(() => allSkusOf(products.list ?? []), [products.list])
   const items = mapping.mode !== INVOICE_MODE.ACCOUNTING
-  const showSku =
-    voucher.products.some((line) => line.skuCode) ||
-    mapping.products.some(({ product, reason }) => (product && isSkuManaged(product)) || reason === 'sku')
+  // A company that does not manage SKUs: no SKU Code column - unless a line still needs its SKU
+  // chosen to be mapped (its product kept by SKU, none matched): the column is the one way to.
+  const companySku = useSkuManagement()
+  const showSku = companySku
+    ? voucher.products.some((line) => line.skuCode) || mapping.products.some(({ product, reason }) => (product && isSkuManaged(product)) || reason === 'sku')
+    : mapping.products.some(({ product, variant, reason }) => (product ? isSkuManaged(product) && !variant : reason === 'sku'))
   // CGST / SGST and / or IGST - as the voucher's lines are taxed (lineTaxKind, on the values it
   // came with, so a rate typed over never moves the columns), never a zero field shown as a tax.
   const taxColumns = taxColumnsOf(voucher.products)

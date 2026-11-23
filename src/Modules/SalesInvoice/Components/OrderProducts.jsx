@@ -5,6 +5,7 @@ import { MultiSelectField } from '@/Components/Common/MultiSelectField'
 import { Button } from '@/Components/ui/button'
 import { Checkbox } from '@/Components/ui/checkbox'
 import { findDocumentType } from '@/Constants/salesInvoice'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import { InvoiceCard } from '@/Modules/SalesInvoice/Components/InvoiceGrid'
 import { orderRowAvailable } from '@/Modules/SalesInvoice/orderProducts'
@@ -32,6 +33,8 @@ const quantityText = (value) => (value === null ? '--' : String(value))
  *   onFill(row)  + was pressed - left out on the Document step (no + there)
  */
 export default function OrderProducts({ orders, partyLabel, disabled, onFill }) {
+  // SKU Code only for a company that manages SKUs.
+  const showSku = useSkuManagement()
   const { numbers, products } = orders
   const label = findDocumentType(orders.source)?.label ?? orders.source
 
@@ -97,7 +100,7 @@ export default function OrderProducts({ orders, partyLabel, disabled, onFill }) 
                     <th className={cn(cell, 'font-medium')}>Product</th>
                     <th className={cn(cell, 'font-medium')}>Reference No.</th>
                     <th className={cn(cell, 'font-medium')}>HSN Code</th>
-                    <th className={cn(cell, 'font-medium')}>SKU Code</th>
+                    {showSku ? <th className={cn(cell, 'font-medium')}>SKU Code</th> : null}
                     <th className={cn(cell, 'text-right font-medium')}>Remaining Qty</th>
                     <th className={cn(cell, 'text-right font-medium')}>Original Qty</th>
                     {onFill ? (
@@ -125,7 +128,7 @@ export default function OrderProducts({ orders, partyLabel, disabled, onFill }) 
                         <td className={cn(cell, 'break-words')}>{row.productName || '--'}</td>
                         <td className={cn(cell, 'break-words')}>{row.referenceNo || '--'}</td>
                         <td className={cn(cell, 'break-words')}>{row.hsn || '--'}</td>
-                        <td className={cn(cell, 'text-xs break-all')}>{row.skuCode || '--'}</td>
+                        {showSku ? <td className={cn(cell, 'text-xs break-all')}>{row.skuCode || '--'}</td> : null}
                         <td className={cn(cell, 'text-right font-semibold tabular-nums', !available && 'text-destructive')}>{quantityText(row.remainQty)}</td>
                         <td className={cn(cell, 'text-right tabular-nums text-muted-foreground')}>{quantityText(row.quantity)}</td>
                         {onFill ? (

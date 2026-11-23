@@ -7,6 +7,7 @@ import { Modal } from '@/Components/Common/Modal'
 import { Button } from '@/Components/ui/button'
 import { Label } from '@/Components/ui/label'
 import { Switch } from '@/Components/ui/switch'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import useProducts from '@/Hooks/useProducts'
 import useReorderAnimation from '@/Hooks/useReorderAnimation'
 import { toast } from '@/Library/toast'
@@ -89,6 +90,7 @@ const moved = (rows, key, toIndex) => {
 
 /** One process - its card in the list. */
 function ProcessCard({ row, index, count, custom, errors, disabled, dragging, onEdit, onMove, dragProps }) {
+  const showSku = useSkuManagement()
   const { item } = row
   const name = String(item.product_name ?? '').trim() || `Process ${index + 1}`
   const colour = drawableColour(item.colour_code)
@@ -118,7 +120,7 @@ function ProcessCard({ row, index, count, custom, errors, disabled, dragging, on
         <span className="min-w-0 flex-1 truncate text-sm font-medium" data-testid="process-name">
           {name}
         </span>
-        {String(item.sku_code ?? '').trim() ? (
+        {showSku && String(item.sku_code ?? '').trim() ? (
           <span className="text-xs text-muted-foreground">
             SKU Code : (<SkuCode code={String(item.sku_code).trim()} details={skuDetailsOf(item)} />)
           </span>

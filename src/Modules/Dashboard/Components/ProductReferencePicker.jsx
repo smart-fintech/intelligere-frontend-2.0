@@ -60,6 +60,7 @@ import { SkuDetailsTooltip } from '@/Components/Common/SkuDetailsTooltip'
 import { SkuSelector } from '@/Components/Common/SkuSelector'
 import { Button } from '@/Components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import { buildProductReference } from '@/Services/Inventory/inventoryProductService'
 import { validateReferenceDraft } from '../productForm'
@@ -111,6 +112,8 @@ export default function ProductReferencePicker({
   className,
 }) {
   const references = Array.isArray(value) ? value : []
+  // No SKU Code to pick or show for a company that does not manage SKUs: a product is referred to by its first SKU.
+  const showSku = useSkuManagement()
 
   /* ---------------- The choices ---------------- */
   const all = useMemo(() => readProducts(products.rows), [products.rows])
@@ -154,7 +157,7 @@ export default function ProductReferencePicker({
     const chosen = candidates.find((entry) => String(entry.key) === key)
     const only = referableSkus(chosen)
 
-    setDraft({ product: key, sku: only.length === 1 ? String(only[0].productId) : '', qty: '', wastage: '' })
+    setDraft({ product: key, sku: only.length === 1 || (only.length > 0 && showSku === false) ? String(only[0].productId) : '', qty: '', wastage: '' })
     setDraftErrors({})
   }
 
@@ -253,14 +256,16 @@ export default function ProductReferencePicker({
               readOnly
               disabled
             />
-            <Field
-              id={`${id}-sku`}
-              label="SKU Code"
-              className="col-span-12 sm:col-span-6 lg:col-span-4"
-              value={original.sku_code || 'No SKU code'}
-              readOnly
-              disabled
-            />
+            {showSku ? (
+              <Field
+                id={`${id}-sku`}
+                label="SKU Code"
+                className="col-span-12 sm:col-span-6 lg:col-span-4"
+                value={original.sku_code || 'No SKU code'}
+                readOnly
+                disabled
+              />
+            ) : null}
           </>
         ) : (
           <>
@@ -279,7 +284,7 @@ export default function ProductReferencePicker({
             />
 
             {/* The shared SKU picker: codes only, each SKU's sku_details on hover. */}
-            {!product || hasSkuVariants ? (
+            {showSku && (!product || hasSkuVariants) ? (
               <SkuSelector
                 id={`${id}-sku`}
                 label="SKU Code"
@@ -359,7 +364,7 @@ export default function ProductReferencePicker({
         <Table containerClassName="rounded-md border border-border">
           <TableHeader className="bg-muted">
             <TableRow className="hover:bg-transparent">
-              {['Product Name', 'SKU Code', 'Quantity', 'Wastage'].map((heading) => (
+              {['Product Name', 'SKU Code', 'Quantity', 'Wastage'].filter((heading) => showSku || heading !== 'SKU Code').map((heading) => (
                 <TableHead key={heading} className="h-8 text-xs font-semibold tracking-wide uppercase">
                   {heading}
                 </TableHead>
@@ -382,17 +387,19 @@ export default function ProductReferencePicker({
                   <TableCell wrap className="py-2 text-sm">
                     {displayValue(reference['Product Name'])}
                   </TableCell>
-                  <TableCell wrap className="py-2 text-sm">
-                    {/* Its sku_details on hover or focus only - the shared SKU tooltip. */}
-                    <SkuDetailsTooltip details={referenceDetails(reference)}>
-                      <span
-                        tabIndex={0}
-                        className="cursor-help rounded-sm break-words underline decoration-muted-foreground/50 decoration-dotted underline-offset-2 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                      >
-                        {displayValue(reference.sku_code)}
-                      </span>
-                    </SkuDetailsTooltip>
-                  </TableCell>
+                  {showSku ? (
+                    <TableCell wrap className="py-2 text-sm">
+                      {/* Its sku_details on hover or focus only - the shared SKU tooltip. */}
+                      <SkuDetailsTooltip details={referenceDetails(reference)}>
+                        <span
+                          tabIndex={0}
+                          className="cursor-help rounded-sm break-words underline decoration-muted-foreground/50 decoration-dotted underline-offset-2 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                        >
+                          {displayValue(reference.sku_code)}
+                        </span>
+                      </SkuDetailsTooltip>
+                    </TableCell>
+                  ) : null}
                   <TableCell className="py-2 text-sm">{displayValue(reference.qty)}</TableCell>
                   <TableCell className="py-2 text-sm">{displayValue(reference.wastage)}</TableCell>
                   <TableCell className="py-2 text-right">

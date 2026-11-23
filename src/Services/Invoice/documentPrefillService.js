@@ -1,7 +1,9 @@
 /**
  * PREFILL FROM - a new document filled in from one saved earlier:
  *
- *   POST invoice/document-details/           { company_id, document_type }
+ *   POST invoice/document-details/           { company_id, document_type, ref_doc_type }
+ *        document_type   the type chosen in Prefill From (the source)
+ *        ref_doc_type    the type of the document being made
  *        -> { "1": { document_id, document_no, buyer_name, buyer_data_id }, "2": ... }
  *           the company's documents of that type, to choose from
  *   POST invoice/prefill-document-details/   { document_ids: [..], document_no: [..] }
@@ -37,9 +39,9 @@ export const readPrefillDocuments = (reply) => {
     }))
 }
 
-/** The company's documents of a type - readPrefillDocuments of the reply. */
-export const getPrefillDocuments = ({ companyId, documentType }) =>
-  api.post(DOCUMENT_LIST_URL, { company_id: companyId, document_type: documentType }).then(readPrefillDocuments)
+/** The company's documents of a type (`documentType`) for one being made of `refDocType` - readPrefillDocuments of the reply. */
+export const getPrefillDocuments = ({ companyId, documentType, refDocType }) =>
+  api.post(DOCUMENT_LIST_URL, { company_id: companyId, document_type: documentType, ref_doc_type: refDocType }).then(readPrefillDocuments)
 
 export const buildPrefillDetailsBody = (documents) => ({
   document_ids: documents.map((document) => document.documentId),

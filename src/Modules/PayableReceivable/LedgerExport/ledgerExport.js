@@ -75,6 +75,13 @@ const PARTY_GROUP_KEYS = PARTY_GROUPS.map((name) => name.toLowerCase())
 /** groupLedgers' groups, less every one that is not a party group. */
 export const partyGroupsOnly = (groups) => groups.filter((group) => PARTY_GROUP_KEYS.includes(group.name.trim().toLowerCase()))
 
+/** A number the API sent, or null when it sent none ('', null, missing, not a number). */
+const readSentAmount = (value) => {
+  if (value === '' || value === null || value === undefined) return null
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
+}
+
 const readReportRow = (row, index) => ({
   key: String(index),
   date: row.Date ?? '',
@@ -85,6 +92,9 @@ const readReportRow = (row, index) => ({
   amount: toNumber(row.amount),
   // The opening row's amount may be '' - nothing to show, not a 0.
   hasAmount: row.amount !== '' && row.amount !== null && row.amount !== undefined,
+  // As sent, sign and all; the opening row has neither - null, shown blank.
+  credit: readSentAmount(row.credit),
+  debit: readSentAmount(row.debit),
   balance: row.balance,
 })
 

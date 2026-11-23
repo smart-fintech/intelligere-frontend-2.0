@@ -212,6 +212,7 @@ export default function ProductsStep({
   const entryFigures = lineFigures(form.entry, {
     interState,
     reverseCharge: settings.reverseCharge,
+    lut: settings.lut,
     withDiscount,
   })
 
@@ -325,6 +326,7 @@ export default function ProductsStep({
               withDiscount={withDiscount}
               challan={challan}
               reverseCharge={Boolean(settings.reverseCharge)}
+              lut={Boolean(settings.lut)}
               errors={errors}
               disabled={disabled}
               onUpdate={updateEntry}
@@ -343,7 +345,8 @@ export default function ProductsStep({
 
             <AddedProducts
               challan={challan}
-              reverseCharge={Boolean(settings.reverseCharge)}
+              // No GST column under LUT either - none is charged.
+              reverseCharge={Boolean(settings.reverseCharge || settings.lut)}
               lines={form.lines}
               productsByKey={products.byKey}
               ledgersById={ledgers.byId}
@@ -429,7 +432,8 @@ export default function ProductsStep({
                           className="[flex:1_1_6rem]"
                           options={GST_RATE_OPTIONS}
                           value={charge.gstRate}
-                          disabled={disabled}
+                          // LUT: no GST charged - the slab stays, disabled.
+                          disabled={disabled || Boolean(settings.lut)}
                           onValueChange={(value) => updateCharge(charge.id, { gstRate: value })}
                         />
                         <div className="[flex:1_1_6rem] pt-6 text-xs text-muted-foreground">

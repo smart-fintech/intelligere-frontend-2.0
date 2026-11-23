@@ -107,6 +107,7 @@ import { Button } from '@/Components/ui/button'
 import { TableCell, TableRow } from '@/Components/ui/table'
 import { useActiveCompany } from '@/Hooks/useActiveCompany'
 import useInventoryAccess from '@/Hooks/useInventoryAccess'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { useListView } from '@/Hooks/useListView'
 import { useWindowedRows } from '@/Hooks/useWindowedRows'
 import { cn } from '@/Library/utils'
@@ -405,6 +406,8 @@ export default function ProductTable({
 }) {
   // The arrow and the eye - see the note at the top.
   const { full: detailed } = useInventoryAccess()
+  // No SKU Code filter, nor a code in the viewed SKU's title, for a company that does not manage SKUs.
+  const showSku = useSkuManagement()
 
   // A SKU's View and Edit sit on its own line in the opened row, so the
   // product row keeps an Edit only where there is no such line to put it
@@ -422,11 +425,12 @@ export default function ProductTable({
   const products = useMemo(() => readProducts(rows, warehouseNames), [rows, warehouseNames])
   const offered = useMemo(() => {
     const all = productFilterOptions(products)
-    if (!singleWarehouse) return all
+    if (!singleWarehouse && showSku) return all
 
-    const fields = Object.fromEntries(Object.entries(all.fields).filter(([field]) => field !== PRODUCT_FILTER.WAREHOUSE))
+    const hidden = [...(singleWarehouse ? [PRODUCT_FILTER.WAREHOUSE] : []), ...(showSku ? [] : [PRODUCT_FILTER.SKU_CODE])]
+    const fields = Object.fromEntries(Object.entries(all.fields).filter(([field]) => !hidden.includes(field)))
     return { ...all, fields }
-  }, [products, singleWarehouse])
+  }, [products, singleWarehouse, showSku])
 
   /* ---------------- Filters ----------------
      Kept as { field: value }. A value the products no longer offer - the
@@ -658,7 +662,7 @@ export default function ProductTable({
           product={viewed}
           description={
             viewedSku
-              ? `SKU: ${viewedSku.skuCode || `${viewing.sku + 1} (no code)`}${viewedDetail && viewedDetail.srNo !== null ? ` · Sr No. ${viewedDetail.srNo}` : ''}`
+              ? `SKU: ${showSku ? viewedSku.skuCode || `${viewing.sku + 1} (no code)` : viewing.sku + 1}${viewedDetail && viewedDetail.srNo !== null ? ` · Sr No. ${viewedDetail.srNo}` : ''}`
               : undefined
           }
         />

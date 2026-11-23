@@ -171,21 +171,21 @@ export const getOutstandingInvoices = async ({ companyName, source }) => {
 export const BANK_STATEMENT_SOCKET_MODULE = 'bank_statement'
 
 /**
- * The Send to Tally message. It is flat - NOT the { payload: { module_name, ... } }
- * envelope of the other modules - as the bank statement has always been sent:
+ * The Send to Tally message:
  *
- *   { company, bank, module: "bank_statement", bank_statement_data: [...] }
+ *   { payload: { company_name, bank_name, module_name: "bank_statement",
+ *                bankstmnt_entry_id, data: [...] } }
  *
- * `bank` is the bank's ledger; the rows are built by toTallyRow
- * (Modules/BankStatement/bankStatementModel).
+ * `bank` is the bank's ledger; `entryId` the bankstmnt_entry_id of the
+ * interval-voucher/ reply, right after the module name; the rows are built by
+ * toTallyRow (Modules/BankStatement/bankStatementModel).
  */
-export const buildBankStatementSocketMessage = ({ companyName, bank, rows,entryId }) => (
-  {
-    payload: {
-      company_name: companyName,
-      bank_name: bank,
-      bankstmnt_entry_id: entryId,
-      module_name: BANK_STATEMENT_SOCKET_MODULE,
-      data: rows,
-    }
-  })
+export const buildBankStatementSocketMessage = ({ companyName, bank, rows, entryId }) => ({
+  payload: {
+    company_name: companyName,
+    bank_name: bank,
+    module_name: BANK_STATEMENT_SOCKET_MODULE,
+    bankstmnt_entry_id: entryId,
+    data: rows,
+  },
+})

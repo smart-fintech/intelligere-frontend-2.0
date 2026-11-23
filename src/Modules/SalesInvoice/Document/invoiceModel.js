@@ -65,8 +65,11 @@ const labelOf = (options, value) => options.find((option) => option.value === va
  *                       printed under the amount in words: the total in that
  *                       currency at that rate (fromBaseAmount)
  * @param baseCode       the company's own currency code, the sheet's amounts'
+ * @param showSku        the company manages SKUs (useSkuManagement): a line's SKU
+ *                       code is printed (beside its name; a challan's SKU Code
+ *                       column) - not otherwise
  */
-export function toInvoiceModel({ form, figures, gst, productsByKey, ledgersById, bank, images, currency = null, baseCode = 'INR' }) {
+export function toInvoiceModel({ form, figures, gst, productsByKey, ledgersById, bank, images, currency = null, baseCode = 'INR', showSku = true }) {
   const { seller, buyer, document } = form
   const interState = figures.tax.interState
   const ledgerOf = (id) => (id ? ledgersById.get(String(id)) : null)
@@ -87,16 +90,17 @@ export function toInvoiceModel({ form, figures, gst, productsByKey, ledgersById,
       const service = isServiceLine(line)
       const product = service ? null : productsByKey.get(line.productKey)
       const variant = lineVariant(product, line)
+      const skuCode = service || !showSku ? '' : (variant?.skuCode ?? '')
       const row = figures.lines[line.id]
       return {
         kind: 'product',
         sr: index + 1,
         id: line.id,
-        name: service ? (ledgerOf(line.ledgerId)?.ledger_name ?? '') : [product?.name, variant?.skuCode].filter(Boolean).join(' - '),
+        name: service ? (ledgerOf(line.ledgerId)?.ledger_name ?? '') : [product?.name, skuCode].filter(Boolean).join(' - '),
         // A challan prints the product and its SKU code in columns of their own.
         service,
         productName: service ? '' : (product?.name ?? ''),
-        skuCode: service ? '' : (variant?.skuCode ?? ''),
+        skuCode,
         description: line.description,
         hsn: line.hsn,
         quantity: Number(line.quantity) || 0,
@@ -139,9 +143,11 @@ export function toInvoiceModel({ form, figures, gst, productsByKey, ledgersById,
     ...lines.map((line) => ({ type: 'product', key: `prod-${line.id}`, sr: line.sr, data: line, amount: line.taxable })),
     ...charges.map((charge) => ({ type: 'charge', key: `chg-${charge.id}`, label: charge.name, amount: charge.taxable })),
   ]
-  if (figures.discountPaise) {
-    rows.push({ type: 'meta', key: 'discount', label: ledgerName('discount', 'Discount'), amount: -rupees(figures.discountPaise) })
-  }
+  const discountRow = figures.discountPaise
+    ? { type: 'meta', key: 'discount', label: ledgerName('discount', 'Discount'), amount: -rupees(figures.discountPaise) }
+    : null
+  // Before the GST rows - it comes off the taxable value; under RSP after them (below), off the grand total.
+  if (discountRow && !figures.rsp) rows.push(discountRow)
   // The GST rows: one row per real ledger, named exactly as the ledger is -
   // every rate posted to it added up (CGST 2.5% and 6% both on a common "CGST"
   // -> one "CGST" row; rate-wise ledgers stay rows of their own; CGST, SGST and
@@ -162,6 +168,7 @@ export function toInvoiceModel({ form, figures, gst, productsByKey, ledgersById,
     })
   })
   if (figures.tcsPaise) rows.push({ type: 'meta', key: 'tcs', label: ledgerName('tcs', 'TCS'), amount: rupees(figures.tcsPaise) })
+  if (discountRow && figures.rsp) rows.push(discountRow)
   if (figures.roundOffPaise) {
     rows.push({ type: 'meta', key: 'roundoff', label: ledgerName('roundOff', 'Round Off'), amount: rupees(figures.roundOffPaise) })
   }

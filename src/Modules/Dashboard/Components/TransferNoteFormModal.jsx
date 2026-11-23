@@ -40,6 +40,7 @@ import { SkuSelector } from '@/Components/Common/SkuSelector'
 import { Button } from '@/Components/ui/button'
 import { Input } from '@/Components/ui/input'
 import { toast } from '@/Library/toast'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import {
   buildTransferNoteBody,
@@ -72,6 +73,8 @@ const skuValueOf = (variant) => String(variant?.product_id ?? '')
 
 export default function TransferNoteFormModal({ open, onOpenChange, note, companyName, warehouses, fromChoices, products, onSaved }) {
   const editing = Boolean(note)
+  // No SKU Code to pick or show for a company that does not manage SKUs: a product moves from its first SKU.
+  const showSku = useSkuManagement()
   const [form, setForm] = useState(() => (note ? transferFormOf(note) : newTransferForm()))
   const [errors, setErrors] = useState({})
   const [entry, setEntry] = useState(NO_ENTRY)
@@ -104,7 +107,7 @@ export default function TransferNoteFormModal({ open, onOpenChange, note, compan
   const chooseProduct = (key) => {
     const chosen = stock.find((option) => String(option.key) === key)
     // Another product: its own SKUs, nothing of the last one's. One SKU: chosen with the product.
-    setEntry({ ...NO_ENTRY, productKey: key, skuValue: chosen?.skus.length === 1 ? String(chosen.skus[0].productId) : '' })
+    setEntry({ ...NO_ENTRY, productKey: key, skuValue: chosen?.skus.length === 1 || (chosen?.skus.length && showSku === false) ? String(chosen.skus[0].productId) : '' })
   }
 
   const addLine = () => {
@@ -296,16 +299,18 @@ export default function TransferNoteFormModal({ open, onOpenChange, note, compan
                 options={stock.map((option) => ({ value: String(option.key), label: option.name || 'Unnamed product' }))}
                 searchable
               />
-              <SkuSelector
-                id="transfer-sku"
-                label="SKU Code"
-                skuVariants={product ? product.skus.map((option) => option.source) : []}
-                valueOf={skuValueOf}
-                value={entry.skuValue}
-                onChange={(value) => setEntry((current) => ({ ...current, skuValue: value }))}
-                disabled={!product}
-                showChosenDetails
-              />
+              {showSku ? (
+                <SkuSelector
+                  id="transfer-sku"
+                  label="SKU Code"
+                  skuVariants={product ? product.skus.map((option) => option.source) : []}
+                  valueOf={skuValueOf}
+                  value={entry.skuValue}
+                  onChange={(value) => setEntry((current) => ({ ...current, skuValue: value }))}
+                  disabled={!product}
+                  showChosenDetails
+                />
+              ) : null}
               <div className="space-y-1">
                 <Field
                   id="transfer-quantity"
@@ -351,7 +356,7 @@ export default function TransferNoteFormModal({ open, onOpenChange, note, compan
                   <tr>
                     <th className="w-10 px-2 py-2 text-left">Sr</th>
                     <th className="px-2 py-2 text-left">Product Name</th>
-                    <th className="px-2 py-2 text-left">SKU Code</th>
+                    {showSku ? <th className="px-2 py-2 text-left">SKU Code</th> : null}
                     <th className="w-20 px-2 py-2 text-left">HSN</th>
                     <th className="w-16 px-2 py-2 text-left">Unit</th>
                     {editing ? null : <th className="w-20 px-2 py-2 text-right">Available</th>}
@@ -367,9 +372,11 @@ export default function TransferNoteFormModal({ open, onOpenChange, note, compan
                       <tr key={line.key} className="animate-in border-t border-border align-top duration-200 fade-in-0 slide-in-from-top-1">
                         <td className="px-2 py-2 text-muted-foreground tabular-nums">{index + 1}</td>
                         <td className="px-2 py-2 font-medium [overflow-wrap:anywhere]">{line.name || '--'}</td>
-                        <td className="px-2 py-2">
-                          <SkuCode code={line.skuCode} details={line.skuDetails} />
-                        </td>
+                        {showSku ? (
+                          <td className="px-2 py-2">
+                            <SkuCode code={line.skuCode} details={line.skuDetails} />
+                          </td>
+                        ) : null}
                         <td className="px-2 py-2">{line.hsn || '--'}</td>
                         <td className="px-2 py-2">{line.unit || '--'}</td>
                         {editing ? null : <td className="px-2 py-2 text-right tabular-nums">{line.available}</td>}

@@ -51,6 +51,7 @@ import { DetailItem, DetailList } from '@/Components/Common/DetailList'
 import { Modal } from '@/Components/Common/Modal'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table'
 import { perSkuFieldRank } from '@/Constants/inventory'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import { formatDate } from '@/Utils/date'
 import { displayValue, fieldLabel, referencesOfCategory, skuStockFields, variantWarehouses } from '../productList'
@@ -77,9 +78,12 @@ function Empty({ children }) {
 
 /** A heading over one SKU's part of a tab - only worth drawing when there are several, or it has a code. */
 function VariantHeading({ variant, index, count }) {
-  if (count <= 1 && !variant.skuCode) return null
+  // A company that does not manage SKUs: no code in it - "SKU 2" only when there are several.
+  const showSku = useSkuManagement()
+  const code = showSku ? variant.skuCode : ''
+  if (count <= 1 && !code) return null
 
-  return <h4 className="text-xs font-semibold text-brand">{variant.skuCode || `SKU ${index + 1}`}</h4>
+  return <h4 className="text-xs font-semibold text-brand">{code || `SKU ${index + 1}`}</h4>
 }
 
 /** The company's own fields as detail rows - those with a value, less any in `skip`. */
@@ -166,6 +170,7 @@ function GeneralTab({ product }) {
 }
 
 function VariantsTab({ product }) {
+  const showSku = useSkuManagement()
   if (product.variants.length === 0) return <Empty>This product has no SKU variants.</Empty>
 
   return (
@@ -183,7 +188,7 @@ function VariantsTab({ product }) {
             <VariantHeading variant={variant} index={index} count={product.variants.length} />
 
             <DetailList>
-              <DetailItem label="SKU Code">{variant.skuCode}</DetailItem>
+              {showSku ? <DetailItem label="SKU Code">{variant.skuCode}</DetailItem> : null}
               <DetailItem label="SKU Quantity">{displayValue(variant.totalQty)}</DetailItem>
               <DetailItem label="SKU Amount">{displayValue(variant.totalAmount)}</DetailItem>
               <DetailItem label="Selling Rate">{displayValue(variant.source['Selling Rate'])}</DetailItem>
@@ -342,6 +347,7 @@ function SectionTitle({ children, count }) {
 
 /** Each SKU's past versions: the references as they were, one table per kind the category has. */
 function VersionHistory({ product, sections }) {
+  const showSku = useSkuManagement()
   if (countOf(product, (variant) => variant.pastVersions) === 0) return <Empty>No past versions for this product.</Empty>
 
   return (
@@ -350,7 +356,7 @@ function VersionHistory({ product, sections }) {
         variant.pastVersions.map((version) => (
           <section key={`${index}-${version.key}`} className="space-y-2 rounded-md border border-border p-3">
             <h4 className="text-xs font-semibold text-brand">
-              {product.variants.length > 1 ? `${variant.skuCode || `SKU ${index + 1}`} - ` : ''}
+              {product.variants.length > 1 ? `${(showSku && variant.skuCode) || `SKU ${index + 1}`} - ` : ''}
               {version.label}
             </h4>
             {sections.map(({ key, title }) => {

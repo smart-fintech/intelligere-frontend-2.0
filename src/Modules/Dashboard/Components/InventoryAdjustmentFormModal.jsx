@@ -40,6 +40,7 @@ import { SkuSelector } from '@/Components/Common/SkuSelector'
 import { Button } from '@/Components/ui/button'
 import { ADJUSTMENT_ACTIONS, ADJUSTMENT_DOC_TYPES, ADJUSTMENT_VOUCHER_TYPES, toOptions } from '@/Constants/inventory'
 import { toast } from '@/Library/toast'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import {
   buildAdjustmentBody,
@@ -76,6 +77,7 @@ const skuValueOf = (variant) => String(variant?.sku_code ?? '')
 
 /** What the save changed - each SKU and warehouse's quantity before and after. */
 function SaveSummary({ rows }) {
+  const showSku = useSkuManagement()
   return (
     <div className="animate-in space-y-3 duration-300 fade-in-0 zoom-in-95">
       <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
@@ -88,7 +90,7 @@ function SaveSummary({ rows }) {
             <thead className={HEAD}>
               <tr>
                 <th className={TH}>Product Name</th>
-                <th className={TH}>SKU Code</th>
+                {showSku ? <th className={TH}>SKU Code</th> : null}
                 <th className={TH}>Warehouse</th>
                 <th className={cn(TH, 'text-right')}>Old Qty</th>
                 <th className={cn(TH, 'text-right')}>Removed</th>
@@ -99,7 +101,7 @@ function SaveSummary({ rows }) {
               {rows.map((row) => (
                 <tr key={row.key} className="border-t border-border">
                   <td className="px-2 py-2 font-medium">{orDash(row.name)}</td>
-                  <td className="px-2 py-2">{orDash(row.skuCode)}</td>
+                  {showSku ? <td className="px-2 py-2">{orDash(row.skuCode)}</td> : null}
                   <td className="px-2 py-2">{orDash(row.warehouse)}</td>
                   <td className="px-2 py-2 text-right tabular-nums">{orDash(row.oldQty)}</td>
                   <td className="px-2 py-2 text-right text-destructive tabular-nums">{row.removedQty ? `-${row.removedQty}` : '--'}</td>
@@ -117,6 +119,9 @@ function SaveSummary({ rows }) {
 const NO_SEARCH = { status: 'idle', rows: [], error: '', productName: '', skuCode: '' }
 
 export default function InventoryAdjustmentFormModal({ open, onOpenChange, companyName, products, allowedWarehouses, warehouseDetails, onSaved }) {
+  // No SKU Code to pick (or show) for a company that does not manage SKUs: a product's search is all of it,
+  // or its one SKU (chosen with the product, as now).
+  const showSku = useSkuManagement()
   const [form, setForm] = useState(newAdjustmentForm)
   const [errors, setErrors] = useState({})
   const [pick, setPick] = useState({ productName: '', skuCode: '' })
@@ -360,7 +365,12 @@ export default function InventoryAdjustmentFormModal({ open, onOpenChange, compa
             ) : productOptions.length === 0 ? (
               <p className="text-xs text-muted-foreground">There are no products to adjust.</p>
             ) : (
-              <div className="grid grid-cols-1 items-start gap-x-3 gap-y-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto]">
+              <div
+                className={cn(
+                  'grid grid-cols-1 items-start gap-x-3 gap-y-3 sm:grid-cols-2',
+                  showSku ? 'lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto]' : 'lg:grid-cols-[minmax(0,1.4fr)_auto]',
+                )}
+              >
                 <SelectField
                   id="adjustment-product"
                   label="Product"
@@ -372,18 +382,20 @@ export default function InventoryAdjustmentFormModal({ open, onOpenChange, compa
                   searchable
                   error={errors.product}
                 />
-                <SkuSelector
-                  id="adjustment-sku"
-                  label="SKU Code"
-                  skuVariants={skuVariants}
-                  valueOf={skuValueOf}
-                  value={pick.skuCode}
-                  onChange={(value) => setPick((current) => ({ ...current, skuCode: value }))}
-                  placeholder={skuVariants.length > 1 ? 'All SKUs' : 'Select SKU'}
-                  emptyText={chosen ? 'No SKUs' : 'Select a product'}
-                  disabled={skuVariants.length === 0}
-                  showChosenDetails
-                />
+                {showSku ? (
+                  <SkuSelector
+                    id="adjustment-sku"
+                    label="SKU Code"
+                    skuVariants={skuVariants}
+                    valueOf={skuValueOf}
+                    value={pick.skuCode}
+                    onChange={(value) => setPick((current) => ({ ...current, skuCode: value }))}
+                    placeholder={skuVariants.length > 1 ? 'All SKUs' : 'Select SKU'}
+                    emptyText={chosen ? 'No SKUs' : 'Select a product'}
+                    disabled={skuVariants.length === 0}
+                    showChosenDetails
+                  />
+                ) : null}
                 <div className="space-y-1.5">
                   <FieldLabel className="invisible hidden lg:block">Search</FieldLabel>
                   <Button type="button" icon={Search} loading={search.status === 'loading'} disabled={!pick.productName} onClick={runSearch}>
@@ -413,7 +425,7 @@ export default function InventoryAdjustmentFormModal({ open, onOpenChange, compa
                     <tr>
                       <th className={cn(TH, 'w-16')}>Sr No.</th>
                       <th className={TH}>Product Name</th>
-                      <th className={TH}>SKU Code</th>
+                      {showSku ? <th className={TH}>SKU Code</th> : null}
                       <th className={TH}>Warehouse</th>
                       <th className={cn(TH, 'text-right')}>Available</th>
                       <th className={cn(TH, 'w-36 text-right')}>Remove Qty</th>
@@ -425,9 +437,11 @@ export default function InventoryAdjustmentFormModal({ open, onOpenChange, compa
                       <tr key={line.key} className="animate-in border-t border-border align-top duration-200 fade-in-0 slide-in-from-top-1">
                         <td className="px-2 py-2 text-muted-foreground tabular-nums">{orDash(line.srNo)}</td>
                         <td className="px-2 py-2 font-medium [overflow-wrap:anywhere]">{orDash(line.name)}</td>
-                        <td className="px-2 py-2">
-                          <RowSku code={line.skuCode} details={line.skuDetails} />
-                        </td>
+                        {showSku ? (
+                          <td className="px-2 py-2">
+                            <RowSku code={line.skuCode} details={line.skuDetails} />
+                          </td>
+                        ) : null}
                         <td className="px-2 py-2">{orDash(line.warehouseName)}</td>
                         <td className="px-2 py-2 text-right tabular-nums">{line.available}</td>
                         <td className="px-1 py-1">

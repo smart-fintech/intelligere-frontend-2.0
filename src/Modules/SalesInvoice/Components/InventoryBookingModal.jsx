@@ -3,6 +3,7 @@ import { Check, PackageX } from 'lucide-react'
 
 import { Modal } from '@/Components/Common/Modal'
 import { Button } from '@/Components/ui/button'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import useWarehouses from '@/Hooks/useWarehouses'
 import { cn } from '@/Library/utils'
 import { automaticBooking, bookedOf, bookingItemsOf, checkBooking, hasBookingProblems, totalBooked } from '@/Modules/SalesInvoice/inventoryBooking'
@@ -35,6 +36,7 @@ const quantity = (value) => String(Number(Number(value).toFixed(3)))
  *                   the order is saved and its booking was refused
  */
 export default function InventoryBookingModal({ open, lines, productsByKey, companyId, documentNo, initialBooked = null, onConfirm, onClose }) {
+  const showSku = useSkuManagement()
   // The company's warehouses - their names and contact numbers. The shared list
   // (useWarehouses): no request when another screen has it. Without it the stock
   // still shows - only names and contact numbers are missing.
@@ -86,7 +88,7 @@ export default function InventoryBookingModal({ open, lines, productsByKey, comp
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="min-w-0 text-sm font-semibold break-words text-brand">
                   {item.productName || 'Product'}
-                  {item.skuCode ? <span className="ml-2 text-xs font-normal text-muted-foreground">{item.skuCode}</span> : null}
+                  {showSku && item.skuCode ? <span className="ml-2 text-xs font-normal text-muted-foreground">{item.skuCode}</span> : null}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Order Quantity <span className="font-semibold text-foreground tabular-nums" data-testid="booking-order-qty">{quantity(item.orderQty)}</span>

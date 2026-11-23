@@ -5,6 +5,7 @@ import { Field } from '@/Components/Common/FormFields'
 import { MultiSelectField } from '@/Components/Common/MultiSelectField'
 import { SkuDetailsTooltip } from '@/Components/Common/SkuDetailsTooltip'
 import { Button } from '@/Components/ui/button'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import {
   PRODUCTS_ERROR,
@@ -33,6 +34,7 @@ import {
 const NO_VENDORS = []
 
 function ProductRow({ row, pool, errors, disabled, onField, onVendors, onRemove }) {
+  const showSku = useSkuManagement()
   const { product, locked } = row
   const id = `procurement-${row.key}`
   const errorOf = (field) => errors[rowErrorKey(row.key, field)]
@@ -71,7 +73,7 @@ function ProductRow({ row, pool, errors, disabled, onField, onVendors, onRemove 
         <span className="min-w-0 truncate text-sm font-semibold text-foreground" title={product.product_name}>
           {product.product_name}
         </span>
-        {product.sku_code ? (
+        {showSku && product.sku_code ? (
           <SkuDetailsTooltip details={skuDetailList(product.sku_details)}>
             <span tabIndex={0} className="cursor-help rounded bg-brand-soft px-1.5 py-0.5 text-[11px] text-brand">
               {product.sku_code}

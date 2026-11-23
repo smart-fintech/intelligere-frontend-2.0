@@ -143,6 +143,8 @@ const numberOf = (value) => {
  *   name, description   'Product Name', Description
  *   hsn                 hsn_sac_code
  *   quantity, per       Quantity, 'Per Unit'
+ *   remainQty           remain_qty - what a Sales Order still has to deliver, as
+ *                       sent; '' when the line has none
  *   ratePaise           'Selling Rate'
  *   discount            discount (%), null for none
  *   taxablePaise        product_amount - the line's taxable value
@@ -167,6 +169,7 @@ export const readHistoryProducts = (value) =>
         hsn: text(line.hsn_sac_code),
         quantity: text(line.Quantity),
         per: text(line['Per Unit']),
+        remainQty: text(line.remain_qty),
         ratePaise: toPaise(line['Selling Rate']),
         discount: numberOf(line.discount) ? numberOf(line.discount) : null,
         taxablePaise: toPaise(line.product_amount),
@@ -230,6 +233,9 @@ export const readChildProducts = (value) =>
  *   documentType   document_type, else the type it is listed under
  *   documentNo, documentDate   as readHistoryRow reads them
  *   products       readChildProducts(product_data) - its lines only
+ *   challanType, vehicleNo   invoice_master_details' challan_type and
+ *                  delivery_vehicle_no - '' when it has none (a Challan shows them)
+ *   row            readHistoryRow(the document) - what its PDF opens from (doc_pdf)
  *   totals         { amountPaise, cgstPaise, sgstPaise } - its lines' product_amount,
  *                  cgst_amount and sgst_amount added up (null when no line has one)
  */
@@ -245,6 +251,9 @@ export const readChildDocuments = (value) =>
           documentType: text(document.document_type) || text(type),
           documentNo: text(document.document_no ?? master.document_no),
           documentDate: text(document.document_date ?? master.document_date),
+          challanType: text(master.challan_type),
+          vehicleNo: text(master.delivery_vehicle_no),
+          row: readHistoryRow(document),
           products,
           totals: { amountPaise: sumPaise(products, 'amountPaise'), cgstPaise: sumPaise(products, 'cgstPaise'), sgstPaise: sumPaise(products, 'sgstPaise') },
         }
@@ -286,6 +295,8 @@ export const isoDateOf = (value) => {
  *               opens; null when it has none
  *   ewayBillPdfUrl  e_way_bill_pdf - its E-Way Bill PDF, the same way; null
  *               when it has none
+ *   status      status, as the server sends it ("0% completed" - a Sales
+ *               Order's) - '' when it has none
  *   source      the row as the server sent it - what Edit fills the form from
  */
 export const readHistoryRow = (row) => {
@@ -308,6 +319,7 @@ export const readHistoryRow = (row) => {
     deleted: row.x_deleted === true || text(row.x_deleted).toLowerCase() === 'true',
     pdfUrl: fileUrlOf(row.doc_pdf ?? row.doc_PDF),
     ewayBillPdfUrl: fileUrlOf(row.e_way_bill_pdf),
+    status: text(row.status),
     source: row,
   }
 }

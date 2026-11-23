@@ -7,6 +7,7 @@ import { Button } from '@/Components/ui/button'
 import { Card, CardContent } from '@/Components/ui/card'
 import { TableCell, TableRow } from '@/Components/ui/table'
 import { useListView } from '@/Hooks/useListView'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import useWarehouses from '@/Hooks/useWarehouses'
 import { cn } from '@/Library/utils'
 import { SkuCode } from '@/Modules/SalesInvoice/Components/RequestQuotation'
@@ -79,9 +80,11 @@ function PdfButton({ label, onClick }) {
  * Lines in a grid with their headings - one template for both, so they line
  * up. `columns`: [{ key, label, min (rem), fr, right, value(item), show(item)?,
  * optional }]; an optional column is shown only when a line has a value for it.
+ * A column keyed 'sku' (SKU Code) only for a company that manages SKUs.
  */
 export function LineGrid({ columns, items, label, testId }) {
-  const shown = columns.filter((column) => !column.optional || items.some((item) => filled(column.value(item))))
+  const showSku = useSkuManagement()
+  const shown = columns.filter((column) => (column.key !== 'sku' || showSku) && (!column.optional || items.some((item) => filled(column.value(item)))))
   const gridTemplateColumns = shown.map((column) => `minmax(${column.min}rem,${column.fr ?? 1}fr)`).join(' ')
   const minWidth = `${shown.reduce((total, column) => total + column.min, 0) + (shown.length - 1) * 0.75 + 1.5}rem`
   return (

@@ -37,6 +37,7 @@ import { ADJUSTMENT_ACTIONS, ADJUSTMENT_DOC_TYPES, ADJUSTMENT_VOUCHER_TYPES, lab
 import { useActiveCompany } from '@/Hooks/useActiveCompany'
 import useInventoryAdjustments from '@/Hooks/useInventoryAdjustments'
 import { useListView } from '@/Hooks/useListView'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import useProducts from '@/Hooks/useProducts'
 import useSectionAccess, { useAccessScope } from '@/Hooks/useSectionAccess'
 import useWarehouses from '@/Hooks/useWarehouses'
@@ -95,10 +96,11 @@ const LINE_COLUMNS = [
 ]
 
 function AdjustmentDetails({ adjustment }) {
+  const showSku = useSkuManagement()
   const master = [
     ['Action', adjustment.action],
     ['Product', adjustment.product],
-    ['SKU Code', adjustment.skuCode ? <SkuCode code={adjustment.skuCode} details={adjustment.skuDetails} /> : ''],
+    ['SKU Code', showSku && adjustment.skuCode ? <SkuCode code={adjustment.skuCode} details={adjustment.skuDetails} /> : ''],
     ['Reusable', adjustment.reuseText],
     ['Total Price', adjustment.totalPrice],
     ['Doc No.', adjustment.docNo],
@@ -146,6 +148,8 @@ function AdjustmentDialog(props) {
 /* ---------------- The page ---------------- */
 
 export default function InventoryAdjustments() {
+  // SKU Code only for a company that manages SKUs.
+  const showSku = useSkuManagement()
   const { activeCompany, activeCompanyName: companyName } = useActiveCompany()
   const { subUser } = useAccessScope()
   const access = useSectionAccess(ACCESS_SECTIONS.PRODUCT)
@@ -305,9 +309,11 @@ export default function InventoryAdjustments() {
                   <SortableHead view={view} field="product" width={180}>
                     Product
                   </SortableHead>
-                  <SortableHead view={view} field="skuCode" width={150}>
-                    SKU Code
-                  </SortableHead>
+                  {showSku ? (
+                    <SortableHead view={view} field="skuCode" width={150}>
+                      SKU Code
+                    </SortableHead>
+                  ) : null}
                   <SortableHead view={view} field="docNo" width={130}>
                     Doc No.
                   </SortableHead>
@@ -340,7 +346,7 @@ export default function InventoryAdjustments() {
                       <TableCell className="whitespace-nowrap">{formatDate(adjustment.createdAt)}</TableCell>
                       <TableCell className="font-medium">{orDash(adjustment.action)}</TableCell>
                       <TableCell title={adjustment.product}>{orDash(adjustment.product)}</TableCell>
-                      <TableCell>{adjustment.skuCode ? <SkuCode code={adjustment.skuCode} details={adjustment.skuDetails} /> : '--'}</TableCell>
+                      {showSku ? <TableCell>{adjustment.skuCode ? <SkuCode code={adjustment.skuCode} details={adjustment.skuDetails} /> : '--'}</TableCell> : null}
                       <TableCell>{orDash(adjustment.docNo)}</TableCell>
                       <TableCell>{orDash(labelOf(ADJUSTMENT_DOC_TYPES, adjustment.docType))}</TableCell>
                       <TableCell>{orDash(labelOf(ADJUSTMENT_VOUCHER_TYPES, adjustment.voucherType))}</TableCell>
@@ -362,7 +368,7 @@ export default function InventoryAdjustments() {
                     </TableRow>
                     {open ? (
                       <TableRow className="hover:bg-transparent">
-                        <TableCell colSpan={11} wrap className="overflow-visible! bg-muted/40 p-0 py-0!">
+                        <TableCell colSpan={showSku ? 11 : 10} wrap className="overflow-visible! bg-muted/40 p-0 py-0!">
                           <div className="sticky left-0" style={visibleWidth ? { width: visibleWidth - 2 } : undefined}>
                             <AdjustmentDetails adjustment={adjustment} />
                           </div>

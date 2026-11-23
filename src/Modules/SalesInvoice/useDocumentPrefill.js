@@ -58,7 +58,8 @@ export default function useDocumentPrefill({ companyId, documentType, enabled, o
       return
     }
     setList({ status: 'loading', rows: [], error: null })
-    getPrefillDocuments({ companyId, documentType: type })
+    // document_type: the source chosen; ref_doc_type: the document being made.
+    getPrefillDocuments({ companyId, documentType: type, refDocType: documentType })
       .then((rows) => {
         if (ticket === listTicket.current) setList({ status: 'ready', rows, error: null })
       })

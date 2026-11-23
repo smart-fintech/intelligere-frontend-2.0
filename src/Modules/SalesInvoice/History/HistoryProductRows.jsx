@@ -38,8 +38,10 @@ const percent = (value) => (value === null ? '--' : `${Number(value.toFixed(2))}
  *
  *   products     readHistoryProducts(...)
  *   documentNo   for the region's name
+ *   showRemain   Sales Order: "Remain / Qty" - remain_qty / Quantity and unit
+ *                ("1 / 2 unit", "--" for a remain_qty not sent); Qty otherwise
  */
-export default function HistoryProductRows({ products, documentNo }) {
+export default function HistoryProductRows({ products, documentNo, showRemain = false }) {
   if (products.length === 0) {
     return <p className="px-3 py-4 text-center text-xs text-muted-foreground">No product details are saved for this document.</p>
   }
@@ -48,7 +50,7 @@ export default function HistoryProductRows({ products, documentNo }) {
       <div className={cn(GRID, 'border-b border-border pb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase')}>
         {HEADINGS.map(([heading, right]) => (
           <span key={heading} className={cn(CELL, right && 'text-right')}>
-            {heading}
+            {showRemain && heading === 'Qty' ? 'Remain / Qty' : heading}
           </span>
         ))}
       </div>
@@ -60,7 +62,9 @@ export default function HistoryProductRows({ products, documentNo }) {
             {line.description ? <span className="block text-muted-foreground">{line.description}</span> : null}
           </span>
           <span className={CELL}>{line.hsn || '--'}</span>
-          <span className={cn(CELL, 'tabular-nums')}>{line.quantity ? [line.quantity, line.per].filter(Boolean).join(' ') : '--'}</span>
+          <span className={cn(CELL, 'tabular-nums')}>
+            {line.quantity ? `${showRemain ? `${line.remainQty || '--'} / ` : ''}${[line.quantity, line.per].filter(Boolean).join(' ')}` : '--'}
+          </span>
           <span className={cn(CELL, 'text-right tabular-nums')}>{rupees(line.ratePaise)}</span>
           <span className={cn(CELL, 'text-right tabular-nums')}>{percent(line.discount)}</span>
           <span className={cn(CELL, 'text-right font-medium tabular-nums')}>{rupees(line.taxablePaise)}</span>

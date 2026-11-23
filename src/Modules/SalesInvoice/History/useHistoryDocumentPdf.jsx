@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { toEwayBillModel } from '@/Modules/SalesInvoice/Document/ewayBillModel'
 import { toInvoiceModel } from '@/Modules/SalesInvoice/Document/invoiceModel'
 import { readFileDataUrl } from '@/Modules/SalesInvoice/Document/useFileDataUrl'
@@ -48,6 +49,8 @@ export default function useHistoryDocumentPdf(company) {
   const companyId = company.company_id
   const { ledgers, banks, countries, products } = useInvoiceReferenceData(companyId)
   const mappings = useDocumentMappings(companyId, MAPPING_DOCUMENT_TYPE.SALES)
+  // SKU codes printed only for a company that manages SKUs - as the workspace prints them.
+  const showSku = useSkuManagement() === true
   const [job, setJob] = useState(null)
   const queue = useRef(Promise.resolve())
   const jobCount = useRef(0)
@@ -95,10 +98,11 @@ export default function useHistoryDocumentPdf(company) {
           images: { logo, signature, paymentQr },
           // The currency it was saved with (documentCurrency) - printed as when it was saved.
           currency: applicable.savedCurrency,
+          showSku,
         }),
       }
     },
-    [status, company, ledgers, products, banks, countries.data, mappings.ledgerMapping],
+    [status, company, ledgers, products, banks, countries.data, mappings.ledgerMapping, showSku],
   )
 
   /** One at a time: each PDF starts once the one before it has finished. */

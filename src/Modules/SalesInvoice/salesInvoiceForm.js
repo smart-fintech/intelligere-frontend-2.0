@@ -168,7 +168,8 @@ export const isServiceLine = (line) => line?.kind === LINE_KIND.SERVICE
  *   challanLabels a challan's number / date boxes on its sheet, when not
  *                 "Challan No./Delivery No." / "Challan Date/Delivery Date."
  */
-const ALL_SETTINGS = ['eWayBill', 'eInvoice', 'reverseCharge', 'voucherQr', 'roundOff']
+// rsp / lut are Sales Invoice's alone - no other type lists them, so settingsOf keeps them off there.
+const ALL_SETTINGS = ['eWayBill', 'eInvoice', 'reverseCharge', 'voucherQr', 'roundOff', 'rsp', 'lut']
 const ALL_OTHER_DETAILS = ['charges', 'discount', 'tcs', 'roundOff', 'note']
 
 const DOCUMENT_PROFILES = {
@@ -490,6 +491,10 @@ export const settingsFromCompany = (company) => ({
   reverseCharge: false,
   voucherQr: company?.is_voucher_qr === undefined ? true : flagOf(company.is_voucher_qr),
   roundOff: company?.round_off === undefined ? true : flagOf(company.round_off),
+  // RSP: the Other Details discount comes off the grand total, after GST (invoiceFigures).
+  rsp: flagOf(company?.rsp),
+  // LUT: no GST charged on the lines or Other Charges (ratesFor) - their slabs are kept, not applied.
+  lut: flagOf(company?.lut),
 })
 
 /** Today, as an <input type="date"> holds it - the local day, not UTC's. */
@@ -952,11 +957,12 @@ const numberOf = (value) => {
  * `GST Rate` is the WHOLE rate ("18"), as the Product form saves it, and
  * gstBreakdown (Constants/gst) is the one place that halves it. Under reverse
  * charge the buyer pays the tax, so none is charged on the invoice - as the
- * earlier screens did.
+ * earlier screens did. Under LUT (Sales Invoice) none is charged either -
+ * the line's own slab stays as it is, only not applied.
  */
-const ratesFor = (gstRate, { interState, reverseCharge }) => {
+const ratesFor = (gstRate, { interState, reverseCharge, lut = false }) => {
   const split = gstBreakdown(gstRate)
-  if (!split || reverseCharge) return { cgst: 0, sgst: 0, igst: 0 }
+  if (!split || reverseCharge || lut) return { cgst: 0, sgst: 0, igst: 0 }
   return interState
     ? { cgst: 0, sgst: 0, igst: Number(split.igst) }
     : { cgst: Number(split.cgst), sgst: Number(split.sgst), igst: 0 }
@@ -973,7 +979,7 @@ const taxesOn = (taxablePaise, rates) => ({
  * One product line's figures. Amount is Quantity x Rate; with discount on,
  * the line's Disc. % comes off that before tax (the earlier screens' rule).
  */
-export const lineFigures = (line, { interState, reverseCharge, withDiscount }) => {
+export const lineFigures = (line, { interState, reverseCharge, lut = false, withDiscount }) => {
   const grossPaise = Math.round((toPaise(line.rate) ?? 0) * numberOf(line.quantity))
   const discountPercent = withDiscount ? Math.min(Math.max(numberOf(line.discount), 0), 100) : 0
   const discountPaise = percentOf(grossPaise, discountPercent)
@@ -984,7 +990,7 @@ export const lineFigures = (line, { interState, reverseCharge, withDiscount }) =
     discountPercent,
     discountPaise,
     taxablePaise,
-    ...taxesOn(taxablePaise, ratesFor(line.gstRate, { interState, reverseCharge })),
+    ...taxesOn(taxablePaise, ratesFor(line.gstRate, { interState, reverseCharge, lut })),
   }
 }
 
@@ -1057,10 +1063,19 @@ const discountShares = (lines, discountPaise) => {
  *
  * Round off is worked out last, from everything before it, and only while
  * "Show Round Off" is ticked (roundOffFor) - it may be negative.
+ *
+ * Sales Invoice's two company settings (settingsOf - off on every other type):
+ *   RSP   the overall discount comes off the GRAND TOTAL instead - after GST:
+ *         nothing is shared over the lines, each line is taxed on its own
+ *         taxable value, and the discount is capped at the total before it
+ *         (grossTotalPaise). A line's Disc. % is unchanged.
+ *   LUT   no GST on the lines or Other Charges (ratesFor) - their slabs kept.
+ * Both off, every figure is worked out exactly as before.
  */
 export const invoiceFigures = (form) => {
   const tax = taxTreatment(form)
-  const options = { interState: tax.interState, reverseCharge: form.settings.reverseCharge, withDiscount: form.withDiscount }
+  const { rsp, lut } = settingsOf(form)
+  const options = { interState: tax.interState, reverseCharge: form.settings.reverseCharge, lut, withDiscount: form.withDiscount }
 
   const ownLines = Object.fromEntries(form.lines.map((line) => [line.id, lineFigures(line, options)]))
   const charges = Object.fromEntries(form.charges.map((charge) => [charge.id, chargeFigures(charge, options)]))
@@ -1068,9 +1083,11 @@ export const invoiceFigures = (form) => {
   const sum = (rows, key) => Object.values(rows).reduce((total, row) => total + row[key], 0)
 
   const taxablePaise = sum(ownLines, 'taxablePaise')
-  const discountPaise = Math.min(Math.max(toPaise(form.discount.amount) ?? 0, 0), taxablePaise)
+  const typedDiscountPaise = Math.max(toPaise(form.discount.amount) ?? 0, 0)
+  // Before tax (RSP off): capped at the products' taxable value and shared out over the lines.
+  const preTaxDiscountPaise = rsp ? 0 : Math.min(typedDiscountPaise, taxablePaise)
   // Each line taxed on its taxable value less its share of the overall discount.
-  const shares = discountShares(ownLines, discountPaise)
+  const shares = discountShares(ownLines, preTaxDiscountPaise)
   const lines = Object.fromEntries(
     Object.entries(ownLines).map(([id, row]) => {
       const share = shares[id] ?? 0
@@ -1084,16 +1101,23 @@ export const invoiceFigures = (form) => {
   const igstPaise = sum(lines, 'igstPaise') + sum(charges, 'igstPaise')
   const gstPaise = cgstPaise + sgstPaise + igstPaise
   const tcsPaise = toPaise(form.tcs.amount) ?? 0
+  // The grand total before the overall discount - what RSP takes it off.
+  const grossTotalPaise = taxablePaise + chargesPaise + gstPaise + tcsPaise
+  const discountPaise = rsp ? Math.min(typedDiscountPaise, Math.max(grossTotalPaise, 0)) : preTaxDiscountPaise
   const beforeRoundOff = taxablePaise + chargesPaise + gstPaise - discountPaise + tcsPaise
   const roundOffPaise = form.settings.roundOff ? roundOffFor(beforeRoundOff) : 0
 
   return {
     tax,
+    // The settings these figures were worked out under - the sheet and the payload follow them.
+    rsp,
+    lut,
     lines,
     charges,
     taxablePaise,
-    // The products' taxable value after the overall discount - what GST is charged on.
-    netTaxablePaise: taxablePaise - discountPaise,
+    // The products' taxable value after the overall discount - what GST is charged on (all of it under RSP).
+    netTaxablePaise: taxablePaise - preTaxDiscountPaise,
+    grossTotalPaise,
     chargesPaise,
     cgstPaise,
     sgstPaise,
@@ -1287,7 +1311,7 @@ const validateDocumentStep = (form, found, { allowedTypes }) => {
  * Add Product. `key(field)` is where each error goes. A product line needs
  * its product (and SKU); a service line its ledger - the rest is the same.
  */
-const checkLine = (found, line, key, { productsByKey, ledgersById, withDiscount, challan = false, reverseCharge = false }) => {
+const checkLine = (found, line, key, { productsByKey, ledgersById, withDiscount, challan = false, reverseCharge = false, lut = false }) => {
   if (isServiceLine(line)) {
     if (!line.ledgerId) found[key('ledgerId')] = 'Select the service ledger'
     else if (ledgersById && !ledgersById.has(String(line.ledgerId))) found[key('ledgerId')] = 'This ledger is no longer in the list'
@@ -1309,8 +1333,9 @@ const checkLine = (found, line, key, { productsByKey, ledgersById, withDiscount,
       found[key('rate')] = 'Enter the rate'
     }
     // The GST slab the invoice taxes this line at - 0 is a real slab, blank is not.
-    // Under Reverse Charge no GST is charged on the document (ratesFor), and the slab is not shown.
-    if (!reverseCharge && !textOf(line.gstRate)) found[key('gstRate')] = 'Select the GST slab'
+    // Under Reverse Charge no GST is charged on the document (ratesFor), and the slab is not shown;
+    // under LUT none either, and the slab box is disabled.
+    if (!reverseCharge && !lut && !textOf(line.gstRate)) found[key('gstRate')] = 'Select the GST slab'
   }
   if (!challan && withDiscount && textOf(line.discount)) {
     const percent = Number(line.discount)
@@ -1340,6 +1365,7 @@ export const validateEntry = (form, { productsByKey, ledgersById }) => {
     withDiscount,
     challan: isChallan(form),
     reverseCharge: settingsOf(form).reverseCharge,
+    lut: settingsOf(form).lut,
   })
   // An order's row goes on the document once - a second time is an edit of that line.
   const order = activeOrderOf(form.entry)
@@ -1372,6 +1398,7 @@ const validateProductsStep = (form, found, { productsByKey, ledgersById, chargeS
       withDiscount: form.withDiscount,
       challan,
       reverseCharge: settingsOf(form).reverseCharge,
+      lut: settingsOf(form).lut,
     })
   })
 
@@ -1408,11 +1435,13 @@ const validateProductsStep = (form, found, { productsByKey, ledgersById, chargeS
   const figures = invoiceFigures(form)
 
   // The Other Charges discount: a valid amount, no more than the products'
-  // taxable value, and a ledger once it discounts anything.
+  // taxable value (under RSP, the grand total it comes off), and a ledger
+  // once it discounts anything.
   if (textOf(form.discount.amount)) {
     const paise = toPaise(form.discount.amount)
     if (paise === null || paise < 0) found['discount.amount'] = 'Enter a valid amount'
-    else if (paise > figures.taxablePaise) found['discount.amount'] = 'More than the products’ taxable value'
+    else if (figures.rsp && paise > figures.grossTotalPaise) found['discount.amount'] = 'More than the grand total'
+    else if (!figures.rsp && paise > figures.taxablePaise) found['discount.amount'] = 'More than the products’ taxable value'
     else if (paise > 0 && !form.discount.ledgerId) found['discount.ledgerId'] = 'Select the discount ledger'
   }
 

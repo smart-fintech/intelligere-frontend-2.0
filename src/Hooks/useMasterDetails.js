@@ -31,6 +31,7 @@ import { useDispatch, useSelector, useStore } from 'react-redux'
 import { useActiveCompany } from '@/Hooks/useActiveCompany'
 import { getEmail } from '@/Library/secureStorage'
 import { toast } from '@/Library/toast'
+import { isSkuManagementEnabled } from '@/Services/Inventory/inventoryService'
 import {
   fetchMasterDetails,
   masterDetailsKeyOf,
@@ -56,6 +57,20 @@ const ask = (dispatch, store, request) =>
 
     toast.error(selectMasterDetailsError(store.getState()))
   })
+
+/**
+ * Whether the active company manages SKUs - "Enable SKU" in its Master
+ * Details (isSkuManagementEnabled, the Products page's own rule): true or
+ * false - null while that is not known yet (falsy, so nothing SKU is shown
+ * meanwhile; `=== false` for "known not to"). What every screen asks before
+ * it shows a SKU Code column, value or picker; it shares useMasterDetails'
+ * one request.
+ */
+export function useSkuManagement() {
+  const masterDetails = useMasterDetails()
+  if (masterDetails.status !== 'ready') return null
+  return isSkuManagementEnabled(masterDetails.record)
+}
 
 export default function useMasterDetails() {
   const dispatch = useDispatch()

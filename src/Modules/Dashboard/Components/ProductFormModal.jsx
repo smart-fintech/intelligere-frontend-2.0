@@ -175,6 +175,7 @@ import { SkuSelector } from '@/Components/Common/SkuSelector'
 import { Modal } from '@/Components/Common/Modal'
 import { Stepper } from '@/Components/Common/Stepper'
 import { Button } from '@/Components/ui/button'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { toast } from '@/Library/toast'
 import { findHsn, loadHsnList } from '@/Services/Product/hsnService'
 import {
@@ -264,6 +265,8 @@ export default function ProductFormModal({
 }) {
   // Booking a purchase's stock is Add Existing Product with the product already chosen.
   const fromList = fromExisting || Boolean(booking)
+  // No SKU Code to pick for a company that does not manage SKUs: an existing product is its first SKU.
+  const companySku = useSkuManagement()
   // The numbers the next SKU entry and the next warehouse line get - only
   // ever read in a handler. Entry 1 is the one every form starts with, and
   // one counter numbers every line, so no two lines share a key whichever
@@ -384,7 +387,7 @@ export default function ProductFormModal({
   const lockedFields = edit ? LOCKED_FIELDS : fromList ? (existing.product ? LOCKED_FIELDS : LOCKED_BEFORE_CHOICE) : []
   const existingSkus = existingProduct?.variants ?? []
   // A choice to make: several SKUs, or one that has a code.
-  const offersSku = existingSkus.length > 1 || existingSkus.some((variant) => variant.skuCode)
+  const offersSku = companySku !== false && (existingSkus.length > 1 || existingSkus.some((variant) => variant.skuCode))
 
   /* The fields that belong to ONE SKU wherever the form draws them: its
      SKU fields, its Quantity / Expiry Date / Unit Rate, the vendor and
@@ -416,7 +419,8 @@ export default function ProductFormModal({
     if (!product) return
 
     // One SKU with no code is the product itself - no choice to offer.
-    const only = product.variants.length === 1 && !product.variants[0].skuCode ? product.variants[0] : null
+    const only =
+      (product.variants.length === 1 && !product.variants[0].skuCode) || (companySku === false && product.variants.length > 0) ? product.variants[0] : null
     // No SKU chosen yet: a field kept on each SKU ("Selling Rate") is filled
     // when all its SKUs have the same of it - and once a SKU is chosen, from that one.
     const source = productEditSource(product, only)

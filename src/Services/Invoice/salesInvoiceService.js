@@ -255,6 +255,9 @@ export const buildBusinessDocumentPayload = (request) => {
     line.order ? { reference_no: text(line.order.referenceNo), ref_doc_no: text(line.order.documentNo), document_id: line.order.documentId ?? null } : null
   // An edited purchase's line kept as saved: its own product_id, so the update keeps it - and its stock (stockBooking).
   const savedLine = (line) => (line.savedLineId ? { product_id: line.savedLineId } : null)
+  // LUT (Sales Invoice): no GST charged - no slab is sent for a line or charge
+  // (its rates null), its tax amounts are the 0 worked out (invoiceFigures).
+  const noSlab = Boolean(figures.lut)
   const productData = request.lines.map((line) => {
     if (challan) {
       return {
@@ -280,7 +283,7 @@ export const buildBusinessDocumentPayload = (request) => {
       // The amount tax is charged on - Quantity x Rate, less the line's discount.
       product_amount: rupees(line.figures.taxablePaise).toFixed(2),
     }
-    const taxes = taxFields(line.figures, interState, (rate) => rateString(true, rate))
+    const taxes = taxFields(line.figures, interState, (rate) => rateString(!noSlab, rate))
     if (line.service) return { ...common, ...taxes, 'Selling Rate': text(line.rate), ...orderFields(line), ...savedLine(line) }
     return {
       ...common,
@@ -308,7 +311,7 @@ export const buildBusinessDocumentPayload = (request) => {
     if (!charge.ledgerName) return
     otherDetails[charge.ledgerName] = {
       amount: rupees(charge.figures.amountPaise),
-      ...taxFields(charge.figures, interState, (rate) => rate),
+      ...taxFields(charge.figures, interState, (rate) => (noSlab ? null : rate)),
       ...(charge.ledgerSac === undefined ? null : { ledger_sac: charge.ledgerSac }),
       source: OTHER_CHARGES_SOURCE,
     }
@@ -536,6 +539,8 @@ const SELLER_COMPANY_SETTINGS = {
   eInvoice: 'e_invoice',
   voucherQr: 'is_voucher_qr',
   roundOff: 'round_off',
+  rsp: 'rsp',
+  lut: 'lut',
 }
 
 /**
@@ -543,7 +548,7 @@ const SELLER_COMPANY_SETTINGS = {
  *
  *   { company_id, comp_phone, comp_email, comp_address, comp_website,
  *     comp_state, pincode, comp_gstin, pan_no, udyam, category,
- *     e_way_bill, e_invoice, is_voucher_qr, round_off }
+ *     e_way_bill, e_invoice, is_voucher_qr, round_off, rsp, lut }
  *
  * Every mapped field goes up, changed or not - an unchanged one carries the
  * value the company already has, so nothing is blanked. Returns null when

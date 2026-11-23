@@ -38,6 +38,9 @@ const SELLER_SETTINGS = [
   { key: 'reverseCharge', label: 'Reverse Charge Applicable' },
   // { key: 'voucherQr', label: 'Show Voucher QR Code' },
   { key: 'roundOff', label: 'Show Round Off' },
+  // Sales Invoice only (its profile alone lists them) - the company's rsp / lut.
+  { key: 'rsp', label: 'RSP' },
+  { key: 'lut', label: 'LUT' },
 ]
 
 /** Copies a value and says so - the Pincode's copy button. */

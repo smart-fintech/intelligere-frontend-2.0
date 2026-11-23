@@ -1,15 +1,20 @@
+import { useEffect } from 'react'
+
 import { Field, SelectField, TextareaField } from '@/Components/Common/FormFields'
 import { SkuSelector } from '@/Components/Common/SkuSelector'
 import { GST_RATES } from '@/Constants/gst'
 import { DESCRIPTION_MAX_LENGTH } from '@/Constants/salesInvoice'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import {
   isServiceLine,
   isSkuManaged,
   lineFromProduct,
   lineFromServiceLedger,
   lineFromSku,
+  lineVariant,
   rateText,
   skuOptionValue,
+  skuValueOf,
   toDecimalInput,
   withCurrentOption,
 } from '@/Modules/SalesInvoice/salesInvoiceForm'
@@ -71,6 +76,8 @@ export default function ProductEntry({
   challan = false,
   // Reverse Charge Applicable: no GST is charged on the document - no GST Slab box.
   reverseCharge = false,
+  // LUT (Sales Invoice): no GST is charged - the GST Slab box stays, disabled and not required.
+  lut = false,
   figures,
   withDiscount,
   errors,
@@ -84,6 +91,16 @@ export default function ProductEntry({
 
   const service = isServiceLine(entry)
   const skuManaged = !service && isSkuManaged(product)
+  // A company that does not manage SKUs has no SKU Code to pick: a product kept by SKU takes its
+  // first, as one without SKUs takes its only one (null - not known yet - waits).
+  const companySku = useSkuManagement()
+  const skuShown = skuManaged && companySku !== false
+  const needsFirstSku = skuManaged && companySku === false && !lineVariant(product, entry)
+  useEffect(() => {
+    // A line with no SKU yet (one filled in elsewhere): only its SKU is set, never its rate or HSN.
+    if (!needsFirstSku) return
+    onUpdate((current) => ({ ...current, skuValue: skuValueOf(product.variants[0], 0) }), ['skuValue'])
+  }, [needsFirstSku, product, onUpdate])
 
   return (
     <div className="flex flex-wrap items-start gap-x-2 gap-y-2 [&>*]:min-w-0">
@@ -122,13 +139,18 @@ export default function ProductEntry({
             // Radix can report '' on its own (see CodeSelector); re-choosing the
             // same product must not clear its SKU either.
             if (!key || key === entry.productKey) return
-            onUpdate((current) => lineFromProduct(current, productsByKey.get(key)), ['productKey', 'skuValue', 'hsn', 'rate', 'gstRate'])
+            const chosen = productsByKey.get(key)
+            onUpdate((current) => {
+              const next = lineFromProduct(current, chosen)
+              // No SKU to pick here: its first SKU, with that SKU's values.
+              return companySku === false && isSkuManaged(chosen) ? lineFromSku(next, chosen, skuValueOf(chosen.variants[0], 0)) : next
+            }, ['productKey', 'skuValue', 'hsn', 'rate', 'gstRate'])
           }}
         />
       )}
 
-      {/* Only a product kept by SKU has a SKU to choose - and only its own. */}
-      {skuManaged ? (
+      {/* Only a product kept by SKU has a SKU to choose - and only its own; none for a company that does not manage SKUs. */}
+      {skuShown ? (
         <div style={WIDE}>
           <SkuSelector
             id={id('sku')}
@@ -220,14 +242,14 @@ export default function ProductEntry({
           <SelectField
             id={id('gst-slab')}
             label="GST Slab"
-            required
+            required={!lut}
             placeholder="Select"
             options={withCurrentOption(GST_SLAB_OPTIONS, entry.gstRate).map((option) =>
               option.value === entry.gstRate ? { ...option, label: `${rateText(option.value)}%` } : option,
             )}
             value={entry.gstRate}
             error={errorOf('gstRate')}
-            disabled={disabled}
+            disabled={disabled || lut}
             onValueChange={(value) => value && onUpdate((current) => ({ ...current, gstRate: value }), ['gstRate'])}
           />
         </div>

@@ -46,6 +46,9 @@ const signedAmount = (row) => {
   return `${formatAmount(row.amount)} ${row.type === 'credit' ? 'Cr' : 'Dr'}`
 }
 
+/** The API's own credit or debit, as sent - blank when it sent none. */
+const sentAmount = (value) => (value === null ? '' : formatAmount(value))
+
 function PartyRows({ ledger, rows }) {
   return (
     <>
@@ -55,11 +58,13 @@ function PartyRows({ ledger, rows }) {
           <TableCell title={row.invoiceNo}>{row.invoiceNo}</TableCell>
           <TableCell title={row.particulars}>{row.particulars}</TableCell>
           <TableCell title={row.voucherType}>{row.voucherType}</TableCell>
+          <TableCell className="text-right tabular-nums">{sentAmount(row.credit)}</TableCell>
+          <TableCell className="text-right tabular-nums">{sentAmount(row.debit)}</TableCell>
           <TableCell className="text-right tabular-nums">{signedAmount(row)}</TableCell>
         </TableRow>
       ))}
       <TableRow className="font-semibold">
-        <TableCell colSpan={4}>Closing Balance</TableCell>
+        <TableCell colSpan={6}>Closing Balance</TableCell>
         <TableCell className="text-right tabular-nums">{netText(ledger.debit, ledger.credit)}</TableCell>
       </TableRow>
     </>
@@ -79,6 +84,12 @@ function LedgerTable({ ledger }) {
             <PlainHead width={150}>Invoice No.</PlainHead>
             <PlainHead width={260}>Particulars</PlainHead>
             <PlainHead width={130}>Voucher Type</PlainHead>
+            <PlainHead width={140} className="text-right">
+              Credit
+            </PlainHead>
+            <PlainHead width={140} className="text-right">
+              Debit
+            </PlainHead>
             <PlainHead width={160} className="text-right">
               Amount
             </PlainHead>

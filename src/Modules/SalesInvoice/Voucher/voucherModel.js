@@ -789,6 +789,8 @@ const PARTY_FIELDS = {
   state: ['comp_state', 'ledger_state', 'state', 'statename'],
   pincode: ['pincode', 'ledger_pincode', 'comp_pincode'],
   address: ['comp_address', 'ledger_address', 'address'],
+  // A ledger's GST registration type ("Regular", "Unregistered"...) - only a ledger record has one.
+  gstRegType: ['ledger_gst_reg_type'],
 }
 
 const partyOf = (records, name) => ({
@@ -797,6 +799,8 @@ const partyOf = (records, name) => ({
   state: firstText(records, PARTY_FIELDS.state),
   pincode: firstText(records, PARTY_FIELDS.pincode),
   address: firstText(records, PARTY_FIELDS.address),
+  // Under the ledger's own name - buyer_gst_reg_type reads it; null (still sent) when the records have none.
+  ledger_gst_reg_type: firstText(records, PARTY_FIELDS.gstRegType),
 })
 
 /** The document types that CREDIT the party with the total (a purchase, a sales return) - every other type debits it. */
@@ -944,7 +948,6 @@ export const buildTallyVoucherPayload = ({ voucher: sourceVoucher, mapping, comp
     const sac = getLedgerSac(recordOf(slot)) || (sameText(name, charge.ledgerName) ? charge.ledgerSac : '')
     return { type: charge.kind, name, amount: charge.amount, gst_rate: charge.gstRate, ...taxPayload(charge), ledger_sac: sac || null }
   })
-
   return {
     module_name: TALLY_VOUCHER_MODULE,
     company_name: textOf(company?.comp_name),

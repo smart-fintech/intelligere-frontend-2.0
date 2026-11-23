@@ -16,9 +16,12 @@
  *                              seller, a purchase's buyer) - it IS the company,
  *                              and Next saves that side back to the company
  *                              record, so an old copy must never stand in for it
- *   ship_to / dispatch_from    Shipping To / Dispatched From - "Same as ..."
- *                              when sameAsBuyer / sameAsSeller say so, or when
- *                              the card holds its party's own address
+ *   ship_to / dispatch_from    Shipping To / Dispatched From, as saved - "Same
+ *                              as ..." when the saved address IS its party's
+ *                              (name, GSTIN, state, address, pincode); one
+ *                              not saved leaves the form's own default. The
+ *                              sameAsBuyer / sameAsSeller flags are not read
+ *                              (the backend only ever sent its default, true)
  *   invoice_master_details     the Document Details (and rcm -> Reverse Charge),
  *                              and the ledger party's currency / conversion_rate
  *                              (documentCurrency)
@@ -159,9 +162,14 @@ const cardOf = (saved) => {
   }
 }
 
-/** Whether a saved card is its party's own address (or empty) - "Same as ..." when the record does not say. */
-const isPartysOwn = (card, party) =>
-  ADDRESS_FIELDS.every((field) => !card[field]) || ADDRESS_FIELDS.every((field) => sameText(card[field], party?.[field]))
+/** Whether a card holds an address at all - any of its fields. */
+const hasAddress = (card) => ADDRESS_FIELDS.some((field) => card[field])
+
+/** A field as compared - trimmed, spaces collapsed, case aside ('' for null). */
+const comparable = (value) => textOf(value).replace(/\s+/g, ' ').toLowerCase()
+
+/** Whether a saved card is exactly its party's own address - every field the same (an empty one only against an empty one). */
+const isPartysOwn = (card, party) => ADDRESS_FIELDS.every((field) => comparable(card[field]) === comparable(party?.[field]))
 
 /* ------------------------------------------------------------------ */
 /* The form                                                           */
@@ -192,8 +200,10 @@ export const formFromSavedDocument = (record, { createForm, company, parties, le
 
   const shipping = cardOf(record.ship_to)
   const dispatch = cardOf(record.dispatch_from)
-  const shippingSameAsBuyer = flagOrNull(record.sameAsBuyer) ?? isPartysOwn(shipping, buyer)
-  const dispatchSameAsSeller = flagOrNull(record.sameAsSeller) ?? isPartysOwn(dispatch, seller)
+  // From what was saved: an address saved is shown - as "Same as ..." when it is that party's own;
+  // none saved leaves the form's default.
+  const shippingSameAsBuyer = hasAddress(shipping) ? isPartysOwn(shipping, buyer) : base.shippingSameAsBuyer
+  const dispatchSameAsSeller = hasAddress(dispatch) ? isPartysOwn(dispatch, seller) : base.dispatchSameAsSeller
 
   /* ---- Document Details ---- */
   const parts = [master.document_no_f, master.document_no_s, master.document_no_t].map(numberText)
@@ -338,6 +348,8 @@ export const lineFromSavedProduct = (row, { ledgers, products }) => {
  *   kept from `form`     the document type, its number (and the auto-number
  *                        parts) and date, the company side (the company as
  *                        it is now) and the company's settings
+ *   a Credit Note from a Sales Invoice   its Invoice No. / Invoice Date are
+ *                        that invoice's own document_no / document_date
  *   from the record      the ledger party, Shipping To / Dispatched From, the
  *                        other Document Details, the bank, the lines, Other
  *                        Charges, discount, TCS, round off, the note - and
@@ -350,6 +362,14 @@ export const lineFromSavedProduct = (row, { ledgers, products }) => {
 export const formPrefilledFrom = (record, form, options) => {
   const source = formFromSavedDocument(record, options)
   const { parties } = options
+  // The invoice a Credit Note adjusts is the one it is made from.
+  const fromInvoice = form.documentType === 'Credit Note' && source.documentType === DOCUMENT_TYPE_INVOICE
+  const invoiceRef = fromInvoice
+    ? {
+        challanInvoiceNo: textOf(record.document_no) || source.document.invoiceNo,
+        challanInvoiceDate: inputDateOf(record.document_date) || source.document.invoiceDate,
+      }
+    : null
   return {
     ...source,
     lines: source.lines.map((line) => ({ ...line, order: null })),
@@ -358,6 +378,7 @@ export const formPrefilledFrom = (record, form, options) => {
     settings: { ...form.settings, reverseCharge: source.settings.reverseCharge },
     document: {
       ...source.document,
+      ...invoiceRef,
       autoIncrement: form.document.autoIncrement,
       invoiceNo: form.document.invoiceNo,
       invoiceNoParts: form.document.invoiceNoParts,

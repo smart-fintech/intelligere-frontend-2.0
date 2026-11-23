@@ -6,6 +6,7 @@ import { Button } from '@/Components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table'
 import { Tooltip } from '@/Components/ui/tooltip'
 import { EVENT_KIND, EVENT_KINDS, EVENT_STAGE } from '@/Constants/procurementAutomation'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import { CancelledWatermark, EventStatusBadge } from '@/Modules/Procurement/Components/EventSummary'
 import ProductVendors from '@/Modules/Procurement/Components/ProductVendors'
@@ -221,6 +222,7 @@ function VendorsHidden() {
  * vendors in a row under it (`opened` holds the open rows' keys).
  */
 function ProductTable({ event, opened, onToggle, onProfile, onCertificateVerified }) {
+  const showSku = useSkuManagement()
   const showLowest = event.kind === EVENT_KIND.BID && event.stage !== EVENT_STAGE.UPCOMING
   const hidden = amountsHidden(event)
   const columns = 8 + (showLowest ? 1 : 0)
@@ -259,7 +261,7 @@ function ProductTable({ event, opened, onToggle, onProfile, onCertificateVerifie
                 <TableCell className="align-top">{orDash(product.sr_no ?? index + 1)}</TableCell>
                 <TableCell wrap className="align-top">
                   <span className="font-medium">{orDash(product.product_name)}</span>
-                  {product.sku_code ? (
+                  {showSku && product.sku_code ? (
                     <SkuDetailsTooltip details={skuDetailList(product.sku_details)}>
                       <span tabIndex={0} className="ml-2 cursor-help rounded bg-brand-soft px-1.5 py-0.5 text-[11px] text-brand">
                         {product.sku_code}

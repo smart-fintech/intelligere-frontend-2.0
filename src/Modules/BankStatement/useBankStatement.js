@@ -390,7 +390,7 @@ export default function useBankStatement({ company, companyId, banks, isTally, i
       toTallyRow(entry, { companyName, bankLedger, email, remainingLedger, ref: refs[entry.sr_no] }),
     )
     pending.current = list
-    const started = await tally.start(buildBankStatementSocketMessage({ companyName, bank: bankLedger, rows }))
+    const started = await tally.start(buildBankStatementSocketMessage({ companyName, bank: bankLedger, rows, entryId }))
     if (!started) {
       pending.current = null
       setSendingIds([])

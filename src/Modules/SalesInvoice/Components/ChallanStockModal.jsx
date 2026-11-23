@@ -3,6 +3,7 @@ import { Check, PackageX } from 'lucide-react'
 
 import { Modal } from '@/Components/Common/Modal'
 import { Button } from '@/Components/ui/button'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import { SkuCode } from '@/Modules/SalesInvoice/Components/RequestQuotation'
 import { bookingKey, buildStockUpdateBody, checkStockRemoval, hasStockProblems, totalRemoved, warehouseKey } from '@/Modules/SalesInvoice/challanStock'
@@ -35,6 +36,7 @@ const inputClass =
  *                 skuWarehouseSummary: its stock may have gone out before, and must not twice
  */
 export default function ChallanStockModal({ rows, initialEntered, autoFilled = false, companyName, documentNo, onDone, onClose, onSkip = null }) {
+  const showSku = useSkuManagement()
   const [entered, setEntered] = useState(() => initialEntered ?? {})
   const problems = checkStockRemoval(rows, entered, { shared: autoFilled })
   const valid = !hasStockProblems(problems)
@@ -99,7 +101,7 @@ export default function ChallanStockModal({ rows, initialEntered, autoFilled = f
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="min-w-0 text-sm font-semibold break-words text-brand">
                   {row.productName || 'Product'}
-                  {row.skuCode ? (
+                  {showSku && row.skuCode ? (
                     <span className="ml-2 text-xs font-normal text-foreground">
                       <SkuCode code={row.skuCode} details={row.skuDetails} />
                     </span>

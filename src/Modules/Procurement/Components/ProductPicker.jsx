@@ -7,6 +7,7 @@ import { MultiSelectField } from '@/Components/Common/MultiSelectField'
 import { SkuSelector } from '@/Components/Common/SkuSelector'
 import { Button } from '@/Components/ui/button'
 import { toast } from '@/Library/toast'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import { hasProduct, vendorChoicesFor, vendorLabel } from '@/Modules/Procurement/procurement'
 import { skuAttributes } from '@/Utils/skuAttributes'
@@ -34,6 +35,8 @@ const NONE = []
 const skuValueOf = (variant, index) => String(variant?.product_id ?? index)
 
 export default function ProductPicker({ products, companyVendors, rows, nextSrNo, onAdd, disabled }) {
+  // No SKU Code to pick for a company that does not manage SKUs: a product goes with its first SKU (sent as before).
+  const showSku = useSkuManagement()
   const [productId, setProductId] = useState('')
   const [skuValue, setSkuValue] = useState('')
   const [vendorIds, setVendorIds] = useState([])
@@ -41,10 +44,10 @@ export default function ProductPicker({ products, companyVendors, rows, nextSrNo
   const options = products.data ?? NONE
   const product = options.find((option) => option.id === productId) ?? null
   const variants = product?.variants ?? NONE
-  const variant = variants.find((item, index) => skuValueOf(item, index) === skuValue) ?? null
+  const variant = showSku === false ? (variants[0] ?? null) : (variants.find((item, index) => skuValueOf(item, index) === skuValue) ?? null)
   const skuCode = variant ? String(variant.sku_code).trim() : ''
 
-  const needsSku = variants.length > 0
+  const needsSku = showSku !== false && variants.length > 0
   // The vendors wait for the SKU of a product kept by SKU.
   const skuPending = needsSku && !variant
 

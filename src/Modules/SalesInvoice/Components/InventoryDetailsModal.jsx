@@ -4,6 +4,7 @@ import { ChevronRight, FileQuestion } from 'lucide-react'
 import { InlineAlert } from '@/Components/Common/DataList'
 import { Modal } from '@/Components/Common/Modal'
 import { Button } from '@/Components/ui/button'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import { QuotationFooter, QuotationSteps, SkuCode } from '@/Modules/SalesInvoice/Components/RequestQuotation'
 import { PROCUREMENT_STATE as STATE, QUOTATION_STATES, stockIsShort, stockRequiredQty } from '@/Modules/SalesInvoice/procurement'
@@ -71,6 +72,8 @@ function OrderLines({ rows }) {
  *                has none (an order updated, or saved without the booking)
  */
 export default function InventoryDetailsModal({ stock, documentNo, procurement = null, onClose }) {
+  // SKU Code only for a company that manages SKUs.
+  const showSku = useSkuManagement()
   // 'stock' or 'quotation' - the request shows once its requirements are in.
   const [view, setView] = useState('stock')
   const quoting = Boolean(procurement) && view === 'quotation' && QUOTATION_STATES.includes(procurement.state)
@@ -157,7 +160,7 @@ export default function InventoryDetailsModal({ stock, documentNo, procurement =
               <table className="w-full min-w-[720px] table-fixed text-sm">
                 <colgroup>
                   <col />
-                  <col className="w-40" />
+                  {showSku ? <col className="w-40" /> : null}
                   <col className="w-24" />
                   <col className="w-24" />
                   <col className="w-24" />
@@ -167,7 +170,7 @@ export default function InventoryDetailsModal({ stock, documentNo, procurement =
                 <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
                   <tr>
                     <th className={cn(cell, 'font-medium')}>Product Name</th>
-                    <th className={cn(cell, 'font-medium')}>SKU Code</th>
+                    {showSku ? <th className={cn(cell, 'font-medium')}>SKU Code</th> : null}
                     <th className={cn(cell, 'text-right font-medium')}>Ordered Qty</th>
                     <th className={cn(cell, 'text-right font-medium')}>Available Qty</th>
                     <th className={cn(cell, 'text-right font-medium')}>Minimum Qty</th>
@@ -184,9 +187,11 @@ export default function InventoryDetailsModal({ stock, documentNo, procurement =
                       <Fragment key={key}>
                         <tr className="border-t border-border align-top" data-testid="inventory-row">
                           <td className={cn(cell, 'font-medium break-words')}>{name || '--'}</td>
-                          <td className={cn(cell, 'text-xs')}>
-                            <SkuCode code={row.sku_code} details={row.sku_details} />
-                          </td>
+                          {showSku ? (
+                            <td className={cn(cell, 'text-xs')}>
+                              <SkuCode code={row.sku_code} details={row.sku_details} />
+                            </td>
+                          ) : null}
                           <td className={cn(cell, 'text-right tabular-nums')}>{quantity(row.ordered_qty)}</td>
                           <td className={cn(cell, 'text-right tabular-nums')}>{quantity(row.available_qty)}</td>
                           <td className={cn(cell, 'text-right tabular-nums', row.below_min_qty === true && 'font-semibold text-destructive')}>{quantity(row.min_qty)}</td>
@@ -214,7 +219,7 @@ export default function InventoryDetailsModal({ stock, documentNo, procurement =
                         </tr>
                         {isOpen ? (
                           <tr className="bg-muted/30">
-                            <td colSpan={7} className="p-0">
+                            <td colSpan={showSku ? 7 : 6} className="p-0">
                               <OrderLines rows={orders} />
                             </td>
                           </tr>

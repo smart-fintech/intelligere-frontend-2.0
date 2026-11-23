@@ -8,6 +8,7 @@ import { Button } from '@/Components/ui/button'
 import { Checkbox } from '@/Components/ui/checkbox'
 import { Label } from '@/Components/ui/label'
 import { Switch } from '@/Components/ui/switch'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import {
   NO_VENDOR_MESSAGE,
@@ -88,11 +89,12 @@ const mergedOrderQty = (nodes) => {
 
 /** A product's name and SKU, and its Order Qty (order_qty - `orderQty` added up when merged); display only. */
 function NodeHeading({ node, orderQty = node.orderQty }) {
+  const showSku = useSkuManagement()
   return (
     <div className="min-w-0 flex-1 space-y-0.5">
       <p className="text-sm font-semibold break-words text-brand">
         {node.name || 'Product'}
-        {node.skuCode ? (
+        {showSku && node.skuCode ? (
           <>
             {' '}
             <span className="text-xs font-normal text-foreground">
@@ -332,6 +334,7 @@ function VendorStep({ procurement }) {
 
 /* ---- Review & Download - the SellerTable ---- */
 function ReviewStep({ procurement }) {
+  const showSku = useSkuManagement()
   const { machine, state, parts, lines, choices, problems, actions } = procurement
   const [expanded, setExpanded] = useState(() => (parts.length === 1 ? parts[0].vendor.key : null))
   const submitting = state === STATE.QUOTATION_SUBMITTING
@@ -436,7 +439,7 @@ function ReviewStep({ procurement }) {
                           <thead className="text-left text-xs text-muted-foreground">
                             <tr>
                               <th className={cn(cell, 'font-medium')}>Product Name</th>
-                              <th className={cn(cell, 'w-36 font-medium')}>SKU Code</th>
+                              {showSku ? <th className={cn(cell, 'w-36 font-medium')}>SKU Code</th> : null}
                               <th className={cn(cell, 'w-28 font-medium')}>HSN Code</th>
                               <th className={cn(cell, 'w-36 font-medium')}>Quantity</th>
                             </tr>
@@ -450,9 +453,11 @@ function ReviewStep({ procurement }) {
                                     {node.name}
                                     <span className="block text-[11px] text-muted-foreground">Required {quantityText(qty)}</span>
                                   </td>
-                                  <td className={cn(cell, 'text-xs')}>
-                                    <SkuCode code={node.skuCode} details={node.skuDetails} />
-                                  </td>
+                                  {showSku ? (
+                                    <td className={cn(cell, 'text-xs')}>
+                                      <SkuCode code={node.skuCode} details={node.skuDetails} />
+                                    </td>
+                                  ) : null}
                                   <td className={cell}>{node.hsn || '--'}</td>
                                   <td className={cell}>
                                     <input

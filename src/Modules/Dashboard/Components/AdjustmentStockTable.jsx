@@ -23,6 +23,7 @@ import { TablePager } from '@/Components/Common/TableTools'
 import { Checkbox } from '@/Components/ui/checkbox'
 import { Input } from '@/Components/ui/input'
 import { useListView } from '@/Hooks/useListView'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import { removeQtyProblem } from '@/Modules/Dashboard/inventoryAdjustments'
 import { SkuCode } from '@/Modules/SalesInvoice/Components/RequestQuotation'
@@ -84,6 +85,8 @@ function SelectedRowDetails({ row }) {
 
 export default function AdjustmentStockTable({ rows, picks, onChange, warehouseDetails, errors }) {
   const view = useListView(rows)
+  // SKU Code only for a company that manages SKUs.
+  const showSku = useSkuManagement()
 
   return (
     <div className="animate-in duration-200 fade-in-0 slide-in-from-top-1">
@@ -93,7 +96,7 @@ export default function AdjustmentStockTable({ rows, picks, onChange, warehouseD
             <tr>
               <th className="w-10 px-2 py-2" aria-label="Select" />
               <th className={TH}>Product Name</th>
-              <th className={TH}>SKU Code</th>
+              {showSku ? <th className={TH}>SKU Code</th> : null}
               <th className={TH}>HSN</th>
               <th className={TH}>Per</th>
               <th className={cn(TH, 'text-right')}>Unit Rate</th>
@@ -134,9 +137,11 @@ export default function AdjustmentStockTable({ rows, picks, onChange, warehouseD
                     <td className={cn(TD, 'max-w-56 font-medium [overflow-wrap:anywhere]')}>
                       {firstOfProduct ? orDash(row.name) : <span className="sr-only">{row.name}</span>}
                     </td>
-                    <td className={cn(TD, 'max-w-48')}>
-                      <RowSku code={row.skuCode} details={row.skuDetails} />
-                    </td>
+                    {showSku ? (
+                      <td className={cn(TD, 'max-w-48')}>
+                        <RowSku code={row.skuCode} details={row.skuDetails} />
+                      </td>
+                    ) : null}
                     <td className={TD}>{orDash(row.hsn)}</td>
                     <td className={TD}>{orDash(row.unit)}</td>
                     <td className={cn(TD, 'text-right tabular-nums')}>{orDash(row.unitRate)}</td>
@@ -160,7 +165,7 @@ export default function AdjustmentStockTable({ rows, picks, onChange, warehouseD
                   </tr>
                   {selected ? (
                     <tr className="border-l-2 border-l-brand bg-brand/5">
-                      <td colSpan={COLUMNS} className="p-0">
+                      <td colSpan={showSku ? COLUMNS : COLUMNS - 1} className="p-0">
                         <SelectedRowDetails row={row} />
                       </td>
                     </tr>

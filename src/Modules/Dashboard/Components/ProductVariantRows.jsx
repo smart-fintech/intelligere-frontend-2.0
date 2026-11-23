@@ -55,6 +55,7 @@ import { Eye, Pencil } from 'lucide-react'
 
 import { SkuDetailsTooltip } from '@/Components/Common/SkuDetailsTooltip'
 import { Button } from '@/Components/ui/button'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import { formatDate } from '@/Utils/date'
 import { orDash } from '@/Utils/display'
@@ -69,6 +70,10 @@ const GRID_WITH_ACTIONS =
   'grid min-w-[58rem] grid-cols-[minmax(7rem,1.3fr)_4.75rem_6rem_5.5rem_minmax(8rem,1.6fr)_5.5rem_6.25rem_9.25rem_4.25rem] gap-x-3'
 
 const HEADINGS = ['SKU Code', 'SKU Qty', 'SKU Amount', 'Unit Rate', 'Warehouse', 'Wh. Qty', 'Expiry Date', 'Created At']
+
+/** The same two without SKU Code - a company that does not manage SKUs (useSkuManagement). */
+const GRID_NO_SKU = 'grid min-w-[47rem] grid-cols-[4.75rem_6rem_5.5rem_minmax(8rem,1.6fr)_5.5rem_6.25rem_9.25rem] gap-x-3'
+const GRID_WITH_ACTIONS_NO_SKU = 'grid min-w-[51rem] grid-cols-[4.75rem_6rem_5.5rem_minmax(8rem,1.6fr)_5.5rem_6.25rem_9.25rem_4.25rem] gap-x-3'
 
 /**
  * A SKU as the lines it takes: one per warehouse of each of its entries. An
@@ -131,7 +136,9 @@ function RowActions({ product, variant, detail, name, onViewSku, onEditSku, edit
 
 export default function ProductVariantRows({ product, onViewSku, onEditSku, editDisabled = false }) {
   const withActions = Boolean(onViewSku || onEditSku)
-  const grid = withActions ? GRID_WITH_ACTIONS : GRID
+  const showSku = useSkuManagement()
+  const grid = showSku ? (withActions ? GRID_WITH_ACTIONS : GRID) : withActions ? GRID_WITH_ACTIONS_NO_SKU : GRID_NO_SKU
+  const headings = showSku ? HEADINGS : HEADINGS.filter((heading) => heading !== 'SKU Code')
   const actions = { product, onViewSku, onEditSku, editDisabled }
 
   if (product.variants.length === 0 && !onViewSku) {
@@ -141,7 +148,7 @@ export default function ProductVariantRows({ product, onViewSku, onEditSku, edit
   return (
     <div className="overflow-x-auto px-3 py-2">
       <div className={cn(grid, 'border-b border-border pb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase')}>
-        {HEADINGS.map((heading) => (
+        {headings.map((heading) => (
           <span key={heading}>{heading}</span>
         ))}
         {withActions ? <span className="text-right">Actions</span> : null}
@@ -150,7 +157,7 @@ export default function ProductVariantRows({ product, onViewSku, onEditSku, edit
       {/* No SKU at all: one line across the data columns, its View where every line's is. */}
       {product.variants.length === 0 ? (
         <div className={cn(grid, 'items-center py-1.5 text-xs text-foreground')}>
-          <span className="col-span-8 text-muted-foreground">No SKU or warehouse details for this product.</span>
+          <span className={cn(showSku ? 'col-span-8' : 'col-span-7', 'text-muted-foreground')}>No SKU or warehouse details for this product.</span>
           <RowActions {...actions} variant={null} detail={null} name="" />
         </div>
       ) : null}
@@ -171,20 +178,22 @@ export default function ProductVariantRows({ product, onViewSku, onEditSku, edit
             {firstOfVariant ? (
               <>
                 {/* Its sku_details on hover or focus - see the note at the top. */}
-                <SkuDetailsTooltip details={skuDetailPairs(variant)} side="right" align="start">
-                  <span
-                    tabIndex={0}
-                    className="w-fit max-w-full cursor-help rounded-sm font-medium break-words underline decoration-muted-foreground/50 decoration-dotted underline-offset-2 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  >
-                    {orDash(variant.skuCode)}
-                  </span>
-                </SkuDetailsTooltip>
+                {showSku ? (
+                  <SkuDetailsTooltip details={skuDetailPairs(variant)} side="right" align="start">
+                    <span
+                      tabIndex={0}
+                      className="w-fit max-w-full cursor-help rounded-sm font-medium break-words underline decoration-muted-foreground/50 decoration-dotted underline-offset-2 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    >
+                      {orDash(variant.skuCode)}
+                    </span>
+                  </SkuDetailsTooltip>
+                ) : null}
                 <span>{orDash(variant.totalQty)}</span>
                 <span>{orDash(variant.totalAmount)}</span>
               </>
             ) : (
               // The SKU's three columns, left blank under its first line.
-              <span className="col-span-3" />
+              <span className={showSku ? 'col-span-3' : 'col-span-2'} />
             )}
 
             <span>{firstOfDetail ? orDash(detail?.unitRate) : ''}</span>

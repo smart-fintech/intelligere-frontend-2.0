@@ -9,6 +9,7 @@
  *   entryFromOrderRow(row, ...)   the entry form filled with one - null when its
  *                                 product (or service ledger) is not in the lists
  *   orderReference(rows)          the one Reference No. the checked rows share - or ''
+ *   orderReferenceDate(rows)      the one Reference Date they share, as a date input holds it - or ''
  *
  * A line filled from an order keeps where it came from as its `order`
  * ({ documentNo, documentId, referenceNo, remainQty, key, itemKey }): Add
@@ -23,7 +24,7 @@ import {
   PURCHASE_DOCUMENT_TYPE_INVOICE,
   PURCHASE_DOCUMENT_TYPE_OUTBOUND_ORDER,
 } from '@/Constants/purchaseInvoice'
-import { lineFromSavedProduct } from '@/Modules/SalesInvoice/documentPrefill'
+import { inputDateOf, lineFromSavedProduct } from '@/Modules/SalesInvoice/documentPrefill'
 import { isServiceLine, textOf } from '@/Modules/SalesInvoice/salesInvoiceForm'
 
 /**
@@ -56,8 +57,9 @@ const quantityOf = (value) => {
  * The rows as the table shows them, each with its own `key` - its order, product
  * and SKU (a second identical row in one order gets "#2"), the same however
  * often the list is asked for:
- *   { key, documentNo, documentId, referenceNo, productName, hsn, skuCode,
- *     remainQty, quantity, raw }   raw - the row as sent
+ *   { key, documentNo, documentId, referenceNo, referenceDate, productName,
+ *     hsn, skuCode, remainQty, quantity, raw }   raw - the row as sent
+ *   (referenceDate: reference_date as sent - "18/11/2026")
  */
 export const readOrderRows = (reply) => {
   const seen = new Map()
@@ -72,6 +74,7 @@ export const readOrderRows = (reply) => {
         documentNo: textOf(row.document_no),
         documentId: row.document_id ?? null,
         referenceNo: textOf(row.reference_no),
+        referenceDate: textOf(row.reference_date),
         productName: textOf(row['Product Name']),
         hsn: textOf(row.hsn_sac_code),
         skuCode: textOf(row.sku_code),
@@ -114,4 +117,18 @@ export const orderReference = (rows) => {
   const references = new Set(rows.map((row) => row.referenceNo))
   if (references.size !== 1) return ''
   return [...references][0]
+}
+
+/**
+ * The Reference Date the checked rows share (reference_date - each row of an
+ * order repeats its order's), as a date input holds it ("18/11/2026" ->
+ * "2026-11-18") - '' when none has one, when they differ, or when their
+ * Reference Nos. differ (two orders' dates are not one document's). A row
+ * without a date never empties another's.
+ */
+export const orderReferenceDate = (rows) => {
+  const references = new Set(rows.map((row) => row.referenceNo).filter(Boolean))
+  const dates = new Set(rows.map((row) => row.referenceDate).filter(Boolean))
+  if (references.size > 1 || dates.size !== 1) return ''
+  return inputDateOf([...dates][0])
 }

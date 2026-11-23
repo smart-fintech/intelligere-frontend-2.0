@@ -425,8 +425,17 @@ const HISTORY_COLUMNS = [
     cellClass: 'truncate tabular-nums',
   },
   {
+    key: 'status',
+    width: 150,
+    // Sales Order's own: the server's status for each order, as sent.
+    when: (ctx) => ctx.documentType === SALES_ORDER,
+    head: () => 'Status',
+    cell: (row) => row.status || '--',
+    cellClass: 'truncate',
+  },
+  {
     key: 'total',
-    width: 200,
+    width: 180,
     align: 'right',
     // The amount keeps its own lettering, not the heading's capitals.
     head: (ctx) => (
@@ -601,6 +610,7 @@ export default function DocumentHistory({
 
   /* ---- what the columns' headings and cells read ---- */
   const context = {
+    documentType,
     count: filtered.length,
     total,
     showGstin,
@@ -823,8 +833,8 @@ export default function DocumentHistory({
                             <TableCell colSpan={columns.length} wrap className="overflow-visible! bg-muted/40 p-0 py-0!">
                               {/* The visible width less the table's 1px border on each side. */}
                               <div className="sticky left-0" style={visibleWidth ? { width: visibleWidth - 2 } : undefined}>
-                                <HistoryProductRows products={row.products} documentNo={row.documentNo} />
-                                <HistoryChildDocuments documents={row.children} documentNo={row.documentNo} />
+                                <HistoryProductRows products={row.products} documentNo={row.documentNo} showRemain={documentType === SALES_ORDER} />
+                                <HistoryChildDocuments documents={row.children} documentNo={row.documentNo} onViewPdf={(child) => setPdfView({ row: child, ewayBill: false })} />
                               </div>
                             </TableCell>
                           </TableRow>

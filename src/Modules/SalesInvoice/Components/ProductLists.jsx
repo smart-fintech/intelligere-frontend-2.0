@@ -1,7 +1,7 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 
 import { Button } from '@/Components/ui/button'
-import useMasterDetails from '@/Hooks/useMasterDetails'
+import useMasterDetails, { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import { formatINR } from '@/Modules/Payment/pricing'
 import { isServiceLine, lineVariant, rateText, textOf } from '@/Modules/SalesInvoice/salesInvoiceForm'
@@ -31,6 +31,8 @@ const cell = 'px-2 py-1.5'
  *   errors          the form's errors - a line with any is flagged
  */
 export function AddedProducts({ lines, productsByKey, ledgersById, figures, editingLineId, errors, disabled, onEdit, onRemove, challan = false, reverseCharge = false }) {
+  // A line's SKU code under its name - only for a company that manages SKUs.
+  const showSku = useSkuManagement()
   if (lines.length === 0) {
     return (
       <p className="text-xs text-muted-foreground">
@@ -77,7 +79,7 @@ export function AddedProducts({ lines, productsByKey, ledgersById, figures, edit
                   {service ? (
                     <span className="ml-1.5 rounded-full bg-brand-soft px-1.5 py-0.5 text-[10px] font-medium text-brand">Service</span>
                   ) : null}
-                  {variant?.skuCode ? <span className="block text-xs text-muted-foreground">{variant.skuCode}</span> : null}
+                  {showSku && variant?.skuCode ? <span className="block text-xs text-muted-foreground">{variant.skuCode}</span> : null}
                   {flagged ? <span className="block text-xs text-destructive">Needs attention - Edit to fix</span> : null}
                 </td>
                 <td className={cell}>{textOf(line.hsn) || '--'}</td>

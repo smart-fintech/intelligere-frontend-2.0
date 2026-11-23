@@ -28,6 +28,7 @@ import { Modal } from '@/Components/Common/Modal'
 import { Button } from '@/Components/ui/button'
 import { PRODUCT_MODULES } from '@/Constants/dashboardModules'
 import { PURCHASE_INVOICE_MODULE } from '@/Constants/purchaseInvoice'
+import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import { SkuCode } from '@/Modules/SalesInvoice/Components/RequestQuotation'
 import { gstPercentOf, readQuotationComparison } from '@/Modules/Dashboard/quotationRequests'
@@ -97,6 +98,8 @@ function PastQuotations({ rows }) {
 
 /** One vendor's quotation - its heading with Raise a PO, then its lines. */
 function VendorComparison({ vendor, onRaisePo }) {
+  // SKU Code only for a company that manages SKUs.
+  const showSku = useSkuManagement()
   const [openPast, setOpenPast] = useState(() => new Set())
   const togglePast = (key) =>
     setOpenPast((current) => {
@@ -106,7 +109,7 @@ function VendorComparison({ vendor, onRaisePo }) {
       return next
     })
   const showPast = vendor.products.some((row) => row.past.length > 0)
-  const columns = 14 + (showPast ? 1 : 0)
+  const columns = (showSku ? 14 : 13) + (showPast ? 1 : 0)
 
   return (
     <section className="animate-in space-y-2 rounded-lg border border-border bg-card p-3 shadow-xs duration-300 fade-in-0 slide-in-from-bottom-2" aria-label={vendor.name}>
@@ -132,7 +135,9 @@ function VendorComparison({ vendor, onRaisePo }) {
           <table className="w-full min-w-[72rem] text-sm">
             <thead className="bg-muted/50">
               <tr>
-                {['Sr', 'Description / Specs', 'SKU Code', 'Delivery Time', 'HSN', 'Per', 'Qty', 'MOQ', 'Unit Rate', 'Disc %', 'GST %', 'Total', 'Quotation No.', 'Quotation Date'].map((head) => (
+                {['Sr', 'Description / Specs', 'SKU Code', 'Delivery Time', 'HSN', 'Per', 'Qty', 'MOQ', 'Unit Rate', 'Disc %', 'GST %', 'Total', 'Quotation No.', 'Quotation Date']
+                  .filter((head) => showSku || head !== 'SKU Code')
+                  .map((head) => (
                   <th key={head} className={cn(HEAD, ['Qty', 'MOQ', 'Unit Rate', 'Disc %', 'GST %', 'Total'].includes(head) ? 'text-right' : 'text-left')}>
                     {head}
                   </th>
@@ -150,9 +155,11 @@ function VendorComparison({ vendor, onRaisePo }) {
                       <td className={CELL}>
                         <Description row={row} />
                       </td>
-                      <td className={CELL}>
-                        <SkuCode code={row.sku_code} details={row.sku_details} />
-                      </td>
+                      {showSku ? (
+                        <td className={CELL}>
+                          <SkuCode code={row.sku_code} details={row.sku_details} />
+                        </td>
+                      ) : null}
                       <td className={CELL}>{orDash(vendor.master.delivery_time)}</td>
                       <td className={CELL}>{orDash(row.Hsn_code)}</td>
                       <td className={CELL}>{orDash(row.Per)}</td>
