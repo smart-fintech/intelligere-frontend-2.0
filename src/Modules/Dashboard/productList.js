@@ -40,6 +40,7 @@
  *   readProducts(rows, warehouseNames)   the rows, under the names the screens use
  *   productFilterOptions(products)       what each filter can offer
  *   filterProducts(products, filters)    the products the filters leave
+ *   narrowToWarehouses(products, labels) what they hold in some warehouses only
  *   isProductCategory(product, category) whether a product is of a category
  *   hasMaterialReferences(product)       whether its category has raw and
  *                                        semi-finished references at all
@@ -643,7 +644,9 @@ export const variantWarehouses = (variant) => variant.details.flatMap((detail) =
  * works in. A field is one of:
  *
  *   PRODUCT_FILTER.SKU_CODE      a SKU's code
- *   PRODUCT_FILTER.WAREHOUSE     a warehouse, by its label
+ *   PRODUCT_FILTER.WAREHOUSE     warehouses, by label - a list: stock in any
+ *                                of them (narrowToWarehouses then narrows the
+ *                                rows themselves to them)
  *   PRODUCT_FILTER.EXPIRY_FROM   } an expiry date range, YYYY-MM-DD - either
  *   PRODUCT_FILTER.EXPIRY_TO     } end may be left open
  *   skuAttributeFilter(name)     one of the company's SKU fields - "Color",
@@ -683,13 +686,20 @@ export const isWithinDates = (value, from, to) => {
   return (!from || date >= from) && (!to || date <= to)
 }
 
+/** A filter's value as a list - the Warehouse filter can hold several, every other one a single value. */
+const asList = (value) => (Array.isArray(value) ? value : [value])
+
 /** Whether one SKU passes every filter that is set - `range` is the expiry range, or null. */
 const variantMatches = (variant, filters, range) => {
   if (range && !variant.details.some((detail) => isWithinDates(detail.expiryDate, range.from, range.to))) return false
 
   return Object.entries(filters).every(([field, value]) => {
     if (field === PRODUCT_FILTER.SKU_CODE) return variant.skuCode === value
-    if (field === PRODUCT_FILTER.WAREHOUSE) return variantWarehouses(variant).some((warehouse) => warehouse.label === value)
+    // Several warehouses: stock in ANY of them.
+    if (field === PRODUCT_FILTER.WAREHOUSE) {
+      const wanted = asList(value)
+      return variantWarehouses(variant).some((warehouse) => wanted.includes(warehouse.label))
+    }
 
     if (field.startsWith(ATTRIBUTE_PREFIX)) {
       const name = field.slice(ATTRIBUTE_PREFIX.length)
@@ -708,11 +718,77 @@ const variantMatches = (variant, filters, range) => {
 export const filterProducts = (products, filters) => {
   const { [PRODUCT_FILTER.EXPIRY_FROM]: from = '', [PRODUCT_FILTER.EXPIRY_TO]: to = '', ...rest } = filters ?? {}
 
-  const active = Object.fromEntries(Object.entries(rest).filter(([, value]) => value))
+  // An empty list of warehouses is no filter, the same as an empty value.
+  const active = Object.fromEntries(Object.entries(rest).filter(([, value]) => (Array.isArray(value) ? value.length > 0 : value)))
   const range = from || to ? { from, to } : null
   if (Object.keys(active).length === 0 && !range) return products
 
   return products.filter((product) => product.variants.some((variant) => variantMatches(variant, active, range)))
+}
+
+/** A sum as the reply writes one: text, no float noise ("0.30000000000000004" -> "0.3"). */
+const sumText = (numbers) => tidy(numbers.reduce((total, number) => total + number, 0))
+
+/**
+ * THE PRODUCTS AS THEY STAND IN SOME WAREHOUSES - for the Warehouse filter,
+ * which narrows what a product row and its opened row show, not just which
+ * rows there are. `labels` are the chosen warehouses (by label); none, and
+ * the products are handed back as they are.
+ *
+ * Narrowed at every level, each a new object (the products, and the reply
+ * they were read from, are never changed):
+ *
+ *   a warehouse line     kept only when it is one of the chosen
+ *   an entry             kept only with a chosen line left - its rate, expiry
+ *                        date, Created At and `source` (what Edit and View
+ *                        open: the WHOLE record) stay as they are
+ *   a SKU                kept only with an entry left
+ *
+ * and the figures worked out again from what is left, the way the backend
+ * works them out for all of a product's stock:
+ *
+ *   SKU totalQty         its lines' warehouse quantities
+ *   SKU totalAmount      each line's quantity x its entry's Unit Rate
+ *   product quantity, totalAmount   its SKUs' together
+ *
+ * A quantity or rate that is not a number counts as 0, as it does in the
+ * backend's totals.
+ */
+export const narrowToWarehouses = (products, labels) => {
+  if (!labels || labels.length === 0) return products
+  const wanted = new Set(labels)
+
+  return products.map((product) => {
+    const variants = product.variants
+      .map((variant) => {
+        const details = variant.details
+          .map((detail) => {
+            const warehouses = detail.warehouses.filter((warehouse) => wanted.has(warehouse.label))
+            return warehouses.length > 0 ? { ...detail, warehouses } : null
+          })
+          .filter(Boolean)
+        if (details.length === 0) return null
+
+        const lines = details.flatMap((detail) =>
+          detail.warehouses.map((warehouse) => ({ quantity: numberOf(warehouse.quantity) ?? 0, rate: numberOf(detail.unitRate) ?? 0 })),
+        )
+
+        return {
+          ...variant,
+          details,
+          totalQty: sumText(lines.map((line) => line.quantity)),
+          totalAmount: sumText(lines.map((line) => line.quantity * line.rate)),
+        }
+      })
+      .filter(Boolean)
+
+    return {
+      ...product,
+      variants,
+      quantity: sumText(variants.map((variant) => Number(variant.totalQty))),
+      totalAmount: sumText(variants.map((variant) => Number(variant.totalAmount))),
+    }
+  })
 }
 
 /**

@@ -334,21 +334,8 @@ export const buildLedgerGroupCreateMessage = ({ companyName, name, under }) => (
 
 const LEDGER_CSV_IMPORT_URL = 'tally/LedgerCSVImportTally/'
 
-/**
- * The blank CSV the user fills in, kept with the app's other static files in
- * Assets/format - the folder every format template goes in (a product or
- * vendor one later sits beside it and is imported the same way).
- *
- * `?raw` is Vite's "give me the contents, not a link". The alternative,
- * `?url`, gives a built file named LedgerFormat-a1b2c3.csv - and since a
- * browser saves a download under the name in the URL, that hash would end up
- * in the file on the user's disk. The contents come through the bundle
- * instead, and Download Format writes them out under the name below (see
- * downloadTextFile in Utils/fileDownload). The file is one line, so this
- * costs the bundle nothing worth measuring.
- */
-export const LEDGER_CSV_FORMAT_FILE = 'LedgerFormat.csv'
-export { default as LEDGER_CSV_FORMAT_CONTENT } from '@/Assets/format/LedgerFormat.csv?raw'
+/* The blank format is built by the backend per company and ERP - see
+   getImportFormat in Services/Global/csvService. */
 
 /**
  * Sends the filled-in CSV up.

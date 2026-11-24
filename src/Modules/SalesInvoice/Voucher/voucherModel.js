@@ -220,6 +220,8 @@ const readCharges = (other) => {
  *                                  ({ "<ledger>": 13.5 }, earlier documents - slab null)
  *   uploadType                     upload_type as sent ("pdf" for a PDF-uploaded voucher - the
  *                                  only kind that can be edited and saved)
+ *   productType                    the document's own product_type as sent ("Product", "Service",
+ *                                  "Product-Service" - '' for none); see isServiceVoucher
  *   note                           other_details.note
  *   narration                      the voucher's narration when it has one, else its note -
  *                                  what the Narration box starts with
@@ -253,10 +255,19 @@ export const readVoucher = (row) => {
     gstLedgers: readGstCharges(row.gst_charges),
     note: textOf(other.note),
     uploadType: textOf(row.upload_type),
+    productType: textOf(row.product_type),
     narration: textOf(row.narration ?? other.note),
     source: row,
   }
 }
+
+/**
+ * A SERVICE voucher - its own product_type is "Service" (case aside). It has
+ * no Document Date / Sales (Purchase) Ledger / Taxable Amount row on the card
+ * (VoucherCard), and its account ledger is never asked for (resolveVoucher).
+ * Any other product_type keeps both.
+ */
+export const isServiceVoucher = (voucher) => sameText(voucher?.productType, SERVICE_PRODUCT_TYPE)
 
 /* ------------------------------------------------------------------ */
 /* Mapping                                                            */
@@ -584,7 +595,8 @@ export const resolveVoucher = (sourceVoucher, choices, { ledgers, products, acco
   const problems = []
   if (!voucherType) problems.push(voucherTypes && voucherTypes.length === 0 ? 'Tally has no voucher types.' : 'Select the voucher type.')
   if (voucher.id === null || voucher.id === undefined || textOf(voucher.id) === '') problems.push('The voucher has no document_id.')
-  if (voucher.products.length > 0 && !isResolved(account.status)) problems.push(`Select the ${accountLabel} ledger.`)
+  // A service voucher (isServiceVoucher) is sent without one.
+  if (voucher.products.length > 0 && !isServiceVoucher(voucher) && !isResolved(account.status)) problems.push(`Select the ${accountLabel} ledger.`)
   if (!isResolved(party.status)) problems.push(voucher.party.name ? `Ledger "${voucher.party.name}" is not in the ledger list - select the party ledger.` : 'Select the party ledger.')
   if (mode === INVOICE_MODE.ITEM) {
     productRows.forEach((slot) => {

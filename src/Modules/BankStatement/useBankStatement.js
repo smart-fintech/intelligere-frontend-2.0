@@ -168,11 +168,13 @@ export default function useBankStatement({ company, companyId, banks, isTally, i
     setLoadingPage(true)
     try {
       const page = await getStatementPage({ companyId, lastIndex })
-      const fresh = page.rows.filter((row) => row.is_verified !== true && row.is_verified !== 'true')
       setEntryId(page.entryId)
       setTotal(page.count)
       setNextIndex(lastIndex + page.rows.length)
-      setEntries(applyMappings(fresh, withMappings, bankLedgers))
+      // Every row of the page is shown, as the reply has it - rows already
+      // marked is_verified are not dropped (that left an Intelligere statement
+      // whose rows were all verified with nothing on screen).
+      setEntries(applyMappings(page.rows, withMappings, bankLedgers))
       if (page.rows.length === 0) await loadSummary(page.entryId)
     } catch (error) {
       toast.error(error.message)

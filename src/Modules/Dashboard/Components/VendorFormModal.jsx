@@ -319,11 +319,16 @@ export default function VendorFormModal({
    * that is saved - and the dropdown's value is worked out from it here, so
    * the two can never disagree. (The same arrangement as the Bank Form.)
    *
-   * A vendor saved against a ledger that is not in the list any more matches
-   * nothing; its name is then shown as the dropdown's placeholder rather
-   * than silently disappearing.
+   * The saved name is matched exactly first, then regardless of case and
+   * surrounding spaces ("samsung electronics " is the ledger "Samsung
+   * Electronics"), so an edit opens on the vendor's ledger. One saved
+   * against a ledger that is not in the list any more matches nothing; its
+   * name is then shown as the dropdown's placeholder rather than silently
+   * disappearing. Either way it is picked again like any other.
    */
-  const selectedLedger = ledgers.find((ledger) => ledger.ledger_name === form.ledger_name)
+  const selectedLedger =
+    ledgers.find((ledger) => ledger.ledger_name === form.ledger_name) ??
+    (form.ledger_name ? ledgers.find((ledger) => sameName(textOf(ledger.ledger_name), form.ledger_name)) : undefined)
 
   // Built once per ledger list, not on every keystroke in the form.
   const ledgerOptions = useMemo(
@@ -346,7 +351,7 @@ export default function VendorFormModal({
   const loadingLedgers = ledgersStatus === 'loading' || ledgersStatus === 'idle'
   const ledgerPlaceholder = loadingLedgers
     ? 'Loading...'
-    : form.ledger_name || (ledgers.length === 0 ? 'No ledgers found' : 'Select Ledger')
+    : form.ledger_name || (ledgers.length === 0 ? 'No ledgers found' : 'Search Vendor...')
 
   /* ---------------------------------------------------------------- */
   /* Country -> State -> City                                         */
@@ -780,12 +785,14 @@ export default function VendorFormModal({
             label="Vendor Name"
             required
             icon={Building2}
+            // The saved name while it matches no ledger - see "Ledger Name"
+            // above. (A second `placeholder` here used to override this one,
+            // so such a vendor opened on an empty-looking box.)
             placeholder={ledgerPlaceholder}
             value={selectedLedger ? String(getLedgerId(selectedLedger)) : ''}
             error={errors.ledger_name}
             disabled={submitting || loadingLedgers || ledgers.length === 0}
             searchable
-            placeholder="Search Vendor..."
             searchPlaceholder="Search Vendor..."
             onValueChange={selectLedger}
             options={ledgerOptions}

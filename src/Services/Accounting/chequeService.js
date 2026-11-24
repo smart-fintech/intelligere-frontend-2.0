@@ -41,7 +41,7 @@ const IMAGE_FOLDER = 'media/processed_cheques/'
 
 // Named so axios sends the FormData as it is - see Services/Company/bankService.
 
-/** The CSV to fill in for many cheques - see LEDGER_CSV_FORMAT_FILE on why it is `?raw`. */
+/** The CSV to fill in for many cheques - see Assets/Read.txt on why it is `?raw`. */
 export const CHEQUE_CSV_FORMAT_FILE = 'Cheque_format.csv'
 export { default as CHEQUE_CSV_FORMAT_CONTENT } from '@/Assets/format/Cheque_format.csv?raw'
 

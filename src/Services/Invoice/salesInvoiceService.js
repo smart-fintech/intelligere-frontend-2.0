@@ -209,6 +209,10 @@ export const buildBusinessDocumentPayload = (request) => {
   const challan = rules.goodsOnly ?? request.documentType === DOCUMENT_TYPE_CHALLAN
   const namesInvoice = rules.invoiceRef ?? DOCUMENT_TYPES_WITH_INVOICE_REF.includes(request.documentType)
   const hasChallanType = rules.challanType ?? challan
+  // A goods-only type whose lines are still saved priced (Inbound Challan - its profile's
+  // pricedLines): each line as a Purchase Invoice's - Selling Rate, discount, product_amount and
+  // its GST - from the values the line holds; its totals, other_details and gst_charges stay a challan's.
+  const pricedLines = challan && Boolean(rules.pricedLines)
 
   const masterDetails = {
     document_no: request.invoiceNo,
@@ -259,7 +263,7 @@ export const buildBusinessDocumentPayload = (request) => {
   // (its rates null), its tax amounts are the 0 worked out (invoiceFigures).
   const noSlab = Boolean(figures.lut)
   const productData = request.lines.map((line) => {
-    if (challan) {
+    if (challan && !pricedLines) {
       return {
         'Product Name': line.productName,
         Description: text(line.description),
@@ -283,7 +287,9 @@ export const buildBusinessDocumentPayload = (request) => {
       // The amount tax is charged on - Quantity x Rate, less the line's discount.
       product_amount: rupees(line.figures.taxablePaise).toFixed(2),
     }
-    const taxes = taxFields(line.figures, interState, (rate) => rateString(!noSlab, rate))
+    // A priced challan line whose product has no GST slab sends none (rates null), never a made-up 0.
+    const slabless = pricedLines && !text(line.gstRate)
+    const taxes = taxFields(line.figures, interState, (rate) => rateString(!noSlab && !slabless, rate))
     if (line.service) return { ...common, ...taxes, 'Selling Rate': text(line.rate), ...orderFields(line), ...savedLine(line) }
     return {
       ...common,
@@ -742,7 +748,7 @@ export const getUniqueProducts = async ({ companyId, ledgerId, documentType }) =
  *   lineVariantOf(product, line)   the SKU a line chose
  *   partyLedgerId            the ledger saved as buyer_id - the buyer's on a
  *                            sale (the default), the supplier's on a purchase
- *   rules                    { goodsOnly, invoiceRef, challanType } - from the
+ *   rules                    { goodsOnly, pricedLines, invoiceRef, challanType } - from the
  *                            type's profile (buildBusinessDocumentPayload)
  *   chargeLedgerSac          each Other Charges row carries its own ledger's
  *                            SAC (`ledgerSac`, saved as ledger_sac) - Sales Invoice

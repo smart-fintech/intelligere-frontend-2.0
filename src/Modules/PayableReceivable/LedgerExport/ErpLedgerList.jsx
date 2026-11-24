@@ -11,6 +11,7 @@ import { QUERY } from '@/Constants/queryKeys'
 import { useListView } from '@/Hooks/useListView'
 import { useQuery } from '@/Library/queryCache'
 import { toast } from '@/Library/toast'
+import { cn } from '@/Library/utils'
 import { BankEntryModal, EditEntryModal } from '@/Modules/PayableReceivable/LedgerExport/ErpEntryModals'
 import {
   ENTRY_PAGER,
@@ -22,6 +23,7 @@ import {
   financialYearOptions,
   isFixedRow,
   isBalanceRow,
+  isCancelledRow,
   isOpeningDeleteType,
   readErpLedgers,
   rowDetails,
@@ -59,6 +61,10 @@ const NO_FILTERS = Object.freeze({ ledger: '', search: '', from: '', to: '' })
 const YEAR_OPTIONS = financialYearOptions()
 const COLUMN_COUNT = 9
 const UTF8_MARK = String.fromCharCode(0xfeff)
+// A cancelled transaction's whole row: a soft red, the text as it is. On the cells and
+// opaque, as DataTable's own row tints are, so the pinned Actions cell is tinted too.
+const CANCELLED_ROW =
+  '[&>td]:bg-[#FCE8E8]! [&:hover>td]:bg-[#F9DCDC]! dark:[&>td]:bg-[#3a1d1f]! dark:[&:hover>td]:bg-[#4a2427]!'
 
 const toAmount = (value) => formatAmount(Number(value) || 0)
 
@@ -154,7 +160,7 @@ function LedgerRows({ ledgerName, rows, showDetails, onEdit, onDelete, deleting 
           const details = showDetails ? rowDetails(row) : null
           return (
             <Fragment key={index}>
-              <TableRow>
+              <TableRow className={cn(isCancelledRow(row) && CANCELLED_ROW)}>
                 <TableCell>{row.date}</TableCell>
                 <TableCell title={String(row.voucher_no ?? '')}>{row.voucher_no}</TableCell>
                 <TableCell title={String(row.vouchertype ?? '')}>{row.vouchertype ?? ''}</TableCell>

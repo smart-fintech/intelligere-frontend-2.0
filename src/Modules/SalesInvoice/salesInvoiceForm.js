@@ -51,6 +51,7 @@ import {
 import { percentOf, toPaise } from '@/Modules/Payment/pricing'
 import { savedValue } from '@/Modules/Dashboard/productList'
 import { getLedgerSac } from '@/Services/Ledger/ledgerService'
+import { isValidGstNumber } from '@/Services/Gst/gstService'
 import { fileUrlOf } from '@/Services/Global/apiHelpers'
 import { DEFAULT_COUNTRY } from '@/Services/Global/locationService'
 import { toInputDate } from '@/Utils/date'
@@ -1254,11 +1255,34 @@ const checkPortalRequirements = (found, form) => {
   })
 }
 
+/**
+ * The parties whose GSTIN E-Invoice needs - only while its box is ticked, on
+ * a type that has it (settingsOf): the seller's and the buyer's, an export's
+ * (buyer outside India, or Supply Type Export) seller's alone, as e-invoice
+ * generation allows. Unticked, none: E-Way Bill's GSTINs are its own
+ * (PORTAL_RULES). -> [] | ['seller'] | ['seller', 'buyer']
+ */
+export const eInvoiceGstinParties = (form) => {
+  if (isChallan(form) || !settingsOf(form).eInvoice) return []
+  // What this type has (applicableForm) - a Supply Type it does not show is its default, never Export.
+  const { buyer, document } = applicableForm(form)
+  return isForeignBuyer(buyer) || document.supplyType === SUPPLY_TYPE_EXPORT ? ['seller'] : ['seller', 'buyer']
+}
+
+/** One party's GSTIN, when E-Invoice needs it: there, and a valid 15-character GSTIN. */
+const checkEInvoiceGstin = (found, form, party) => {
+  if (!eInvoiceGstinParties(form).includes(party)) return
+  const gstin = textOf(form[party].gstin)
+  if (!gstin) found[`${party}.gstin`] = 'Required for e-invoice'
+  else if (!isValidGstNumber(gstin)) found[`${party}.gstin`] = 'Enter a valid 15-character GSTIN'
+}
+
 const validateSellerStep = (form, found) => {
   const { seller } = form
   if (!textOf(seller.name)) found['seller.name'] = 'Seller name is required'
   if (!textOf(seller.state)) found['seller.state'] = 'Select the seller state'
   checkContact(found, 'seller', seller)
+  checkEInvoiceGstin(found, form, 'seller')
   if (textOf(seller.pincode) && !isValidPincode(seller.pincode)) found['seller.pincode'] = 'Enter a valid 6-digit pincode'
   if (textOf(seller.pan) && !isValidPan(seller.pan)) found['seller.pan'] = 'Enter a valid 10-character PAN'
 
@@ -1273,6 +1297,7 @@ const validateBuyerStep = (form, found) => {
   if (!textOf(buyer.country)) found['buyer.country'] = 'Select the country'
   if (!foreign && !textOf(buyer.state)) found['buyer.state'] = 'Select the buyer state'
   checkContact(found, 'buyer', buyer)
+  checkEInvoiceGstin(found, form, 'buyer')
   if (!foreign && textOf(buyer.pincode) && !isValidPincode(buyer.pincode)) found['buyer.pincode'] = 'Enter a valid 6-digit pincode'
 
   if (!form.shippingSameAsBuyer) checkAddressCard(found, 'shipping', form.shipping, { indian: !foreign })

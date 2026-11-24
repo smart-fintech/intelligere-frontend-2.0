@@ -49,6 +49,10 @@ function Tick({ checked }) {
  *
  * `placeholder` is what an empty box says - the caller also uses it to say
  * the list is loading or empty (`disabled` then).
+ *
+ * `compact`: the toolbar's 32px box (a filter row's - see TableFilters), one
+ * line that never grows: the choice's name, or the first one's and "+2" for
+ * the rest, with all of them on hover. With no `label`, `ariaLabel` names it.
  */
 export function MultiSelectField({
   id,
@@ -62,6 +66,8 @@ export function MultiSelectField({
   placeholder = 'Select',
   searchPlaceholder = 'Search',
   className,
+  compact = false,
+  ariaLabel,
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -155,6 +161,8 @@ export function MultiSelectField({
             role="combobox"
             tabIndex={disabled ? -1 : 0}
             aria-labelledby={label ? labelId : undefined}
+            aria-label={label ? undefined : ariaLabel}
+            title={compact && value.length > 0 ? value.map((option) => labels.get(option) ?? option).join(', ') : undefined}
             aria-haspopup="listbox"
             aria-expanded={open}
             aria-controls={open ? listId : undefined}
@@ -165,7 +173,8 @@ export function MultiSelectField({
             onClick={() => show(!open)}
             onKeyDown={onBoxKey}
             className={cn(
-              'flex min-h-10 w-full cursor-pointer items-center gap-2 rounded-md border border-input bg-card py-1.5 pr-2 pl-2 text-sm shadow-xs transition-[color,box-shadow] outline-none',
+              'flex w-full cursor-pointer items-center gap-2 rounded-md border border-input bg-card pr-2 pl-2 text-sm shadow-xs transition-[color,box-shadow] outline-none',
+              compact ? 'h-8 pl-3' : 'min-h-10 py-1.5',
               'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30',
               'aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40',
               open && 'border-ring ring-[3px] ring-ring/50',
@@ -173,7 +182,16 @@ export function MultiSelectField({
             )}
           >
             {value.length === 0 ? (
-              <span className="flex-1 truncate px-1 text-muted-foreground">{placeholder}</span>
+              // Compact, it reads as the filter row's "All ..." choice, not a hint.
+              <span className={cn('flex-1 truncate', compact ? 'text-foreground' : 'px-1 text-muted-foreground')}>{placeholder}</span>
+            ) : compact ? (
+              // One line: the first choice, and how many more.
+              <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                <span className="truncate">{labels.get(value[0]) ?? value[0]}</span>
+                {value.length > 1 ? (
+                  <span className="shrink-0 rounded-sm bg-brand-soft px-1.5 text-xs font-medium text-brand">+{value.length - 1}</span>
+                ) : null}
+              </span>
             ) : (
               // Wraps; past three rows it scrolls rather than stretching the form.
               <div className="flex max-h-[5.25rem] flex-1 flex-wrap gap-1 overflow-y-auto">

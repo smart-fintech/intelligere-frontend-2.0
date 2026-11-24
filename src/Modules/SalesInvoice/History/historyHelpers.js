@@ -316,6 +316,8 @@ export const readHistoryRow = (row) => {
     products: readHistoryProducts(row.product_data),
     children: readChildDocuments(row.child_documents),
     fromTally: row.past_tally_invoice === true || text(row.past_tally_invoice).toLowerCase() === 'true',
+    // How it came in - "intelligere", "tally", "pdf" (AI), ... as sent, lower case: what the Source filter reads.
+    uploadType: text(row.upload_type).toLowerCase(),
     deleted: row.x_deleted === true || text(row.x_deleted).toLowerCase() === 'true',
     pdfUrl: fileUrlOf(row.doc_pdf ?? row.doc_PDF),
     ewayBillPdfUrl: fileUrlOf(row.e_way_bill_pdf),
@@ -340,8 +342,15 @@ export const uniqueHistoryRows = (rows) => {
 /* Filters                                                            */
 /* ------------------------------------------------------------------ */
 
-/** The Source filter's choices - Tally or Intelligere by past_tally_invoice (readHistoryRow). */
-export const HISTORY_SOURCE = Object.freeze({ TALLY: 'tally', INTELLIGERE: 'intelligere' })
+/** The Source filter's choices - each by the document's upload_type (HISTORY_SOURCE_UPLOAD_TYPE). */
+export const HISTORY_SOURCE = Object.freeze({ TALLY: 'tally', INTELLIGERE: 'intelligere', AI: 'ai' })
+
+/** The upload_type each source lets through - an AI Invoice is one read from an uploaded PDF. */
+const HISTORY_SOURCE_UPLOAD_TYPE = Object.freeze({
+  [HISTORY_SOURCE.TALLY]: 'tally',
+  [HISTORY_SOURCE.INTELLIGERE]: 'intelligere',
+  [HISTORY_SOURCE.AI]: 'pdf',
+})
 
 /** No filter set. */
 export const EMPTY_HISTORY_FILTERS = Object.freeze({ from: '', to: '', party: '', source: '', minAmount: '', maxAmount: '' })
@@ -371,7 +380,8 @@ export const amountRangeError = ({ minAmount, maxAmount }) => {
  *
  *   from, to          document_date on or after / on or before (YYYY-MM-DD)
  *   party             the buyer / seller (historyPartyOptions' value)
- *   source            HISTORY_SOURCE.TALLY or .INTELLIGERE
+ *   source            HISTORY_SOURCE.TALLY / .INTELLIGERE / .AI - upload_type
+ *                     "tally" / "intelligere" / "pdf"
  *   minAmount, maxAmount   total_amount at or above / at or below - not
  *                     applied while the range is the wrong way round
  */
@@ -385,8 +395,7 @@ export const filterHistoryRows = (rows, filters) => {
     if (from && row.documentDay < from) return false
     if (to && row.documentDay > to) return false
     if (party && party !== (row.partyId || `name:${row.buyerName}`)) return false
-    if (source === HISTORY_SOURCE.TALLY && !row.fromTally) return false
-    if (source === HISTORY_SOURCE.INTELLIGERE && row.fromTally) return false
+    if (source && HISTORY_SOURCE_UPLOAD_TYPE[source] && row.uploadType !== HISTORY_SOURCE_UPLOAD_TYPE[source]) return false
     if ((min !== null || max !== null) && row.totalPaise === null) return false
     if (min !== null && row.totalPaise < min) return false
     if (max !== null && row.totalPaise > max) return false

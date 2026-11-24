@@ -165,6 +165,27 @@ function SelectContent({
     if (!forList.includes(event.key)) event.stopPropagation()
   }
 
+  /* Typing while the LIST has the focus - as it does the moment it opens,
+     Radix putting it on the chosen option (or the list itself) - goes into
+     the search box, not to Radix's type-ahead, which would only jump between
+     options: otherwise opening a dropdown and typing a name did nothing
+     until the box was clicked. A character key is taken here (preventDefault
+     keeps it from Radix, which runs after this), written into the search and
+     the cursor moved there; from then on the box has the keys itself. A
+     space is left alone while nothing has been typed - on an option it is
+     Radix's "choose this one". */
+  const typeIntoSearch = (event) => {
+    props.onKeyDown?.(event)
+    const input = searchInputRef.current
+    if (!searchable || !onSearchChange || !input || event.defaultPrevented || event.target === input) return
+    if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) return
+    if (event.key === " " && !searchValue) return
+
+    event.preventDefault()
+    input.focus()
+    onSearchChange(searchValue + event.key)
+  }
+
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
@@ -190,6 +211,7 @@ function SelectContent({
         position={position}
         align={align}
         {...props}
+        onKeyDown={typeIntoSearch}
       >
         {/* No key handling on the wrapper below: it would catch what the
             input deliberately lets through on its way up to the list. */}

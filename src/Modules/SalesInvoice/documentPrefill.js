@@ -19,7 +19,9 @@
  *   ship_to / dispatch_from    Shipping To / Dispatched From, as saved - "Same
  *                              as ..." when the saved address IS its party's
  *                              (name, GSTIN, state, address, pincode); one
- *                              not saved leaves the form's own default. The
+ *                              not saved (null, {}, empty fields) is never
+ *                              "Same as ..." on Edit, and leaves the form's own
+ *                              default elsewhere (sameAsWhenUnsaved). The
  *                              sameAsBuyer / sameAsSeller flags are not read
  *                              (the backend only ever sent its default, true)
  *   invoice_master_details     the Document Details (and rcm -> Reverse Charge),
@@ -150,15 +152,22 @@ const ledgerEntryOf = (section) => {
 
 const ADDRESS_FIELDS = ['name', 'gstin', 'state', 'address', 'pincode']
 
-/** A ship_to / dispatch_from as a card holds it. */
+/** A saved address field as text - '' for nothing saved, and for "null" / "None" / "undefined" sent as text. */
+const savedText = (value) => {
+  const raw = textOf(value)
+  return ['null', 'none', 'undefined'].includes(raw.toLowerCase()) ? '' : raw
+}
+
+/** A ship_to / dispatch_from as a card holds it - a pincode of 0 is none. */
 const cardOf = (saved) => {
   const value = objectOf(saved)
+  const pincode = savedText(value.pincode)
   return {
-    name: textOf(value.name),
-    gstin: textOf(value.gstin).toUpperCase(),
-    state: textOf(value.state ?? value.statename),
-    address: textOf(value.address),
-    pincode: numberText(value.pincode),
+    name: savedText(value.name),
+    gstin: savedText(value.gstin).toUpperCase(),
+    state: savedText(value.state) || savedText(value.statename),
+    address: savedText(value.address),
+    pincode: Number(pincode) === 0 ? '' : pincode,
   }
 }
 
@@ -184,8 +193,12 @@ const isPartysOwn = (card, party) => ADDRESS_FIELDS.every((field) => comparable(
  * @param products   the product list (readProducts)
  * @param banks      the bank records
  * @param countries  { countryNames, stateNamesOf } - for the ledger party's country / state
+ * @param sameAsWhenUnsaved  "Same as ..." for a ship_to / dispatch_from with nothing
+ *                   saved in it (null, {}, empty fields): Edit's false - never ticked
+ *                   for an address the document does not have; not given (Prefill
+ *                   From, the History PDF), the form's own default
  */
-export const formFromSavedDocument = (record, { createForm, company, parties, ledgers, products, banks, countries }) => {
+export const formFromSavedDocument = (record, { createForm, company, parties, ledgers, products, banks, countries, sameAsWhenUnsaved = null }) => {
   const base = createForm(company)
   const master = objectOf(record.invoice_master_details)
   const ledgerIdByName = (name) => ledgers.named.find((ledger) => sameText(ledger.name, name))?.id ?? ''
@@ -201,9 +214,10 @@ export const formFromSavedDocument = (record, { createForm, company, parties, le
   const shipping = cardOf(record.ship_to)
   const dispatch = cardOf(record.dispatch_from)
   // From what was saved: an address saved is shown - as "Same as ..." when it is that party's own;
-  // none saved leaves the form's default.
-  const shippingSameAsBuyer = hasAddress(shipping) ? isPartysOwn(shipping, buyer) : base.shippingSameAsBuyer
-  const dispatchSameAsSeller = hasAddress(dispatch) ? isPartysOwn(dispatch, seller) : base.dispatchSameAsSeller
+  // none saved: sameAsWhenUnsaved when given (Edit), else the form's default.
+  const unsaved = (fallback) => (sameAsWhenUnsaved === null ? fallback : sameAsWhenUnsaved)
+  const shippingSameAsBuyer = hasAddress(shipping) ? isPartysOwn(shipping, buyer) : unsaved(base.shippingSameAsBuyer)
+  const dispatchSameAsSeller = hasAddress(dispatch) ? isPartysOwn(dispatch, seller) : unsaved(base.dispatchSameAsSeller)
 
   /* ---- Document Details ---- */
   const parts = [master.document_no_f, master.document_no_s, master.document_no_t].map(numberText)

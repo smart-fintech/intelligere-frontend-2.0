@@ -88,6 +88,8 @@ const readReportRow = (row, index) => ({
   invoiceNo: row['Invoice No.'] ?? '',
   particulars: row.Particulars ?? '',
   voucherType: row['Voucher Type'] ?? row.vouchertype ?? '',
+  // Tally's export sends "Narration"; blank when it sends none.
+  narration: row.Narration ?? row.narration ?? '',
   type: row.type ?? '',
   amount: toNumber(row.amount),
   // The opening row's amount may be '' - nothing to show, not a 0.
@@ -216,6 +218,9 @@ export const isFixedRow = (row) => FIXED_VOUCHER_TYPES.includes(row.vouchertype)
 
 /** The opening or closing row - given Edit and Delete as the old screen did. */
 export const isBalanceRow = (row) => BALANCE_ROWS.includes(row.particular)
+
+/** A cancelled transaction: the backend's narration is exactly "Cancelled". */
+export const isCancelledRow = (row) => row.narration === 'Cancelled'
 
 /**
  * The voucher types the backend reads as "delete the opening balance". An

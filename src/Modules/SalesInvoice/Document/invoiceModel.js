@@ -298,7 +298,8 @@ export function toInvoiceModel({ form, figures, gst, productsByKey, ledgersById,
     },
     other: { note: form.note },
     currency: currencyOf(currency, baseCode, rupees(figures.totalPaise)),
-    bank: bank ? { bankName: bank.bank_name ?? '', ifsc: bank.ifsc_code ?? '', accountNo: bank.account_no ?? '' } : null,
+    // The bank's ledger name, as Select Bank shows it (bankDetails' bank_ledger_name) - bank_name only for a row without one.
+    bank: bank ? { bankName: String(bank.bank_ledger_name ?? '').trim() || (bank.bank_name ?? ''), ifsc: bank.ifsc_code ?? '', accountNo: bank.account_no ?? '' } : null,
     lines: [...lines, ...charges],
     rows,
     // The goods table's Disc. % column - while With Discount is ticked on a type that offers it.

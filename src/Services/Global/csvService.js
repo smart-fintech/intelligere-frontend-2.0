@@ -37,3 +37,31 @@ export const CSV_SOURCES = {
  * backend's own message (see authService).
  */
 export const generateCsv = (payload) => api.post(DOWNLOAD_CSV_URL, payload)
+
+/* ------------------------------------------------------------------ */
+/* The blank import formats - Ledger and Product CSV Upload cards      */
+/* ------------------------------------------------------------------ */
+
+const IMPORT_FORMAT_URL = 'tally/ledger-product-format/'
+
+/** What the Ledger and Product upload cards accept - the format comes down as .xlsx, a CSV still works. */
+export const IMPORT_FILE_ACCEPT = '.csv,.xlsx'
+
+/** The `source` names the format endpoint knows. */
+export const FORMAT_SOURCES = {
+  LEDGER: 'ledger',
+  PRODUCT: 'product',
+}
+
+/**
+ *   POST tally/ledger-product-format/   { company_id, source, user_erp_type }
+ *                                    -> { file_url: ".../LedgerFormat.xlsx" }
+ *
+ * The backend builds the workbook for this company (its Group column is a
+ * dropdown of the company's groups - which for ledgers depend on the ERP),
+ * so it is asked each time rather than shipped with the app. `erpType` is
+ * 'tally' or 'intelligere', from the profile in the store. Saving the file
+ * from `file_url` is CsvDownloadButton's job, as for the list exports.
+ */
+export const getImportFormat = ({ companyId, source, erpType }) =>
+  api.post(IMPORT_FORMAT_URL, { company_id: companyId, source, user_erp_type: erpType })

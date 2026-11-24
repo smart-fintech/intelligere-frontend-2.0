@@ -183,6 +183,8 @@ export const getProductUnits = async (companyName) => {
  *   hsn        chosen from the HSN list, or typed (HsnSelector)
  *   gstRate    chosen from the GST slabs (Constants/gst), with the tax it
  *              splits into shown under it
+ *   hidden     not drawn and not checked - it is sent as the form holds it
+ *              (what the product was saved with, or empty)
  */
 export const BASIC_PRODUCT_ERP = Object.freeze({ TALLY: 'tally', INTELLIGERE: 'intelligere' })
 
@@ -195,7 +197,7 @@ export const BASIC_PRODUCT_FIELDS = Object.freeze({
     { key: 'hsn', label: 'HSN', from: 'hsn', hsn: true },
     { key: 'quantity', label: 'Quantity', from: 'quantity', numeric: true },
     { key: 'unit', label: 'Unit', from: 'unit', choices: BASIC_PRODUCT_CHOICES.UNITS },
-    { key: 'rate', label: 'Rate', from: 'rate', numeric: true },
+    { key: 'rate', label: 'Selling Rate', from: 'Rate', numeric: true },
     { key: 'gst_rate', label: 'GST Rate', from: 'gstRate', gstRate: true },
   ],
   [BASIC_PRODUCT_ERP.INTELLIGERE]: [
@@ -206,8 +208,11 @@ export const BASIC_PRODUCT_FIELDS = Object.freeze({
     { key: 'gst_rate', label: 'GST Rate', from: 'gstRate', gstRate: true },
     { key: 'category', label: 'Category', from: 'category' },
     { key: 'quantity', label: 'Quantity', from: 'quantity', numeric: true },
-    { key: 'selling_price', label: 'Selling Price', from: 'Selling Rate', numeric: true },
-    { key: 'Unit Rate', label: 'Unit Rate', from: 'rate', numeric: true },
+    { key: 'selling_rate', label: 'Selling Rate', from: 'Selling Rate', numeric: true },
+    // Not drawn in the form (`hidden`): only the Selling Rate is asked for.
+    // It is still sent, so the payload keeps its shape - empty for a new
+    // product, and a product's own saved rate, untouched, on an edit.
+    { key: 'Unit Rate', label: 'Unit Rate', from: 'rate', numeric: true, hidden: true },
   ],
 })
 
@@ -224,7 +229,7 @@ const fieldValues = (erp, form) =>
  *
  *   { "company": "MAAN ENTERPRISE 1", "product_name": "abc", "group": "primary",
  *     "hsn_code": "01", "per_unit": "NOS", "gst_rate": "5", "category": "",
- *     "quantity": "95.0", "selling_price": "90", "Unit Rate": "10",
+ *     "quantity": "95.0", "selling_rate": "90", "Unit Rate": "10",
  *     "vendor": [ { "id": 531, "name": "Selected Vendor Name" } ] }
  *
  * Every value is text, as typed. `vendor` is the chosen vendors as
@@ -267,16 +272,9 @@ export const isProductAlreadyExists = (response) => /already exists/i.test(Strin
 
 const PRODUCT_CSV_IMPORT_URL = 'inventory/product_csv_import/'
 
-/**
- * The blank CSV the user fills in, beside the ledger one in Assets/format
- * and downloaded the same way - its contents come through the bundle (`?raw`)
- * and are written out under the name below (see LEDGER_CSV_FORMAT_FILE in
- * ledgerService for why).
- *
- *   Product Name, Group, HSN Code, Quantity, Unit, Rate, GST Rate, Description
- */
-export const PRODUCT_CSV_FORMAT_FILE = 'Product Detail format.csv'
-export { default as PRODUCT_CSV_FORMAT_CONTENT } from '@/Assets/format/ProductFormat.csv?raw'
+/* The blank format (Product Name, Group, HSN Code, Quantity, Unit, Rate,
+   GST Rate, Description) is built by the backend with the company's groups -
+   see getImportFormat in Services/Global/csvService. */
 
 /**
  * Sends the filled-in CSV up.

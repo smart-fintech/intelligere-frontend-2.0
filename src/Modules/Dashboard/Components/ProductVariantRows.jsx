@@ -1,20 +1,30 @@
 /**
  * What a product's row opens out into: its SKUs, and where each one's stock
- * is - one line per warehouse allocation.
+ * is. Each SKU is one block - what it is, then where it is kept:
  *
- *   SKU Code   SKU Qty   SKU Amount   Unit Rate   Warehouse   Wh. Qty   Expiry       Created At              Actions
- *   PRI-001    300       36000        120         Main        200       --           12-Oct-26 12:39:56 PM   (eye) (pencil)
- *                                                 Godown 2    100
- *   PRI-002    100       13500        135         Main        100       31-12-2026   14-Oct-26 09:05:12 AM   (eye) (pencil)
+ *   SKU Code PRI-001   SKU Qty 300   SKU Amount 36000          <- the summary
+ *   Unit Rate   Warehouse   Wh. Qty   Expiry Date   Created At              Actions
+ *   120         Main        200       --            12-Oct-26 12:39:56 PM   (eye) (pencil)
+ *               Godown 2    100
+ *   135         Main        100       31-12-2026    14-Oct-26 09:05:12 AM   (eye) (pencil)
+ *
+ *   SKU Code PRI-002   ...
+ *
+ * THE SUMMARY is the SKU's own: its code, and its Qty and Amount as the
+ * product row worked them out - the backend's totals, or, with warehouses
+ * chosen in the filter, those warehouses' alone (narrowToWarehouses in
+ * ../productList, which also leaves out the lines and entries of other
+ * warehouses before they reach here). It is said once, above its table,
+ * never again on each line.
  *
  * WHAT A SKU IS MADE OF is on its code: hovering it (or tabbing to it) shows
  * its `sku_details` in the shared SKU tooltip (SkuDetailsTooltip) - only
  * those, or "No SKU details available". There is no column for them.
  *
- * A SKU's own columns are written once, on its first line, and left blank
- * on the lines under it - so two warehouses of one SKU read as one SKU in
- * two places, not as two SKUs. The same goes for an entry's rate, expiry
- * date and Created At across that entry's warehouses.
+ * Under it, one line per warehouse of each of its entries. An entry's rate,
+ * expiry date, Created At and buttons are written on its first line and left
+ * blank under it, so two warehouses of one entry read as one record in two
+ * places; a faint rule parts one entry from the next.
  *
  * CREATED AT is each entry's own `product_details[].created_at`, shown as
  * the backend sends it (date and time, e.g. "12-Oct-26 12:39:56 PM") - it
@@ -29,8 +39,10 @@
  *
  * Made of plain boxes laid out as a grid, not a <table>: it sits inside a
  * cell of the product table, whose rules would reach every cell of a table
- * nested in it (see DataTable). It scrolls sideways inside its own box on a
- * narrow screen, so the page never does.
+ * nested in it (see DataTable). It is as wide as the product table and no
+ * wider - its columns share that width out - and on a screen too narrow
+ * for them a block scrolls sideways inside itself, so neither the table nor
+ * the page ever does.
  *
  * VIEW AND EDIT ARE AN ENTRY'S. A SKU can hold several `product_details`
  * entries, each its own record by its `sr_no`: each entry has its own View
@@ -39,7 +51,7 @@
  * record and saves to it alone, View shows that SKU with that record's
  * stock. A SKU with no entries has one of each, for the SKU (`detail`
  * null). A product with no SKU at all (none sent, or every one deleted) is
- * one line in the same grid, saying so, with its View in the same place -
+ * one line, saying so, with its View at its right end as every line has it -
  * handed no SKU, the dialog shows the product; there is nothing to Edit.
  *
  * Props:
@@ -61,19 +73,26 @@ import { formatDate } from '@/Utils/date'
 import { orDash } from '@/Utils/display'
 import { skuDetailPairs } from '../productList'
 
-/** The eight columns, and the least width the grid is drawn at before it scrolls. */
-const GRID =
-  'grid min-w-[54rem] grid-cols-[minmax(7rem,1.3fr)_4.75rem_6rem_5.5rem_minmax(8rem,1.6fr)_5.5rem_6.25rem_9.25rem] gap-x-3'
+/** A block's warehouse lines: five columns, and the least width they are drawn at before the block scrolls. */
+const GRID = 'grid min-w-[36rem] grid-cols-[6rem_minmax(9rem,2fr)_5.5rem_6.5rem_minmax(9.5rem,1.2fr)] gap-x-3 px-3'
 
-/** The same, with a ninth column for each SKU's View and Edit. */
-const GRID_WITH_ACTIONS =
-  'grid min-w-[58rem] grid-cols-[minmax(7rem,1.3fr)_4.75rem_6rem_5.5rem_minmax(8rem,1.6fr)_5.5rem_6.25rem_9.25rem_4.25rem] gap-x-3'
+/** The same, with a sixth for each entry's View and Edit. */
+const GRID_WITH_ACTIONS = 'grid min-w-[41rem] grid-cols-[6rem_minmax(9rem,2fr)_5.5rem_6.5rem_minmax(9.5rem,1.2fr)_4.25rem] gap-x-3 px-3'
 
-const HEADINGS = ['SKU Code', 'SKU Qty', 'SKU Amount', 'Unit Rate', 'Warehouse', 'Wh. Qty', 'Expiry Date', 'Created At']
+const HEADINGS = ['Unit Rate', 'Warehouse', 'Wh. Qty', 'Expiry Date', 'Created At']
 
-/** The same two without SKU Code - a company that does not manage SKUs (useSkuManagement). */
-const GRID_NO_SKU = 'grid min-w-[47rem] grid-cols-[4.75rem_6rem_5.5rem_minmax(8rem,1.6fr)_5.5rem_6.25rem_9.25rem] gap-x-3'
-const GRID_WITH_ACTIONS_NO_SKU = 'grid min-w-[51rem] grid-cols-[4.75rem_6rem_5.5rem_minmax(8rem,1.6fr)_5.5rem_6.25rem_9.25rem_4.25rem] gap-x-3'
+/** The lettering of the headings, in a block's table and its summary alike. */
+const HEADING_TEXT = 'text-[11px] font-semibold tracking-wide text-muted-foreground uppercase'
+
+/** One figure of a SKU's summary: its name, then its value. */
+function SummaryItem({ label, children }) {
+  return (
+    <div className="flex min-w-0 items-baseline gap-1.5">
+      <span className={cn(HEADING_TEXT, 'shrink-0')}>{label}</span>
+      <span className="min-w-0 font-semibold break-words text-foreground">{children}</span>
+    </div>
+  )
+}
 
 /**
  * A SKU as the lines it takes: one per warehouse of each of its entries. An
@@ -89,10 +108,7 @@ const linesOf = (variant) => {
     })),
   )
 
-  return (lines.length > 0 ? lines : [{ detail: null, warehouse: null, firstOfDetail: true }]).map((line, index) => ({
-    ...line,
-    firstOfVariant: index === 0,
-  }))
+  return lines.length > 0 ? lines : [{ detail: null, warehouse: null, firstOfDetail: true }]
 }
 
 /**
@@ -137,86 +153,98 @@ function RowActions({ product, variant, detail, name, onViewSku, onEditSku, edit
 export default function ProductVariantRows({ product, onViewSku, onEditSku, editDisabled = false }) {
   const withActions = Boolean(onViewSku || onEditSku)
   const showSku = useSkuManagement()
-  const grid = showSku ? (withActions ? GRID_WITH_ACTIONS : GRID) : withActions ? GRID_WITH_ACTIONS_NO_SKU : GRID_NO_SKU
-  const headings = showSku ? HEADINGS : HEADINGS.filter((heading) => heading !== 'SKU Code')
+  const grid = withActions ? GRID_WITH_ACTIONS : GRID
   const actions = { product, onViewSku, onEditSku, editDisabled }
 
   if (product.variants.length === 0 && !onViewSku) {
     return <p className="px-3 py-4 text-center text-xs text-muted-foreground">No SKU or warehouse details for this product.</p>
   }
 
-  return (
-    <div className="overflow-x-auto px-3 py-2">
-      <div className={cn(grid, 'border-b border-border pb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase')}>
-        {headings.map((heading) => (
-          <span key={heading}>{heading}</span>
-        ))}
-        {withActions ? <span className="text-right">Actions</span> : null}
-      </div>
-
-      {/* No SKU at all: one line across the data columns, its View where every line's is. */}
-      {product.variants.length === 0 ? (
-        <div className={cn(grid, 'items-center py-1.5 text-xs text-foreground')}>
-          <span className={cn(showSku ? 'col-span-8' : 'col-span-7', 'text-muted-foreground')}>No SKU or warehouse details for this product.</span>
+  // No SKU at all: one line saying so, its View where every line's is.
+  if (product.variants.length === 0) {
+    return (
+      <div className="px-3 py-3">
+        <div className="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-card px-3 py-2 text-xs">
+          <span className="text-muted-foreground">No SKU or warehouse details for this product.</span>
           <RowActions {...actions} variant={null} detail={null} name="" />
         </div>
-      ) : null}
+      </div>
+    )
+  }
 
+  return (
+    <div className="space-y-2.5 px-3 py-3">
       {product.variants.map((variant, variantIndex) => {
         const name = variant.skuCode || `${variantIndex + 1}`
 
-        return linesOf(variant).map(({ detail, warehouse, firstOfVariant, firstOfDetail }, lineIndex) => (
-          <div
-            key={`${variantIndex}-${lineIndex}`}
-            className={cn(
-              grid,
-              'items-center py-1.5 text-xs text-foreground',
-              // A rule between two SKUs; the lines of one SKU sit together.
-              firstOfVariant && variantIndex > 0 && 'border-t border-border/60',
-            )}
+        return (
+          <section
+            key={variantIndex}
+            aria-label={showSku ? `SKU ${name}` : `Stock ${variantIndex + 1}`}
+            className="overflow-hidden rounded-md border border-border/70 bg-card"
           >
-            {firstOfVariant ? (
-              <>
-                {/* Its sku_details on hover or focus - see the note at the top. */}
-                {showSku ? (
+            {/* The SKU, said once - see THE SUMMARY at the top. */}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-border/60 bg-muted/50 px-3 py-2 text-xs">
+              {showSku ? (
+                <SummaryItem label="SKU Code">
+                  {/* Its sku_details on hover or focus - see the note at the top. */}
                   <SkuDetailsTooltip details={skuDetailPairs(variant)} side="right" align="start">
                     <span
                       tabIndex={0}
-                      className="w-fit max-w-full cursor-help rounded-sm font-medium break-words underline decoration-muted-foreground/50 decoration-dotted underline-offset-2 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      className="cursor-help rounded-sm underline decoration-muted-foreground/50 decoration-dotted underline-offset-2 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                     >
                       {orDash(variant.skuCode)}
                     </span>
                   </SkuDetailsTooltip>
-                ) : null}
-                <span>{orDash(variant.totalQty)}</span>
-                <span>{orDash(variant.totalAmount)}</span>
-              </>
-            ) : (
-              // The SKU's three columns, left blank under its first line.
-              <span className={showSku ? 'col-span-3' : 'col-span-2'} />
-            )}
+                </SummaryItem>
+              ) : null}
+              <SummaryItem label="SKU Qty">{orDash(variant.totalQty)}</SummaryItem>
+              <SummaryItem label="SKU Amount">{orDash(variant.totalAmount)}</SummaryItem>
+            </div>
 
-            <span>{firstOfDetail ? orDash(detail?.unitRate) : ''}</span>
+            {/* Where it is kept: its own table, sideways-scrolling only inside itself. */}
+            <div className="overflow-x-auto">
+              <div className={cn(grid, HEADING_TEXT, 'border-b border-border/60 py-1.5')}>
+                {HEADINGS.map((heading) => (
+                  <span key={heading}>{heading}</span>
+                ))}
+                {withActions ? <span className="text-right">Actions</span> : null}
+              </div>
 
-            {warehouse ? (
-              <>
-                <span className="break-words">{orDash(warehouse.label)}</span>
-                <span>{orDash(warehouse.quantity)}</span>
-              </>
-            ) : (
-              <span className="col-span-2 text-muted-foreground">No warehouse allocation</span>
-            )}
+              {linesOf(variant).map(({ detail, warehouse, firstOfDetail }, lineIndex) => (
+                <div
+                  key={lineIndex}
+                  className={cn(
+                    grid,
+                    'items-center py-1.5 text-xs text-foreground',
+                    // A faint rule between two entries; the lines of one entry sit together.
+                    firstOfDetail && lineIndex > 0 && 'border-t border-border/40',
+                  )}
+                >
+                  <span>{firstOfDetail ? orDash(detail?.unitRate) : ''}</span>
 
-            <span>{firstOfDetail ? formatDate(detail?.expiryDate) : ''}</span>
+                  {warehouse ? (
+                    <>
+                      <span className="break-words">{orDash(warehouse.label)}</span>
+                      <span>{orDash(warehouse.quantity)}</span>
+                    </>
+                  ) : (
+                    <span className="col-span-2 text-muted-foreground">No warehouse allocation</span>
+                  )}
 
-            {/* As the backend sends it - see the note at the top. */}
-            <span className="break-words">{firstOfDetail ? orDash(detail?.createdAt) : ''}</span>
+                  <span>{firstOfDetail ? formatDate(detail?.expiryDate) : ''}</span>
 
-            {withActions ? (
-              firstOfDetail ? <RowActions {...actions} variant={variant} detail={detail} name={name} /> : <span />
-            ) : null}
-          </div>
-        ))
+                  {/* As the backend sends it - see the note at the top. */}
+                  <span className="break-words">{firstOfDetail ? orDash(detail?.createdAt) : ''}</span>
+
+                  {withActions ? (
+                    firstOfDetail ? <RowActions {...actions} variant={variant} detail={detail} name={name} /> : <span />
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </section>
+        )
       })}
     </div>
   )

@@ -75,7 +75,7 @@ export const buildJvTallyMessage = (companyName, rows) => ({
   },
 })
 
-/** The CSV to fill in with JV ledger names - see LEDGER_CSV_FORMAT_FILE on why it is `?raw`. */
+/** The CSV to fill in with JV ledger names - see Assets/Read.txt on why it is `?raw`. */
 export const JV_LEDGER_CSV_FORMAT_FILE = 'JV_Ledger_Format.csv'
 export { default as JV_LEDGER_CSV_FORMAT_CONTENT } from '@/Assets/format/JV_Ledger_Format.csv?raw'
 

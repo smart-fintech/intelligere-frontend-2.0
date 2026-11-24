@@ -9,6 +9,7 @@ import PartyAddressFields from '@/Modules/SalesInvoice/Components/PartyAddressFi
 import {
   INDIAN_STATE_OPTIONS,
   buyerFromLedger,
+  eInvoiceGstinParties,
   effectiveShipping,
   portalRequiredFields,
   portalSettingsOf,
@@ -181,6 +182,8 @@ export default function BuyerStep({ invoice, ledgers, countries, disabled }) {
           <Field
             id="buyer-gstin"
             label="Buyer GSTIN"
+            // Required only while E-Invoice is ticked, and the sale is not an export (eInvoiceGstinParties).
+            required={eInvoiceGstinParties(form).includes('buyer')}
             maxLength={15}
             inputClassName="uppercase"
             value={buyer.gstin}

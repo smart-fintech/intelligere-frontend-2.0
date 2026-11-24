@@ -2,6 +2,7 @@ import { Fragment, useId, useMemo, useState } from 'react'
 import { ChevronDown, ChevronUp, ChevronsUpDown, Search, SlidersHorizontal, X } from 'lucide-react'
 
 import { Field, FieldLabel, fieldLabelClass, OPTIONS_PAGE } from '@/Components/Common/FormFields'
+import { MultiSelectField } from '@/Components/Common/MultiSelectField'
 import { Button } from '@/Components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/Components/ui/popover'
 import {
@@ -69,17 +70,25 @@ export const DEFAULT_COLUMN_WIDTH = 160
  * `moreLayout` says how they are tucked away:
  *
  *   'popover'  (default) a small box under the button - for a few short
- *              dropdowns (Customised Fields' yes/no filters)
- *   'panel'    a section that opens UNDER the row, the page's full width,
- *              its filters in a grid of labelled boxes that wraps onto as
- *              many rows as it needs: one column on a phone, up to four on
- *              a wide screen. For a list whose extra filters are many, or
- *              have long names and values - a product's SKU attributes.
- *              The button opens and closes it, with a chevron that says
- *              which; `moreTitle` heads it.
+ *              dropdowns (Customised Fields' yes/no filters); each applies
+ *              as it is picked
+ *   'grid'     a wider popover for a list whose extra filters are many, or
+ *              have long names and values - a product's SKU attributes. Its
+ *              filters sit in a compact grid of labelled boxes (one column
+ *              on a phone, up to three on a wide screen) that scrolls inside
+ *              the popover when it is taller than the room there is, under
+ *              `moreTitle`. Picks are held there until APPLY sets them all
+ *              and closes it; CLEAR empties them (and sets that at once);
+ *              closing it any other way leaves the filters as they were.
+ *              It takes no room on the page - see MoreFiltersPopover.
  *
  * Either way the button counts the tucked filters that are set, so one
  * out of sight is never forgotten, and Clear clears them with the rest.
+ *
+ * `view.multiFilterFields` (optional) names fields that take SEVERAL values
+ * - the product lists' Warehouse. Each is a compact multi-select on the row
+ * (MultiSelectField): its value in `view.filters` is an array, `[]` is "all",
+ * and `view.setFilter(field, values)` is handed the new array.
  *
  * `extra` is a filter that is not a dropdown - a DateRangeFilter, say -
  * drawn on the row after the dropdowns. Its value is the page's to keep,
@@ -100,13 +109,9 @@ export function TableFilters({
   const fields = Object.entries(view.filterFields)
   const onRow = fields.filter(([field]) => !moreFilters.includes(field))
   const tucked = fields.filter(([field]) => moreFilters.includes(field))
-  const tuckedInUse = tucked.filter(([field]) => view.filters[field]).length
+  const tuckedInUse = tucked.filter(([field]) => isSet(view.filters[field])).length
   const moreLabel = `More Filters${tuckedInUse > 0 ? ` (${tuckedInUse})` : ''}`
-
-  // The panel's open state - the popover keeps its own.
-  const [moreOpen, setMoreOpen] = useState(false)
-  const panelId = useId()
-  const asPanel = moreLayout === 'panel' && tucked.length > 0
+  const multiFields = view.multiFilterFields ?? NO_OPTIONS
 
   return (
     <div className="mb-3 space-y-3">
@@ -122,32 +127,35 @@ export function TableFilters({
           inputClassName="h-8"
         />
 
-        {onRow.map(([field, label]) => (
-          <FilterSelect
-            key={field}
-            view={view}
-            field={field}
-            label={label}
-            anyLabel={`All ${label}`}
-            className="w-full sm:w-44"
-          />
-        ))}
+        {onRow.map(([field, label]) =>
+          multiFields.includes(field) ? (
+            <MultiSelectField
+              key={field}
+              compact
+              ariaLabel={`Filter by ${label}`}
+              placeholder={`All ${label}`}
+              searchPlaceholder={`Search ${label}`}
+              options={view.filterOptions[field] ?? NO_OPTIONS}
+              value={Array.isArray(view.filters[field]) ? view.filters[field] : NO_OPTIONS}
+              onChange={(values) => view.setFilter(field, values)}
+              className="w-full space-y-0 sm:w-44"
+            />
+          ) : (
+            <FilterSelect
+              key={field}
+              view={view}
+              field={field}
+              label={label}
+              anyLabel={`All ${label}`}
+              className="w-full sm:w-44"
+            />
+          ),
+        )}
 
         {extra}
 
-        {asPanel ? (
-          <Button
-            type="button"
-            variant={moreOpen ? 'secondary' : 'outline'}
-            size="sm"
-            icon={SlidersHorizontal}
-            aria-expanded={moreOpen}
-            aria-controls={panelId}
-            onClick={() => setMoreOpen((open) => !open)}
-          >
-            {moreLabel}
-            <ChevronDown className={cn('size-3.5 transition-transform', moreOpen && 'rotate-180')} />
-          </Button>
+        {moreLayout === 'grid' && tucked.length > 0 ? (
+          <MoreFiltersPopover view={view} tucked={tucked} buttonLabel={moreLabel} title={moreTitle} />
         ) : tucked.length > 0 ? (
           <Popover>
             <PopoverTrigger asChild>
@@ -177,33 +185,122 @@ export function TableFilters({
 
         {actions ? <div className="ml-auto flex items-center gap-2">{actions}</div> : null}
       </div>
-
-      {/* The panel: under the row, the row's own width, never wider. Each
-          filter is a label over a full-width box in a grid that wraps -
-          a long name is cut short with the whole of it on hover, and a long
-          value inside the box the same way. */}
-      {asPanel && moreOpen ? (
-        <section id={panelId} aria-label={moreTitle || 'More filters'} className="rounded-md border border-border bg-muted/30 p-3">
-          {moreTitle ? (
-            <p className="mb-2.5 text-xs font-semibold text-brand">
-              {moreTitle}
-              <span className="font-normal text-muted-foreground"> ({tucked.length})</span>
-            </p>
-          ) : null}
-
-          <div className="grid grid-cols-1 gap-x-3 gap-y-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {tucked.map(([field, label]) => (
-              <div key={field} className="min-w-0 space-y-1">
-                <p className={cn(fieldLabelClass, 'truncate')} title={label}>
-                  {label}
-                </p>
-                <FilterSelect view={view} field={field} label={label} anyLabel="All" className="w-full min-w-0" />
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
     </div>
+  )
+}
+
+/** Whether a filter's value is set - a list of values (a multi-select's) only when it holds one. */
+const isSet = (value) => (Array.isArray(value) ? value.length > 0 : Boolean(value))
+
+/**
+ * "More Filters" as the 'grid' layout draws it - see TableFilters.
+ *
+ *   [ More Filters (2) v ]
+ *   +- SKU Details (7) -------------------------------+
+ *   | Color        Size         Material              |
+ *   | [All     v]  [All     v]  [All     v]           |
+ *   | ...                                             |
+ *   | 2 selected                      Clear   [Apply] |
+ *   +-------------------------------------------------+
+ *
+ * The picks are a DRAFT, started from the filters set when it opens: the
+ * list does not change under the user while they choose. Apply hands each
+ * changed one to `view.setFilter` - the page's own, so its filtering is
+ * exactly what it was - and closes. Clear empties the draft and those
+ * filters at once, leaving it open for new picks.
+ *
+ * A portal, so no container clips it, and Radix keeps it inside the window
+ * (flipping above the button, or sliding along the edge, when it must);
+ * taller than the room there is, its grid scrolls between the heading and
+ * the buttons, which stay in sight.
+ */
+function MoreFiltersPopover({ view, tucked, buttonLabel, title }) {
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState({})
+  const titleId = useId()
+
+  const applied = (field) => view.filters[field] || ''
+
+  const openChange = (next) => {
+    if (next) setDraft(Object.fromEntries(tucked.map(([field]) => [field, applied(field)])))
+    setOpen(next)
+  }
+
+  // FilterSelect reads its value from `filters` and reports through
+  // `setFilter`: here, both are the draft's.
+  const draftView = {
+    ...view,
+    filters: draft,
+    setFilter: (field, value) => setDraft((previous) => ({ ...previous, [field]: value })),
+  }
+
+  const chosenCount = tucked.filter(([field]) => draft[field]).length
+  const anyApplied = tucked.some(([field]) => applied(field))
+
+  const apply = () => {
+    tucked.forEach(([field]) => {
+      const next = draft[field] || ''
+      if (next !== applied(field)) view.setFilter(field, next)
+    })
+    setOpen(false)
+  }
+
+  const clear = () => {
+    setDraft(Object.fromEntries(tucked.map(([field]) => [field, ''])))
+    tucked.forEach(([field]) => {
+      if (applied(field)) view.setFilter(field, '')
+    })
+  }
+
+  return (
+    <Popover open={open} onOpenChange={openChange}>
+      <PopoverTrigger asChild>
+        <Button type="button" variant={open ? 'secondary' : 'outline'} size="sm" icon={SlidersHorizontal}>
+          {buttonLabel}
+          <ChevronDown className={cn('size-3.5 transition-transform duration-200', open && 'rotate-180')} />
+        </Button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        align="start"
+        sideOffset={6}
+        aria-labelledby={title ? titleId : undefined}
+        aria-label={title ? undefined : 'More filters'}
+        className="flex max-h-[min(30rem,var(--radix-popover-content-available-height))] w-[min(44rem,calc(100vw-1rem))] flex-col p-0"
+      >
+        {title ? (
+          <p id={titleId} className="border-b border-border px-3 py-2 text-xs font-semibold text-brand">
+            {title}
+            <span className="font-normal text-muted-foreground"> ({tucked.length})</span>
+          </p>
+        ) : null}
+
+        {/* A long name is cut short, with the whole of it on hover - and a
+            long value inside its box the same way. */}
+        <div className="grid min-h-0 grid-cols-1 gap-x-3 gap-y-2.5 overflow-y-auto overscroll-contain p-3 sm:grid-cols-2 lg:grid-cols-3">
+          {tucked.map(([field, label]) => (
+            <div key={field} className="min-w-0 space-y-1">
+              <p className={cn(fieldLabelClass, 'truncate')} title={label}>
+                {label}
+              </p>
+              <FilterSelect view={draftView} field={field} label={label} anyLabel="All" className="w-full min-w-0" />
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2">
+          <span className="text-xs text-muted-foreground">{chosenCount > 0 ? `${chosenCount} selected` : 'None selected'}</span>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="ghost" size="sm" icon={X} onClick={clear} disabled={chosenCount === 0 && !anyApplied}>
+              Clear
+            </Button>
+            <Button type="button" size="sm" onClick={apply}>
+              Apply
+            </Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 

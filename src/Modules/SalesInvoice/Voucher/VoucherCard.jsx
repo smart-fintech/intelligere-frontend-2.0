@@ -11,7 +11,7 @@ import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { cn } from '@/Library/utils'
 import { formatAmount } from '@/Modules/SalesInvoice/Document/invoiceFormat'
 import { isSkuManaged, skuOptionValue, toDecimalInput } from '@/Modules/SalesInvoice/salesInvoiceForm'
-import { INVOICE_MODE, MAPPING_STATUS, allSkusOf, gstRateOf, isProductMapped, lineTaxKind, productChoice } from '@/Modules/SalesInvoice/Voucher/voucherModel'
+import { INVOICE_MODE, MAPPING_STATUS, allSkusOf, gstRateOf, isProductMapped, isServiceVoucher, lineTaxKind, productChoice } from '@/Modules/SalesInvoice/Voucher/voucherModel'
 import { skuAttributes } from '@/Utils/skuAttributes'
 
 /**
@@ -335,6 +335,8 @@ export default function VoucherCard({ voucher, mapping, edits, ledgers, accountL
   // came with, so a rate typed over never moves the columns), never a zero field shown as a tax.
   const taxColumns = taxColumnsOf(voucher.products)
   const serviceTax = taxHeading(voucher.services)
+  // product_type "Service": no account row, and no account ledger asked for (resolveVoucher).
+  const serviceVoucher = isServiceVoucher(voucher)
 
   /** What a product box shows: what was typed, else the voucher's own value. */
   const lineBox = (line, field) => {
@@ -374,21 +376,26 @@ export default function VoucherCard({ voucher, mapping, edits, ledgers, accountL
         })}
       </RadioGroup>
 
-      {/* ---- A: the document, and its two ledgers ---- */}
+      {/* ---- A: the document, and its two ledgers - a service voucher (isServiceVoucher) without the
+          account row: no Document Date, Sales / Purchase Ledger or Taxable Amount ---- */}
       <div className="grid grid-cols-1 gap-x-3 gap-y-2 @md:grid-cols-3">
-        <ReadOnly id={`${key}-date`} label="Document Date" value={voucher.documentDate || '--'} />
-        <LedgerChoice
-          id={`${key}-account`}
-          label={`${labels.account} Ledger`}
-          slot={mapping.account}
-          // Only the ledgers of this voucher's type (TallyVouchers' accountOptionsOf).
-          ledgers={accountLedgers}
-          onChange={(value) => onChoose({ account: value })}
-          missingText={`Select the ${labels.account} ledger.`}
-          // Products are posted to it; a voucher of services alone has their own ledgers.
-          needed={voucher.products.length > 0}
-        />
-        <ReadOnly id={`${key}-taxable`} label="Taxable Amount" value={amountText(voucher.taxableAmount)} inputClassName="text-right tabular-nums" />
+        {serviceVoucher ? null : (
+          <>
+            <ReadOnly id={`${key}-date`} label="Document Date" value={voucher.documentDate || '--'} />
+            <LedgerChoice
+              id={`${key}-account`}
+              label={`${labels.account} Ledger`}
+              slot={mapping.account}
+              // Only the ledgers of this voucher's type (TallyVouchers' accountOptionsOf).
+              ledgers={accountLedgers}
+              onChange={(value) => onChoose({ account: value })}
+              missingText={`Select the ${labels.account} ledger.`}
+              // Products are posted to it; a voucher of services alone has their own ledgers.
+              needed={voucher.products.length > 0}
+            />
+            <ReadOnly id={`${key}-taxable`} label="Taxable Amount" value={amountText(voucher.taxableAmount)} inputClassName="text-right tabular-nums" />
+          </>
+        )}
         <ReadOnly id={`${key}-date-party`} label="Document Date" value={voucher.documentDate || '--'} />
         <LedgerChoice
           id={`${key}-party`}

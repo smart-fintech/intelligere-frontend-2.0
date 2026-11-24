@@ -43,13 +43,22 @@
  *   the search box        the product's name
  *   SKU Code              a SKU's code; hovering a choice shows that SKU's
  *                         sku_details (SkuDetailsTooltip)
- *   Warehouse             a warehouse some SKU has stock in
+ *   Warehouse             warehouses some SKU has stock in - as many as
+ *                         wanted (a multi-select); see WAREHOUSES below
  *   Expiry                a date range on the SKUs' own expiry dates
  *                         (product_details[].expiry_date) - when any has one
  *   More Filters          one filter per SKU attribute the company's
  *                         products actually have - in a "SKU Details"
- *                         section that opens under the row, its filters
- *                         in a grid that wraps (TableFilters' 'panel')
+ *                         popover, its filters in a compact grid, set
+ *                         together with Apply (TableFilters' 'grid')
+ *
+ * WAREHOUSES narrow the rows themselves, not only which rows there are
+ * (narrowToWarehouses in ../productList): with some chosen, a product's
+ * Quantity (and Total Amount), each SKU's Qty and Amount, and the lines of
+ * an opened row are those warehouses' alone - a SKU, or one of its entries,
+ * with no stock in any of them is left out of the opened row. None chosen:
+ * every warehouse, and the figures exactly as the backend sent them. View
+ * and Edit still open the whole record.
  *
  * A company whose plan allows one warehouse ("Single Warehouse" in its
  * `features`) has no Warehouse filter: there is nothing to choose between.
@@ -113,14 +122,20 @@ import { useWindowedRows } from '@/Hooks/useWindowedRows'
 import { cn } from '@/Library/utils'
 import { hasSingleWarehouseLimit } from '@/Services/Inventory/inventoryService'
 import { orDash } from '@/Utils/display'
-import { filterProducts, PRODUCT_FILTER, productFilterOptions, readProducts } from '../productList'
+import { filterProducts, narrowToWarehouses, PRODUCT_FILTER, productFilterOptions, readProducts } from '../productList'
 import ProductDetailsModal from './ProductDetailsModal'
 import ProductVariantRows from './ProductVariantRows'
 
 const SEARCH_FIELDS = ['name','hsn']
 
-/** The seven columns of data, and the Actions column: the cells an opened row spans. */
-const COLUMN_COUNT = 9
+/**
+ * The columns of data drawn on every page: Product Name, HSN Code, Group,
+ * Unit, Quantity, GST Rate and Selling Rate. An opened row spans exactly the
+ * columns drawn - these, Total Amount when shown and Actions when there is
+ * one - and never more: a cell spanning a column the header does not have
+ * adds a nameless one at the end, squeezing every real column to make room.
+ */
+const DATA_COLUMN_COUNT = 7
 
 /** No expiry range set. */
 const NO_RANGE = { from: '', to: '' }
@@ -420,7 +435,8 @@ export default function ProductTable({
   const { activeCompany } = useActiveCompany()
   const singleWarehouse = hasSingleWarehouseLimit(activeCompany)
 
-  const columnCount = COLUMN_COUNT + (withCategoryAndAmount ? 2 : 0)
+  // The columns drawn below - see DATA_COLUMN_COUNT.
+  const columnCount = DATA_COLUMN_COUNT + (withCategoryAndAmount ? 1 : 0) + (hasActions ? 1 : 0)
 
   const products = useMemo(() => readProducts(rows, warehouseNames), [rows, warehouseNames])
   const offered = useMemo(() => {
@@ -441,21 +457,31 @@ export default function ProductTable({
   const [expiry, setExpiry] = useState(NO_RANGE)
   const expirySet = Boolean(offered.hasExpiry && (expiry.from || expiry.to))
 
-  const filters = useMemo(
-    () =>
-      Object.fromEntries(
-        Object.entries(chosen).filter(
-          ([field, value]) => value && field in offered.fields && offered.options[field]?.includes(value),
-        ),
-      ),
-    [chosen, offered],
-  )
+  const filters = useMemo(() => {
+    const kept = {}
+    Object.entries(chosen).forEach(([field, value]) => {
+      if (!(field in offered.fields)) return
+      const options = offered.options[field] ?? []
+      // The warehouses: each one still offered.
+      if (Array.isArray(value)) {
+        const still = value.filter((entry) => options.includes(entry))
+        if (still.length > 0) kept[field] = still
+      } else if (value && options.includes(value)) {
+        kept[field] = value
+      }
+    })
+    return kept
+  }, [chosen, offered])
 
+  // The products the filters leave - narrowed to the chosen warehouses (see WAREHOUSES at the top).
   const filtered = useMemo(
     () =>
-      filterProducts(
-        products,
-        expirySet ? { ...filters, [PRODUCT_FILTER.EXPIRY_FROM]: expiry.from, [PRODUCT_FILTER.EXPIRY_TO]: expiry.to } : filters,
+      narrowToWarehouses(
+        filterProducts(
+          products,
+          expirySet ? { ...filters, [PRODUCT_FILTER.EXPIRY_FROM]: expiry.from, [PRODUCT_FILTER.EXPIRY_TO]: expiry.to } : filters,
+        ),
+        filters[PRODUCT_FILTER.WAREHOUSE],
       ),
     [products, filters, expiry, expirySet],
   )
@@ -470,6 +496,8 @@ export default function ProductTable({
     ...view,
     filterFields: offered.fields,
     filterOptions: offered.options,
+    // Several warehouses at once - see WAREHOUSES at the top.
+    multiFilterFields: [PRODUCT_FILTER.WAREHOUSE],
     // A SKU code's options show that SKU's sku_details on hover - the same
     // tooltip as everywhere else a SKU code is shown.
     renderFilterOption: (field, option, item) =>
@@ -545,18 +573,25 @@ export default function ProductTable({
 
   /**
    * A line's View - handed the same SKU and entry as that line's Edit, kept
-   * by their places: `sku` and `detail` null for a product with no SKU, and
-   * `detail` null for a SKU with no entries.
+   * by their places in the product as it was read: `sku` and `detail` null
+   * for a product with no SKU, and `detail` null for a SKU with no entries.
+   * Looked up by what they were read from (`source`), as the line may be
+   * one of a product narrowed to some warehouses - a copy, not the read one -
+   * and View shows the whole record.
    */
   const viewSku = useCallback(
-    (product, variant, detail = null) =>
+    (product, variant, detail = null) => {
+      const read = products.find((entry) => entry.key === product.key) ?? product
+      const sku = variant ? read.variants.findIndex((entry) => entry.source === variant.source) : -1
+
       setViewing({
         open: true,
         key: product.key,
-        sku: variant ? product.variants.indexOf(variant) : null,
-        detail: variant && detail ? variant.details.indexOf(detail) : null,
-      }),
-    [],
+        sku: variant && sku >= 0 ? sku : null,
+        detail: variant && detail && sku >= 0 ? read.variants[sku].details.findIndex((entry) => entry.source === detail.source) : null,
+      })
+    },
+    [products],
   )
 
   // The product with ONLY the SKU whose View was pressed - and of that SKU
@@ -578,7 +613,7 @@ export default function ProductTable({
         view={filterView}
         searchPlaceholder="Product name & HSN code"
         moreFilters={moreFilters}
-        moreLayout="panel"
+        moreLayout="grid"
         moreTitle="SKU Details"
         extra={expiryFilter}
         actions={actions}

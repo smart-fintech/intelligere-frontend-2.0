@@ -68,7 +68,7 @@ export function CsvUploadButton({
   /** Why a file is turned away, or null when it may go through. */
   const problemOf = (file) => {
     if (allowed.length > 0 && !allowed.some((rule) => file.name.toLowerCase().endsWith(rule))) {
-      return `Please choose a ${allowed.join(' or ').replaceAll('.', '').toUpperCase()} file.`
+      return `Please choose a ${allowed.map((rule) => rule.slice(1).toUpperCase()).join(' or ')} file.`
     }
     if (maxSizeMb && file.size > maxSizeMb * 1024 * 1024) return `This file is larger than ${maxSizeMb} MB.`
     return null

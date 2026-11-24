@@ -142,15 +142,16 @@ export const overdueText = (days) => {
 /* The filter row                                                     */
 /* ------------------------------------------------------------------ */
 
-export const NO_FILTERS = Object.freeze({ parties: [], dueFrom: '', dueTo: '', minOverdue: '', minAmount: '' })
+export const NO_FILTERS = Object.freeze({ parties: [], billFrom: '', billTo: '', minOverdue: '', minAmount: '' })
 
 /** Text or the list of parties: either way, set when it has a length. */
 export const hasFilters = (filters) => Object.values(filters).some((value) => value.length > 0)
 
-const matchesFilters = (invoice, { dueFrom, dueTo, minOverdue, minAmount }) => {
-  const due = toInputDate(invoice.dueDate)
-  if (dueFrom && (!due || due < dueFrom)) return false
-  if (dueTo && (!due || due > dueTo)) return false
+// The date range is on the bill date, both ends included; Overdue Days stays on the due date.
+const matchesFilters = (invoice, { billFrom, billTo, minOverdue, minAmount }) => {
+  const bill = toInputDate(invoice.billDate)
+  if (billFrom && (!bill || bill < billFrom)) return false
+  if (billTo && (!bill || bill > billTo)) return false
 
   if (minOverdue !== '') {
     const days = overdueDays(invoice.dueDate)

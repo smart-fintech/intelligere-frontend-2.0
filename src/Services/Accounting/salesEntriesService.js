@@ -70,7 +70,7 @@ export const TALLY_FETCH_SALES_MODULE = 'fetch_sales_entries_MP'
 export const TALLY_SEND_MULTI_LEDGER_MODULE = 'sales_inventory_multi_ledger'
 export const TALLY_SEND_SINGLE_LEDGER_MODULE = 'sales_without_inventory'
 
-/** The CSVs to fill in - see LEDGER_CSV_FORMAT_FILE on why they are `?raw`. */
+/** The CSVs to fill in - see Assets/Read.txt on why they are `?raw`. */
 export const MULTI_LEDGER_CSV_FORMAT_FILE = 'SalesEntriesMultiLedgerFormat.csv'
 export { default as MULTI_LEDGER_CSV_FORMAT_CONTENT } from '@/Assets/format/SalesEntriesMultiLedgerFormat.csv?raw'
 export const SINGLE_LEDGER_CSV_FORMAT_FILE = 'SalesEntriesSingleLedgerFormat.csv'

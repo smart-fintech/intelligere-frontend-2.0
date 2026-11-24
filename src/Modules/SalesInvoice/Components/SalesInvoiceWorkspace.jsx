@@ -710,7 +710,7 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
    */
   const sendBooking = async (documentId, { items, booked }) => {
     const body = buildBookingBody({ companyName: company.comp_name, documentId, items, booked })
-    // Nothing any warehouse holds - nothing to book.
+    // Every goods line is sent, also one no warehouse holds; an order of services only has nothing to book.
     if (body.products.length > 0) {
       try {
         const reply = await bookInventory(body)
@@ -877,6 +877,8 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
       products: products.list,
       banks: banks.list,
       countries: { countryNames: getCountries(countries.data), stateNamesOf: (country) => getStates(countries.data, country) },
+      // A ship_to / dispatch_from saved empty is never "Same as ..." - only one that matches its party.
+      sameAsWhenUnsaved: false,
     })
     invoice.load(loaded)
     setEditing({
@@ -1224,6 +1226,7 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
           partyLedgerId: applicable[parties.ledger].ledgerId,
           rules: {
             goodsOnly: isChallanDoc,
+            pricedLines: Boolean(profile.pricedLines),
             invoiceRef: showsDocumentField(form, 'challanInvoiceNo'),
             challanType: showsDocumentField(form, 'challanType'),
           },

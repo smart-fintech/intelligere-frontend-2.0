@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Check, PackageX } from 'lucide-react'
+import { Check } from 'lucide-react'
 
 import { Modal } from '@/Components/Common/Modal'
 import { Button } from '@/Components/ui/button'
 import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import useWarehouses from '@/Hooks/useWarehouses'
 import { cn } from '@/Library/utils'
-import { automaticBooking, bookedOf, bookingItemsOf, checkBooking, hasBookingProblems, totalBooked } from '@/Modules/SalesInvoice/inventoryBooking'
+import { automaticBooking, bookedOf, bookingItemsOf, checkBooking, hasBookingProblems, totalAvailable, totalBooked } from '@/Modules/SalesInvoice/inventoryBooking'
 import { toDecimalInput } from '@/Modules/SalesInvoice/salesInvoiceForm'
 
 const cell = 'px-2 py-1.5'
@@ -15,9 +15,12 @@ const quantity = (value) => String(Number(Number(value).toFixed(3)))
 /**
  * BOOK THE SALES ORDER'S STOCK - the first thing a new Sales Order's Save
  * does, BEFORE the order is created (the workspace's save). Each product on
- * its own: its name and order quantity, then the warehouses that hold its
- * SKU - Warehouse Name, Contact No., Available Quantity, Book Quantity
- * (typed) and Remaining Quantity (available - booked, as it is typed). OK
+ * its own: its name, Required (order) Quantity, Available (all its warehouses'
+ * stock), Remaining to Book (required - available, when the stock falls short)
+ * and Booked, then its warehouses in one table - Warehouse Name, Contact No.,
+ * Available Quantity, Book Quantity (typed) and Remaining Quantity (available -
+ * booked, as it is typed). A product none of whose warehouses holds any of it
+ * gets the same table: its own warehouses, each at 0. OK
  * works only once it all checks out (inventoryBooking's checkBooking - each
  * product booked for its whole order quantity) and hands the quantities back
  * - onConfirm(items, booked); nothing is sent from here. The workspace then
@@ -82,6 +85,9 @@ export default function InventoryBookingModal({ open, lines, productsByKey, comp
       <div className="space-y-4" data-testid="inventory-booking">
         {items.map((item) => {
           const total = totalBooked(item, booked)
+          // The stock all its warehouses hold, and what the order needs beyond it (the backend books only what is there).
+          const available = totalAvailable(item)
+          const shortfall = Math.max(0, item.orderQty - available)
           const error = shown.items[item.key]
           return (
             <section key={item.key} className="space-y-1.5 rounded-md border border-border p-3" aria-label={`Booking of ${item.productName}`} data-testid="booking-item">
@@ -91,64 +97,72 @@ export default function InventoryBookingModal({ open, lines, productsByKey, comp
                   {showSku && item.skuCode ? <span className="ml-2 text-xs font-normal text-muted-foreground">{item.skuCode}</span> : null}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Order Quantity <span className="font-semibold text-foreground tabular-nums" data-testid="booking-order-qty">{quantity(item.orderQty)}</span>
-                  {item.warehouses.length ? (
+                  Required Quantity <span className="font-semibold text-foreground tabular-nums" data-testid="booking-order-qty">{quantity(item.orderQty)}</span>
+                  {' '}
+                  - Available <span className="font-semibold text-foreground tabular-nums" data-testid="booking-available">{quantity(available)}</span>
+                  {shortfall > 0 ? (
                     <>
                       {' '}
-                      - Booked <span className={cn('font-semibold tabular-nums', error ? 'text-destructive' : 'text-foreground')} data-testid="booking-total">{quantity(total)}</span>
+                      - Remaining to Book <span className="font-semibold text-destructive tabular-nums" data-testid="booking-shortfall">{quantity(shortfall)}</span>
                     </>
                   ) : null}
+                  {' '}
+                  - Booked <span className={cn('font-semibold tabular-nums', error ? 'text-destructive' : 'text-foreground')} data-testid="booking-total">{quantity(total)}</span>
                 </p>
               </div>
-              {item.warehouses.length === 0 ? (
-                <p className="flex items-center gap-1.5 text-xs text-muted-foreground" data-testid="booking-no-stock">
-                  <PackageX className="size-3.5" aria-hidden="true" />
-                  No warehouse holds this product - nothing to book.
-                </p>
-              ) : (
-                <div className="overflow-x-auto rounded-md border border-border">
-                  <table className="w-full min-w-[560px] text-sm">
-                    <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-                      <tr>
-                        <th className={cn(cell, 'font-medium')}>Warehouse Name</th>
-                        <th className={cn(cell, 'font-medium')}>Contact No.</th>
-                        <th className={cn(cell, 'text-right font-medium')}>Available Quantity</th>
-                        <th className={cn(cell, 'w-36 font-medium')}>Book Quantity</th>
-                        <th className={cn(cell, 'text-right font-medium')}>Remaining Quantity</th>
+              {/* The same table for every product - one no warehouse holds lists the company's warehouses at 0. */}
+              <div className="overflow-x-auto rounded-md border border-border">
+                <table className="w-full min-w-[560px] text-sm">
+                  <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                    <tr>
+                      <th className={cn(cell, 'font-medium')}>Warehouse Name</th>
+                      <th className={cn(cell, 'font-medium')}>Contact No.</th>
+                      <th className={cn(cell, 'text-right font-medium')}>Available Quantity</th>
+                      <th className={cn(cell, 'w-36 font-medium')}>Book Quantity</th>
+                      <th className={cn(cell, 'text-right font-medium')}>Remaining Quantity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {item.warehouses.map((warehouse) => {
+                      const value = bookedOf(booked, item.key, warehouse.id) ?? 0
+                      const remaining = warehouse.available - Math.max(0, value)
+                      const cellError = shown.cells[`${item.key}:${warehouse.id}`]
+                      return (
+                        <tr key={warehouse.id} className="border-t border-border align-top" data-testid="booking-warehouse">
+                          <td className={cn(cell, 'break-words')}>{warehouse.name}</td>
+                          <td className={cell}>{warehouse.contact || '--'}</td>
+                          <td className={cn(cell, 'text-right tabular-nums')}>{quantity(warehouse.available)}</td>
+                          <td className={cell}>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              aria-label={`Book quantity of ${item.productName} from ${warehouse.name}`}
+                              aria-invalid={Boolean(cellError)}
+                              className="h-8 w-full rounded-md border border-input bg-card px-2 text-right text-sm tabular-nums outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive"
+                              value={booked[item.key]?.[warehouse.id] ?? ''}
+                              onChange={(event) => type(item.key, warehouse.id, event.target.value)}
+                            />
+                            {cellError ? <p className="mt-0.5 text-[11px] text-destructive">{cellError}</p> : null}
+                          </td>
+                          <td className={cn(cell, 'text-right font-semibold tabular-nums', remaining < 0 && 'text-destructive')} data-testid="booking-remaining">
+                            {quantity(remaining)}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {/* A product with no warehouse at all: the same columns, at 0. */}
+                    {item.warehouses.length === 0 ? (
+                      <tr className="border-t border-border align-top text-muted-foreground" data-testid="booking-warehouse-empty">
+                        <td className={cell}>--</td>
+                        <td className={cell}>--</td>
+                        <td className={cn(cell, 'text-right tabular-nums')}>0</td>
+                        <td className={cell}>--</td>
+                        <td className={cn(cell, 'text-right font-semibold tabular-nums')}>0</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {item.warehouses.map((warehouse) => {
-                        const value = bookedOf(booked, item.key, warehouse.id) ?? 0
-                        const remaining = warehouse.available - Math.max(0, value)
-                        const cellError = shown.cells[`${item.key}:${warehouse.id}`]
-                        return (
-                          <tr key={warehouse.id} className="border-t border-border align-top" data-testid="booking-warehouse">
-                            <td className={cn(cell, 'break-words')}>{warehouse.name}</td>
-                            <td className={cell}>{warehouse.contact || '--'}</td>
-                            <td className={cn(cell, 'text-right tabular-nums')}>{quantity(warehouse.available)}</td>
-                            <td className={cell}>
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                aria-label={`Book quantity of ${item.productName} from ${warehouse.name}`}
-                                aria-invalid={Boolean(cellError)}
-                                className="h-8 w-full rounded-md border border-input bg-card px-2 text-right text-sm tabular-nums outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive"
-                                value={booked[item.key]?.[warehouse.id] ?? ''}
-                                onChange={(event) => type(item.key, warehouse.id, event.target.value)}
-                              />
-                              {cellError ? <p className="mt-0.5 text-[11px] text-destructive">{cellError}</p> : null}
-                            </td>
-                            <td className={cn(cell, 'text-right font-semibold tabular-nums', remaining < 0 && 'text-destructive')} data-testid="booking-remaining">
-                              {quantity(remaining)}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
               {error ? (
                 <p className="text-xs text-destructive" role="alert" data-testid="booking-item-error">
                   {error}

@@ -57,6 +57,9 @@ function PartyRows({ ledger, rows }) {
           <TableCell>{row.date}</TableCell>
           <TableCell title={row.invoiceNo}>{row.invoiceNo}</TableCell>
           <TableCell title={row.particulars}>{row.particulars}</TableCell>
+          <TableCell wrap title={row.narration || undefined}>
+            {row.narration}
+          </TableCell>
           <TableCell title={row.voucherType}>{row.voucherType}</TableCell>
           <TableCell className="text-right tabular-nums">{sentAmount(row.credit)}</TableCell>
           <TableCell className="text-right tabular-nums">{sentAmount(row.debit)}</TableCell>
@@ -64,7 +67,7 @@ function PartyRows({ ledger, rows }) {
         </TableRow>
       ))}
       <TableRow className="font-semibold">
-        <TableCell colSpan={6}>Closing Balance</TableCell>
+        <TableCell colSpan={7}>Closing Balance</TableCell>
         <TableCell className="text-right tabular-nums">{netText(ledger.debit, ledger.credit)}</TableCell>
       </TableRow>
     </>
@@ -83,6 +86,7 @@ function LedgerTable({ ledger }) {
             <PlainHead width={110}>Date</PlainHead>
             <PlainHead width={150}>Invoice No.</PlainHead>
             <PlainHead width={260}>Particulars</PlainHead>
+            <PlainHead width={220}>Narration</PlainHead>
             <PlainHead width={130}>Voucher Type</PlainHead>
             <PlainHead width={140} className="text-right">
               Credit

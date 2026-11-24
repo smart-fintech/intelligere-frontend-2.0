@@ -4,8 +4,8 @@
  *
  *   SKU Details (2)                                    [+ Add SKU]
  *   ┌ SKU 1 ─────────────────────────────────────────────── [x] ┐
- *   │ Fabric Type   Material   GSM / Count   Color   Size  ...  │
- *   │ Quantity   Expiry Date   Unit Rate                        │
+ *   │ Fabric Type   Material   GSM / Count   Color   Size       │
+ *   │ Pattern   Quality   Quantity   Expiry Date   Unit Rate    │
  *   │ Warehouse Allocation                      [+ Add Warehouse]│
  *   └───────────────────────────────────────────────────────────┘
  *   ┌ SKU 2 ...
@@ -184,11 +184,11 @@ export default function ProductSkuEntries({
                 )}
               </div>
 
-              {/* 1. What makes this SKU this SKU. */}
-              {renderFields(group.skuFields)}
-
-              {/* 2. Its own quantity, expiry date and rate - after every SKU field. */}
-              {group.detailFields.length > 0 ? renderFields(group.detailFields) : null}
+              {/* 1. What makes this SKU this SKU, and 2. its own quantity,
+                  expiry date and rate - one grid, so those three carry on in
+                  the row where the SKU fields end instead of starting a new
+                  one; they wrap only when that row is full. */}
+              {renderFields([...group.skuFields, ...group.detailFields])}
 
               {/* 3. Where it is kept. */}
               {group.withWarehouse ? (

@@ -30,8 +30,21 @@ import { downloadFileFromUrl } from '@/Utils/fileDownload'
  *              knows the selected company or the signed-in user
  *   disabled   true when there is nothing to export yet (no company, say)
  *   label      the button's text - "Download" unless a page names it
+ *
+ * For a file from another endpoint (the Ledger / Product import formats):
+ *   request         () => Promise of a reply carrying `download_url` or
+ *                   `file_url` - used instead of POSTing `payload`
+ *   fileName        saved under this if the link carries no file name
+ *   successMessage  the toast when the reply has no `msg` of its own
  */
-export function CsvDownloadButton({ payload, disabled = false, label = 'Download' }) {
+export function CsvDownloadButton({
+  payload,
+  request,
+  fileName,
+  successMessage = 'CSV downloaded.',
+  disabled = false,
+  label = 'Download',
+}) {
   const [downloading, setDownloading] = useState(false)
   // Set synchronously on click, so a second click in the same instant is
   // turned away even before `downloading` has rendered.
@@ -43,8 +56,8 @@ export function CsvDownloadButton({ payload, disabled = false, label = 'Download
     setDownloading(true)
 
     try {
-      const response = await generateCsv(payload)
-      const url = response?.download_url
+      const response = await (request ? request() : generateCsv(payload))
+      const url = response?.download_url || response?.file_url
 
       if (!url) {
         toast.error('The file could not be generated - no download link came back. Please try again.')
@@ -52,8 +65,8 @@ export function CsvDownloadButton({ payload, disabled = false, label = 'Download
       }
 
       // Named after `source` in case the link itself carries no file name.
-      await downloadFileFromUrl(url, `${payload?.source || 'export'}.csv`)
-      toast.success(response?.msg || 'CSV downloaded.')
+      await downloadFileFromUrl(url, fileName || `${payload?.source || 'export'}.csv`)
+      toast.success(response?.msg || successMessage)
     } catch (error) {
       // `error.message` is the backend's own text (see authService).
       toast.error(error.message || 'Could not download the file.')

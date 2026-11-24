@@ -185,7 +185,10 @@ export default function BasicProductForm({
   const validate = () => {
     const found = {}
 
-    fields.forEach(({ key, label, required, numeric }) => {
+    fields.forEach(({ key, label, required, numeric, hidden }) => {
+      // A field the user cannot see is never one they are asked to fix.
+      if (hidden) return
+
       const value = form[key].trim()
 
       if (!value) {
@@ -512,7 +515,8 @@ export default function BasicProductForm({
           />
 
           <FormGrid>
-            {fields.map(renderField)}
+            {/* `hidden` fields (Intelligere's Unit Rate) are sent, not drawn. */}
+            {fields.filter((field) => !field.hidden).map(renderField)}
 
             {/* Optional, and Intelligere's alone - see the note at the top.
                 The whole row, so the chosen vendors' chips have room. */}

@@ -15,7 +15,11 @@
  * its WHOLE order quantity - the warehouses' booked quantities add up to it,
  * never more, never less. A warehouse's booking is held to the order quantity,
  * not to its own stock: booking past its stock shows as a negative Remaining
- * (the shortfall). A product no warehouse holds has nothing to book.
+ * (the shortfall). A product none of whose warehouses holds any of it is
+ * offered its own warehouses (its allocations), each with 0 available, and
+ * booked the same way (all of it a shortfall); with no warehouse at all it is
+ * still sent, with none - the backend books only stock that is there, the rest
+ * it records as still to make / buy.
  *
  * Where the stock is: the product list (inventory/product/) - each SKU's
  * entries' warehouse allocations, added up per warehouse; the company's
@@ -62,24 +66,27 @@ export const bookingItemsOf = ({ lines, productsByKey, warehouses = [] }) => {
         productName: textOf(product?.name),
         skuCode: textOf(variant?.skuCode),
         orderQty: numberOf(line.quantity) ?? 0,
-        // Only where the SKU is - a warehouse with none of it is not one to book from.
-        warehouses: [...stock.values()]
-          .filter((entry) => entry.available > 0)
-          .map((entry) => {
-            const record = byId.get(entry.id)
-            return {
-              id: entry.id,
-              name: entry.name || textOf(record?.warehouse_name) || `Warehouse ${entry.id}`,
-              contact: textOf(record?.contact),
-              available: entry.available,
-            }
-          }),
+        // Only where the SKU is - a warehouse with none of it is not one to book from. A SKU no warehouse
+        // holds any of: its own warehouses (its allocations, each at 0) - booked like any other (the shortfall shows).
+        warehouses: (held(stock).length > 0 ? held(stock) : [...stock.values()]).map((entry) => {
+          const record = byId.get(entry.id)
+          return {
+            id: entry.id,
+            name: entry.name || textOf(record?.warehouse_name) || `Warehouse ${entry.id}`,
+            contact: textOf(record?.contact),
+            available: entry.available,
+          }
+        }),
       }
     })
 }
+const held = (stock) => [...stock.values()].filter((entry) => entry.available > 0)
 
 /** What one warehouse's booked text is, as a number - null for nothing typed. */
 export const bookedOf = (booked, itemKey, warehouseId) => numberOf(booked?.[itemKey]?.[warehouseId])
+
+/** A product's stock, over the warehouses that hold it - 0 when none does. */
+export const totalAvailable = (item) => sum(item.warehouses.map((warehouse) => warehouse.available))
 
 /** How much a product has booked, over its warehouses (anything not a number counts as nothing). */
 export const totalBooked = (item, booked) => sum(item.warehouses.map((warehouse) => Math.max(0, bookedOf(booked, item.key, warehouse.id) ?? 0)))
@@ -125,22 +132,21 @@ export const automaticBooking = (items) => {
 }
 
 /**
- * The booking request - each product that books anything, with the warehouses
- * it books from (only those with a quantity above 0), under the backend's names:
+ * The booking request - every product, with the warehouses it books from (only
+ * those with a quantity above 0; none when the product has no warehouse - the
+ * backend then records its whole quantity as still to book), under the backend's names:
  *   { company_name, document_id, products: [{ "Product Name", sku_code, quantity, warehouse: [{ id, book_qty }] }] }
  */
 export const buildBookingBody = ({ companyName, documentId, items, booked }) => ({
   company_name: textOf(companyName),
   document_id: documentId,
-  products: items
-    .map((item) => ({
-      'Product Name': item.productName,
-      sku_code: item.skuCode,
-      quantity: quantityText(item.orderQty),
-      warehouse: item.warehouses
-        .map((warehouse) => ({ id: warehouse.id, value: bookedOf(booked, item.key, warehouse.id) }))
-        .filter((entry) => entry.value !== null && entry.value > 0)
-        .map((entry) => ({ id: entry.id, book_qty: quantityText(entry.value) })),
-    }))
-    .filter((product) => product.warehouse.length > 0),
+  products: items.map((item) => ({
+    'Product Name': item.productName,
+    sku_code: item.skuCode,
+    quantity: quantityText(item.orderQty),
+    warehouse: item.warehouses
+      .map((warehouse) => ({ id: warehouse.id, value: bookedOf(booked, item.key, warehouse.id) }))
+      .filter((entry) => entry.value !== null && entry.value > 0)
+      .map((entry) => ({ id: entry.id, book_qty: quantityText(entry.value) })),
+  })),
 })

@@ -16,6 +16,7 @@ import {
   INDIAN_STATE_OPTIONS,
   effectiveDispatch,
   documentProfile,
+  eInvoiceGstinParties,
   portalRequiredFields,
   portalSettingsOf,
   stateCodeOf,
@@ -159,6 +160,8 @@ export default function SellerStep({ invoice, disabled, onSettingChange }) {
           <Field
             id="seller-gstin"
             label="Seller GSTIN"
+            // Required only while E-Invoice is ticked (eInvoiceGstinParties).
+            required={eInvoiceGstinParties(form).includes('seller')}
             maxLength={15}
             inputClassName="uppercase"
             value={seller.gstin}

@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useMemo, useState } from 'react'
+import { useSelector } from 'react-redux'
 import { AlertCircle, ChevronRight, Download, Eye, FileSpreadsheet, FileText, FileX, Info, Pencil, RefreshCcw, Trash2, Truck, X } from 'lucide-react'
 
 import { ConfirmPopover } from '@/Components/Common/ConfirmPopover'
@@ -12,6 +13,7 @@ import { Checkbox } from '@/Components/ui/checkbox'
 import { Switch } from '@/Components/ui/switch'
 import { TableCell, TableRow } from '@/Components/ui/table'
 import { Tooltip } from '@/Components/ui/tooltip'
+import { PURCHASE_DOCUMENT_TYPE_OUTBOUND_ORDER } from '@/Constants/purchaseInvoice'
 import { QUERY } from '@/Constants/queryKeys'
 import { DOCUMENT_TYPE_INVOICE } from '@/Constants/salesInvoice'
 import { invalidateQueries } from '@/Library/queryCache'
@@ -19,6 +21,7 @@ import { cn } from '@/Library/utils'
 import { toast } from '@/Library/toast'
 import useInventoryAccess from '@/Hooks/useInventoryAccess'
 import { useListView } from '@/Hooks/useListView'
+import { selectIsIntelligereErp } from '@/Store/Slices/profileSlice'
 import { GstProgressPanel, GstToolbarActions, Gstr1Filing } from '@/Modules/SalesInvoice/History/GstDocumentPanel'
 import HistoryPdfModal from '@/Modules/SalesInvoice/History/HistoryPdfModal'
 import HistoryChildDocuments from '@/Modules/SalesInvoice/History/HistoryChildDocuments'
@@ -143,16 +146,21 @@ import { formatDate } from '@/Utils/date'
 const ALL = '__all__'
 
 const SALES_ORDER = 'Sales Order'
+/** The types whose history shows the server's Status column (business-document-history `status`). */
+const STATUS_TYPES = new Set([SALES_ORDER, PURCHASE_DOCUMENT_TYPE_OUTBOUND_ORDER])
 const SALES_ORDER_VIEWS = [
   { value: 'documents', label: 'Sales Order' },
   { value: 'inventory', label: 'Inventory Sales Order' },
 ]
 
+// By upload_type (filterHistoryRows). Tally Invoice is left out for an Intelligere ERP login - it has none.
 const SOURCE_OPTIONS = [
   { value: ALL, label: 'All Sources' },
   { value: HISTORY_SOURCE.TALLY, label: 'Tally Invoice' },
   { value: HISTORY_SOURCE.INTELLIGERE, label: 'Intelligere Invoice' },
+  { value: HISTORY_SOURCE.AI, label: 'AI Invoice' },
 ]
+const sourceOptionsFor = (intelligereErp) => (intelligereErp ? SOURCE_OPTIONS.filter((option) => option.value !== HISTORY_SOURCE.TALLY) : SOURCE_OPTIONS)
 
 /** Money as the app shows it - formatIndianCurrency, from paise. */
 const rupees = (paise) => (paise === null ? '--' : formatIndianCurrency(paise / 100))
@@ -427,8 +435,8 @@ const HISTORY_COLUMNS = [
   {
     key: 'status',
     width: 150,
-    // Sales Order's own: the server's status for each order, as sent.
-    when: (ctx) => ctx.documentType === SALES_ORDER,
+    // Sales Order's and Outbound Purchase Order's: the server's status for each order, as sent.
+    when: (ctx) => STATUS_TYPES.has(ctx.documentType),
     head: () => 'Status',
     cell: (row) => row.status || '--',
     cellClass: 'truncate',
@@ -503,6 +511,12 @@ export default function DocumentHistory({
     setFilters(EMPTY_HISTORY_FILTERS)
     setPage(1)
   }
+  // The Source choices for this login's ERP; Tally Invoice chosen when it is not one of them -> All Sources.
+  const intelligereErp = useSelector(selectIsIntelligereErp)
+  const sourceOptions = sourceOptionsFor(intelligereErp)
+  if (filters.source && !sourceOptions.some((option) => option.value === filters.source)) setFilter({ source: '' })
+  // The Excel export (invoice/export-documents-excel/) has no AI source to filter by.
+  const exportBlocked = filters.source === HISTORY_SOURCE.AI
   const changeList = (apply) => (value) => {
     if (!value) return
     apply(value)
@@ -589,7 +603,7 @@ export default function DocumentHistory({
   /* ---- Download Excel - the filters as applied ---- */
   const [exporting, setExporting] = useState(false)
   const downloadExcel = async () => {
-    if (exporting) return
+    if (exporting || exportBlocked) return
     setExporting(true)
     try {
       const partyName = partyOptions.find((option) => option.value === filters.party)?.label ?? ''
@@ -716,7 +730,7 @@ export default function DocumentHistory({
             id="history-source"
             label="Source"
             className="w-full sm:w-44"
-            options={SOURCE_OPTIONS}
+            options={sourceOptions}
             value={filters.source || ALL}
             onValueChange={(value) => value && setFilter({ source: value === ALL ? '' : value })}
           />
@@ -751,17 +765,31 @@ export default function DocumentHistory({
           {/* The row's actions, together at its end: E-Invoice / E-Way Bill (their types only), then Download Excel. */}
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
             {gstApplies ? <GstToolbarActions gst={gst} rows={filtered} disabled={history.rows.length === 0} size="sm" /> : null}
-            <Button
-              type="button"
-              variant="default"
-              size="sm"
-              icon={FileSpreadsheet}
-              loading={exporting}
-              disabled={exporting || history.rows.length === 0}
-              onClick={downloadExcel}
-            >
-              {exporting ? 'Exporting...' : 'Download Excel'}
-            </Button>
+            {(() => {
+              const button = (
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  icon={FileSpreadsheet}
+                  loading={exporting}
+                  disabled={exporting || history.rows.length === 0 || exportBlocked}
+                  onClick={downloadExcel}
+                >
+                  {exporting ? 'Exporting...' : 'Download Excel'}
+                </Button>
+              )
+              // A disabled button takes no hover - the reason sits on a wrapper.
+              return exportBlocked ? (
+                <Tooltip text="Excel export cannot filter AI Invoices yet - choose another Source to export">
+                  <span tabIndex={0} className="inline-flex outline-none" aria-label="Download Excel - not available for AI Invoice">
+                    {button}
+                  </span>
+                </Tooltip>
+              ) : (
+                button
+              )
+            })()}
           </div>
         </CardContent>
       </Card>

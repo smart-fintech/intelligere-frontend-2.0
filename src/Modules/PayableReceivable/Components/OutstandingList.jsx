@@ -3,7 +3,9 @@ import { AlertCircle, ArrowLeftRight, Download, IndianRupee,
   // Plus,
    RefreshCw, SearchX, X } from 'lucide-react'
 
-import { InlineAlert, ListSkeleton, RetryButton, RowActions, StateMessage } from '@/Components/Common/DataList'
+import { InlineAlert, ListSkeleton, RetryButton,
+  // RowActions, - for the Delete button, hidden for now
+  StateMessage } from '@/Components/Common/DataList'
 import { Field } from '@/Components/Common/FormFields'
 import { Loader } from '@/Components/Common/Loader'
 import { MultiSelectField } from '@/Components/Common/MultiSelectField'
@@ -45,7 +47,7 @@ import { downloadPdf } from '@/Utils/pdf'
  * ONE LIST - Payable or Receivable, the same component with `source` saying
  * which: party -> its invoices -> an invoice's partial payments.
  *
- *   Filters        due date range, overdue by at least N days, at least an
+ *   Filters        bill date range, overdue by at least N days, at least an
  *                  amount, one or several parties (all in the browser, no
  *                  request), on one row
  *   Paging         the parties, and each party's invoices within it - in the
@@ -57,7 +59,8 @@ import { downloadPdf } from '@/Utils/pdf'
  *                  as the old screen did; with none ticked, the whole party,
  *                  whatever the filters and pages show. Add Opening Balance.
  *   per invoice    Credit Days (PUT), Record Payment (PUT: partial or full),
- *                  Delete (DELETE, asked in a popover)
+ *                  Delete (DELETE, asked in a popover) - hidden for now: its
+ *                  button is commented out, the handler and API kept
  *
  * The screen remounts it for another list or company (`key`), so what is open
  * and filtered never carries across; the data itself is in the shared cache
@@ -247,6 +250,8 @@ export default function OutstandingList({ companyName, companyId, source, syncin
   /* ---------------- Changing an entry ---------------- */
   const [paying, setPaying] = useState(null) // { party, invoice }
   const [opening, setOpening] = useState(null) // { ledger } - '' from the header
+  // Delete's state and handler, kept while its button is hidden (commented out in renderInvoice).
+  /* eslint-disable no-unused-vars */
   const [confirming, setConfirming] = useState(null) // `${party}|${invoice.key}`
   const [deleting, setDeleting] = useState(false)
 
@@ -268,6 +273,7 @@ export default function OutstandingList({ companyName, companyId, source, syncin
       setDeleting(false)
     }
   }
+  /* eslint-enable no-unused-vars */
 
   // The PUT is the same as a payment's; only `credit_days` is sent, as the old screen did.
   const saveCreditDays = async (party, invoice, days) => {
@@ -336,6 +342,7 @@ export default function OutstandingList({ companyName, companyId, source, syncin
                 aria-label={`Record payment for ${invoice.invoiceNo}`}
                 onClick={() => setPaying({ party: party.name, invoice })}
               />
+              {/* Delete hidden for now - uncomment (and the RowActions import) to bring it back.
               <RowActions
                 label={invoice.invoiceNo}
                 deleteConfirm={{
@@ -347,7 +354,7 @@ export default function OutstandingList({ companyName, companyId, source, syncin
                   busy: deleting,
                   onConfirm: () => handleDelete(party.name, invoice),
                 }}
-              />
+              /> */}
             </div>
           </TableCell>
         </TableRow>
@@ -465,23 +472,23 @@ export default function OutstandingList({ companyName, companyId, source, syncin
             on anything narrower, with Clear always beside Party Name. Every field its label over a box
             of the same height. From the top, so the rest stay put when the party chips grow a row. */}
         <div className="mb-3 flex flex-wrap items-start gap-3 min-[1200px]:flex-nowrap">
-          {/* The due date, From and To under their own labels as on Ledger Export; neither passes the other. */}
+          {/* The bill date, From and To under their own labels as on Ledger Export; neither passes the other. */}
           <Field
             id="pr-filter-from"
-            label="From Date"
+            label="Bill Date From"
             type="date"
-            value={filters.dueFrom}
-            max={filters.dueTo || undefined}
-            onChange={(event) => setFilter({ dueFrom: event.target.value })}
+            value={filters.billFrom}
+            max={filters.billTo || undefined}
+            onChange={(event) => setFilter({ billFrom: event.target.value })}
             className="w-full sm:w-40 min-[1200px]:shrink-0"
           />
           <Field
             id="pr-filter-to"
-            label="To Date"
+            label="Bill Date To"
             type="date"
-            value={filters.dueTo}
-            min={filters.dueFrom || undefined}
-            onChange={(event) => setFilter({ dueTo: event.target.value })}
+            value={filters.billTo}
+            min={filters.billFrom || undefined}
+            onChange={(event) => setFilter({ billTo: event.target.value })}
             className="w-full sm:w-40 min-[1200px]:shrink-0"
           />
           <Field

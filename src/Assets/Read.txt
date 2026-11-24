@@ -5,12 +5,12 @@ Makes it easy to locate, manage, and update assets.
 
 format/
     The blank CSV templates the user downloads, fills in and uploads back -
-    LedgerFormat.csv today, ProductFormat.csv / VendorFormat.csv and the rest
+    JV_Ledger_Format.csv, the Sales Entries formats and the rest
     as they are added. One folder for all of them, never one per module.
 
     They are imported, not served from public/, so the build tracks them:
 
-        import format from '@/Assets/format/LedgerFormat.csv?raw'
+        import format from '@/Assets/format/JV_Ledger_Format.csv?raw'
 
     `?raw` gives the contents, which is what the download needs - it is saved
     under a name the code chooses (downloadTextFile in Utils/fileDownload).

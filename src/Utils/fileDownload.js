@@ -6,7 +6,7 @@
  * so it works offline and the saved file is named by the caller, not by
  * whatever the build happened to call the asset.
  *
- * @param {string} fileName - The name the file is saved as, e.g. "LedgerFormat.csv".
+ * @param {string} fileName - The name the file is saved as, e.g. "JV_Ledger_Format.csv".
  * @param {string} text - The file's contents.
  * @param {string} mimeType - Defaults to CSV, which is what the formats are.
  */

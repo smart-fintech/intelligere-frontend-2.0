@@ -15,10 +15,16 @@
  *
  * FILTERS - all on the rows already loaded, no request:
  *   the search box   the product's name (when the report has such a column)
- *   Warehouse        a warehouse the product has stock in - not offered to a
- *                    company whose plan allows one warehouse
+ *   Warehouse        warehouses the product has stock in, as many as wanted -
+ *                    not offered to a company whose plan allows one warehouse.
+ *                    With some chosen, a row's Quantity and the lines it opens
+ *                    onto are those warehouses' alone (narrowCustomReport);
+ *                    with none, the report as it came
  *   Expiry           a date range - only when the report HAS an expiry date
  *                    column; none is assumed
+ *
+ * The opened row's Created At is the entry's `created_at` - a dash until the
+ * report sends one (see ../customReport).
  */
 
 import { Fragment, useMemo, useState } from 'react'
@@ -43,16 +49,22 @@ import { cn } from '@/Library/utils'
 import { getProductCustomReport } from '@/Services/Inventory/inventoryProductService'
 import { hasSingleWarehouseLimit } from '@/Services/Inventory/inventoryService'
 import { orDash } from '@/Utils/display'
-import { filterCustomReport, readCustomReport, reportWarehouses } from '../customReport'
+import { filterCustomReport, narrowCustomReport, readCustomReport, reportWarehouses } from '../customReport'
 import { displayValue } from '../productList'
 
 const WAREHOUSE_FILTER = 'warehouse'
 const NO_RANGE = { from: '', to: '' }
+/** No warehouses chosen - one array, so the memos built on it hold. */
+const NO_WAREHOUSES = []
 
 /** The opened row's warehouse lines: a heading, then one line per stock entry. */
-const GRID = 'grid min-w-[40rem] grid-cols-[minmax(9rem,1.6fr)_6rem_6rem_6rem_6rem_minmax(8rem,1.4fr)] gap-x-3'
+const GRID = 'grid min-w-[48rem] grid-cols-[minmax(9rem,1.6fr)_6rem_6rem_6rem_6rem_minmax(9.5rem,1fr)_minmax(8rem,1.4fr)] gap-x-3'
 
-function WarehouseLines({ warehouses }) {
+/**
+ * A row's warehouses. Created At is the ENTRY's (one row is one entry), so
+ * it is written on its first line only, as on the Product view.
+ */
+function WarehouseLines({ warehouses, createdAt }) {
   if (warehouses.length === 0) {
     return <p className="px-3 py-4 text-center text-xs text-muted-foreground">No warehouse allocation for this product.</p>
   }
@@ -65,6 +77,7 @@ function WarehouseLines({ warehouses }) {
         <span>Shelf</span>
         <span>Rack No.</span>
         <span>Quantity</span>
+        <span>Created At</span>
         <span>Other</span>
       </div>
       {warehouses.map((warehouse, index) => (
@@ -74,6 +87,8 @@ function WarehouseLines({ warehouses }) {
           <span>{orDash(warehouse.shelf)}</span>
           <span>{orDash(warehouse.rackNo)}</span>
           <span>{orDash(warehouse.quantity)}</span>
+          {/* As the backend sends it, never re-parsed - the Product view's way. */}
+          <span className="break-words">{index === 0 ? orDash(createdAt) : ''}</span>
           <span className="break-words text-muted-foreground">
             {warehouse.others.length > 0
               ? warehouse.others.map(({ label, value }) => `${label}: ${displayValue(value)}`).join('  ·  ')
@@ -96,16 +111,25 @@ export default function CustomReport({ enabled = true }) {
   const warehouses = useMemo(() => (singleWarehouse ? [] : reportWarehouses(read.rows)), [read.rows, singleWarehouse])
 
   /* ---------------- Filters ---------------- */
-  const [warehouse, setWarehouse] = useState('')
+  const [chosenWarehouses, setChosenWarehouses] = useState(NO_WAREHOUSES)
   const [expiry, setExpiry] = useState(NO_RANGE)
 
   // A warehouse no longer in the report is not applied.
-  const activeWarehouse = warehouses.includes(warehouse) ? warehouse : ''
+  const activeWarehouses = useMemo(() => {
+    const still = chosenWarehouses.filter((label) => warehouses.includes(label))
+    return still.length > 0 ? still : NO_WAREHOUSES
+  }, [chosenWarehouses, warehouses])
   const expirySet = Boolean(read.expiryKey && (expiry.from || expiry.to))
 
+  // The rows the filters leave, in the chosen warehouses only - see FILTERS at the top.
   const filtered = useMemo(
-    () => filterCustomReport(read.rows, { warehouse: activeWarehouse, ...expiry, expiryKey: read.expiryKey }),
-    [read.rows, activeWarehouse, expiry, read.expiryKey],
+    () =>
+      narrowCustomReport(
+        filterCustomReport(read.rows, { warehouses: activeWarehouses, ...expiry, expiryKey: read.expiryKey }),
+        activeWarehouses,
+        read.quantityKey,
+      ),
+    [read.rows, activeWarehouses, expiry, read.expiryKey, read.quantityKey],
   )
 
   const view = useListView(filtered, { searchFields: read.nameKey ? [read.nameKey] : [] })
@@ -114,14 +138,16 @@ export default function CustomReport({ enabled = true }) {
     ...view,
     filterFields: warehouses.length > 0 ? { [WAREHOUSE_FILTER]: 'Warehouse' } : {},
     filterOptions: { [WAREHOUSE_FILTER]: warehouses },
-    filters: { [WAREHOUSE_FILTER]: activeWarehouse },
-    setFilter: (_field, value) => {
-      setWarehouse(value)
+    // Several at once - a multi-select on the row (TableFilters).
+    multiFilterFields: [WAREHOUSE_FILTER],
+    filters: { [WAREHOUSE_FILTER]: activeWarehouses },
+    setFilter: (_field, values) => {
+      setChosenWarehouses(values.length > 0 ? values : NO_WAREHOUSES)
       view.setPage(1)
     },
-    isFiltered: view.isFiltered || Boolean(activeWarehouse) || expirySet,
+    isFiltered: view.isFiltered || activeWarehouses.length > 0 || expirySet,
     clear: () => {
-      setWarehouse('')
+      setChosenWarehouses(NO_WAREHOUSES)
       setExpiry(NO_RANGE)
       view.clear()
     },
@@ -241,7 +267,10 @@ export default function CustomReport({ enabled = true }) {
                   {open ? (
                     <TableRow className="hover:bg-transparent">
                       <TableCell colSpan={columnCount} wrap className="bg-muted/40 p-0">
-                        <WarehouseLines warehouses={row.warehouses} />
+                        {/* Eased in, rather than snapping open. */}
+                        <div className="animate-in duration-200 fade-in-0 slide-in-from-top-1 motion-reduce:animate-none">
+                          <WarehouseLines warehouses={row.warehouses} createdAt={row.createdAt} />
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : null}

@@ -40,23 +40,20 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useSelector } from 'react-redux'
-import { Download } from 'lucide-react'
 
+import { CsvDownloadButton } from '@/Components/Common/CsvDownloadButton'
 import { CsvUploadButton } from '@/Components/Common/CsvUploadButton'
 import { Loader } from '@/Components/Common/Loader'
 import { Panel } from '@/Components/Common/Panel'
-import { Button } from '@/Components/ui/button'
 import { useWebSocket } from '@/Hooks/useWebSocket'
 import { toast } from '@/Library/toast'
+import { FORMAT_SOURCES, IMPORT_FILE_ACCEPT, getImportFormat } from '@/Services/Global/csvService'
 import {
-  PRODUCT_CSV_FORMAT_CONTENT,
-  PRODUCT_CSV_FORMAT_FILE,
   TALLY_PRODUCT_CREATE_MODULE,
   buildTallyProductImportMessage,
   importProductCsv,
 } from '@/Services/Product/productService'
 import { selectIsErpKnown } from '@/Store/Slices/profileSlice'
-import { downloadTextFile } from '@/Utils/fileDownload'
 
 /** Tally safety net: the longest the card waits for stop_loader - as for a ledger import. */
 const TALLY_IMPORT_TIMEOUT_MS = 5 * 60 * 1000
@@ -74,6 +71,8 @@ export default function ProductCsvUpload({ companyId, companyName, isTally = fal
   // file sent up as `intelligere` would create the products in the wrong
   // place. So the upload waits for it, as the ledger card does.
   const erpKnown = useSelector(selectIsErpKnown)
+  // What the upload and the format request both declare.
+  const erpType = isTally ? 'tally' : 'intelligere'
 
   const setPhaseBoth = (next) => {
     phaseRef.current = next
@@ -131,9 +130,6 @@ export default function ProductCsvUpload({ companyId, companyName, isTally = fal
     [],
   )
 
-  /** The blank CSV that ships with the app (Assets/format/ProductFormat.csv) - nothing is fetched. */
-  const handleDownloadFormat = () => downloadTextFile(PRODUCT_CSV_FORMAT_FILE, PRODUCT_CSV_FORMAT_CONTENT)
-
   /** Tally: the whole reply on to Tally, then the wait for its stop_loader. */
   const sendToTally = async (rows) => {
     setPhaseBoth('sending')
@@ -171,11 +167,7 @@ export default function ProductCsvUpload({ companyId, companyName, isTally = fal
     setPhaseBoth('uploading')
 
     try {
-      const response = await importProductCsv({
-        companyId,
-        erpType: isTally ? 'tally' : 'intelligere',
-        file: picked,
-      })
+      const response = await importProductCsv({ companyId, erpType, file: picked })
 
       // ---- Intelligere: the products already exist. ----
       if (!isTally) {
@@ -201,7 +193,7 @@ export default function ProductCsvUpload({ companyId, companyName, isTally = fal
     }
   }
 
-  const busyLabel = phase === 'uploading' ? 'Uploading the CSV...' : 'Creating the products in Tally...'
+  const busyLabel = phase === 'uploading' ? 'Uploading the file...' : 'Creating the products in Tally...'
 
   return (
     <Panel
@@ -210,13 +202,24 @@ export default function ProductCsvUpload({ companyId, companyName, isTally = fal
     >
       {/* The two buttons, one row - as on the ledger card. */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <CsvUploadButton size="sm" loading={busy} disabled={!companyId || !erpKnown} onFileSelect={handleSelect}>
-          Upload CSV
+        <CsvUploadButton
+          size="sm"
+          accept={IMPORT_FILE_ACCEPT}
+          loading={busy}
+          disabled={!companyId || !erpKnown}
+          onFileSelect={handleSelect}
+        >
+          Upload CSV / XLSX
         </CsvUploadButton>
 
-        <Button type="button" variant="default" size="sm" icon={Download} onClick={handleDownloadFormat}>
-          Download Format
-        </Button>
+        {/* Built by the backend with this company's product groups. */}
+        <CsvDownloadButton
+          label="Download Format"
+          fileName="ProductFormat.xlsx"
+          successMessage="Format downloaded."
+          disabled={!companyId || !erpKnown}
+          request={() => getImportFormat({ companyId, source: FORMAT_SOURCES.PRODUCT, erpType })}
+        />
       </div>
     </Panel>
   )

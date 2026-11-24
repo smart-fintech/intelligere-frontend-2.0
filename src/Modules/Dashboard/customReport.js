@@ -24,9 +24,18 @@
  *   an expiry date       ("Expiry Date", expiry_date - isExpiryDateField)
  *                        the only thing an expiry range filter can read;
  *                        without it there is no such filter
+ *   the quantity         ("Quantity", any case - the backend's own test for
+ *                        it) - the row's stock, worked out again from the
+ *                        chosen warehouses when the Warehouse filter is set
  *
- *   readCustomReport(rows, warehouseNames)   columns, rows and those two keys
+ * CREATED AT. A row is one stock entry, and the expansion has a Created At
+ * column for that entry's `created_at`. The report does not send one yet, so
+ * it reads a dash; when a row carries `created_at` it is shown there, as
+ * sent, and is never made a column of its own.
+ *
+ *   readCustomReport(rows, warehouseNames)   columns, rows and those keys
  *   filterCustomReport(rows, filters)        the rows the filters leave
+ *   narrowCustomReport(rows, labels, quantityKey)   them in some warehouses only
  */
 
 import { displayValue, fieldLabel, isExpiryDateField, isWithinDates, otherFields, PRODUCT_FIELD } from './productList'
@@ -35,8 +44,8 @@ const isPlainObject = (value) => value !== null && typeof value === 'object' && 
 const isScalar = (value) => ['string', 'number', 'boolean'].includes(typeof value)
 const textOf = (value) => (value === null || value === undefined ? '' : String(value).trim())
 
-/** The keys that are the row's own, not columns. */
-const NOT_COLUMNS = ['id', 'warehouse']
+/** The keys that are the row's own, not columns - `created_at` is shown in the expansion. */
+const NOT_COLUMNS = ['id', 'warehouse', 'created_at']
 
 /** A warehouse entry's keys the expansion shows by name - everything else follows. */
 const WAREHOUSE_KEYS = ['id', 'warehouse_id', 'name', 'warehouse_name', 'level', 'shelf', 'rack_no', 'warehouse_quantity']
@@ -60,11 +69,12 @@ const readWarehouse = (warehouse, names) => {
  * THE REPORT, ready to draw:
  *
  *   columns     [{ key, label }] - every plain field, first-seen order
- *   rows        [{ key, source, warehouses, ...{ [column]: text } }] - each
- *               column's value as text, under the column's own key, so the
- *               list view can sort and search it as it is
+ *   rows        [{ key, source, warehouses, createdAt, ...{ [column]: text } }] -
+ *               each column's value as text, under the column's own key, so
+ *               the list view can sort and search it as it is
  *   nameKey     the product-name column, or null
  *   expiryKey   the expiry-date column, or null
+ *   quantityKey the quantity column, or null
  *
  * `warehouseNames` is optional: { "<warehouse id>": "name" }.
  */
@@ -94,6 +104,8 @@ export const readCustomReport = (rows, warehouseNames = null) => {
         ...Object.fromEntries(columnKeys.map((column) => [column, displayValue(row[column]) === '--' ? '' : displayValue(row[column])])),
         key,
         source: row,
+        // The entry's own, when the report sends it - see the note at the top.
+        createdAt: textOf(row.created_at),
         warehouses: (Array.isArray(row.warehouse) ? row.warehouse : [])
           .filter(isPlainObject)
           .map((warehouse) => readWarehouse(warehouse, warehouseNames)),
@@ -101,6 +113,7 @@ export const readCustomReport = (rows, warehouseNames = null) => {
     }),
     nameKey: columnKeys.includes(PRODUCT_FIELD.NAME) ? PRODUCT_FIELD.NAME : null,
     expiryKey: columnKeys.find(isExpiryDateField) ?? null,
+    quantityKey: columnKeys.find((key) => key.trim().toLowerCase() === 'quantity') ?? null,
   }
 }
 
@@ -113,13 +126,41 @@ export const reportWarehouses = (rows) =>
 /**
  * The rows the filters leave - a new list, in the same order:
  *
- *   warehouse   a row with stock in that warehouse
+ *   warehouses  labels - a row with stock in any of them (none: no filter)
  *   from, to    a row whose `expiryKey` column falls in the range (YYYY-MM-DD,
  *               either end open) - only with an expiry column at all
  */
-export const filterCustomReport = (rows, { warehouse = '', from = '', to = '', expiryKey = null } = {}) =>
+export const filterCustomReport = (rows, { warehouses = [], from = '', to = '', expiryKey = null } = {}) =>
   rows.filter((row) => {
-    if (warehouse && !row.warehouses.some((entry) => entry.label === warehouse)) return false
+    if (warehouses.length > 0 && !row.warehouses.some((entry) => warehouses.includes(entry.label))) return false
     if (expiryKey && (from || to) && !isWithinDates(row.source[expiryKey], from, to)) return false
     return true
   })
+
+/** A number from a reply's text - 0 when it is not one, as in the backend's totals. */
+const numberOr0 = (value) => {
+  const number = Number(textOf(value))
+  return textOf(value) && Number.isFinite(number) ? number : 0
+}
+
+/**
+ * THE ROWS AS THEY STAND IN SOME WAREHOUSES - the Warehouse filter's: each
+ * row's warehouse lines are only the chosen ones (`labels`), and its
+ * quantity column (`quantityKey`, when there is one) is theirs added up -
+ * as the backend's own warehouse_id filter answers for one warehouse. New
+ * rows; the report is never changed. No labels: the rows as they are.
+ */
+export const narrowCustomReport = (rows, labels, quantityKey = null) => {
+  if (!labels || labels.length === 0) return rows
+
+  return rows.map((row) => {
+    const warehouses = row.warehouses.filter((warehouse) => labels.includes(warehouse.label))
+    const quantity = warehouses.reduce((total, warehouse) => total + numberOr0(warehouse.quantity), 0)
+
+    return {
+      ...row,
+      warehouses,
+      ...(quantityKey ? { [quantityKey]: String(Number(quantity.toFixed(4))) } : {}),
+    }
+  })
+}

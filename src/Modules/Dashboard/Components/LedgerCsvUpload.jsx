@@ -51,23 +51,20 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useSelector } from 'react-redux'
-import { Download } from 'lucide-react'
 
+import { CsvDownloadButton } from '@/Components/Common/CsvDownloadButton'
 import { CsvUploadButton } from '@/Components/Common/CsvUploadButton'
 import { Loader } from '@/Components/Common/Loader'
 import { Panel } from '@/Components/Common/Panel'
-import { Button } from '@/Components/ui/button'
 import { useWebSocket } from '@/Hooks/useWebSocket'
 import { toast } from '@/Library/toast'
+import { FORMAT_SOURCES, IMPORT_FILE_ACCEPT, getImportFormat } from '@/Services/Global/csvService'
 import {
   BULK_LEDGER_CREATE_MODULE,
-  LEDGER_CSV_FORMAT_CONTENT,
-  LEDGER_CSV_FORMAT_FILE,
   buildBulkLedgerMessage,
   importLedgerCsv,
 } from '@/Services/Ledger/ledgerService'
 import { selectIsErpKnown } from '@/Store/Slices/profileSlice'
-import { downloadTextFile } from '@/Utils/fileDownload'
 
 /**
  * Tally safety net: the longest the card waits for stop_loader after the
@@ -99,6 +96,8 @@ export default function LedgerCsvUpload({ companyId, companyName, isTally = fals
    * is read.
    */
   const erpKnown = useSelector(selectIsErpKnown)
+  // What the upload and the format request both declare.
+  const erpType = isTally ? 'tally' : 'intelligere'
 
   const setPhaseBoth = (next) => {
     phaseRef.current = next
@@ -169,18 +168,6 @@ export default function LedgerCsvUpload({ companyId, companyName, isTally = fals
   )
 
   /* ---------------------------------------------------------------- */
-  /* Download Format                                                  */
-  /* ---------------------------------------------------------------- */
-
-  /**
-   * The blank CSV that ships with the app (Assets/format/LedgerFormat.csv),
-   * written out under its own name. Nothing is fetched - the contents are in
-   * the bundle already, so this works with the backend unreachable.
-   */
-  const handleDownloadFormat = () =>
-    downloadTextFile(LEDGER_CSV_FORMAT_FILE, LEDGER_CSV_FORMAT_CONTENT)
-
-  /* ---------------------------------------------------------------- */
   /* Upload                                                           */
   /* ---------------------------------------------------------------- */
 
@@ -237,11 +224,7 @@ export default function LedgerCsvUpload({ companyId, companyName, isTally = fals
     setPhaseBoth('uploading')
 
     try {
-      const response = await importLedgerCsv({
-        companyId,
-        erpType: isTally ? 'tally' : 'intelligere',
-        file: picked,
-      })
+      const response = await importLedgerCsv({ companyId, erpType, file: picked })
 
       // ---- Intelligere: the ledgers already exist. The backend's own
       // message says how many, so it is shown exactly as it arrived. ----
@@ -271,7 +254,7 @@ export default function LedgerCsvUpload({ companyId, companyName, isTally = fals
   /* What the loader says: the upload first, then the wait on Tally, which
      begins the moment the rows have gone out over the socket. */
   const busyLabel =
-    phase === 'uploading' ? 'Uploading the CSV...' : 'Creating the ledgers in Tally...'
+    phase === 'uploading' ? 'Uploading the file...' : 'Creating the ledgers in Tally...'
 
   return (
     <Panel
@@ -291,23 +274,24 @@ export default function LedgerCsvUpload({ companyId, companyName, isTally = fals
             so the card does not say the same thing twice. */}
         <CsvUploadButton
           size="sm"
+          accept={IMPORT_FILE_ACCEPT}
           loading={busy}
           disabled={!companyId || !erpKnown}
           onFileSelect={handleSelect}
         >
-          Upload CSV
+          Upload CSV / XLSX
         </CsvUploadButton>
 
-        {/* Ledger-specific: the blank format that ships with the app. */}
-        <Button
-          type="button"
-          variant="default"
-          size="sm"
-          icon={Download}
-          onClick={handleDownloadFormat}
-        >
-          Download Format
-        </Button>
+        {/* The blank format, built by the backend for this company and ERP
+            (its Group dropdown differs between Tally and Intelligere) - so
+            it too waits for the ERP to be known. */}
+        <CsvDownloadButton
+          label="Download Format"
+          fileName="LedgerFormat.xlsx"
+          successMessage="Format downloaded."
+          disabled={!companyId || !erpKnown}
+          request={() => getImportFormat({ companyId, source: FORMAT_SOURCES.LEDGER, erpType })}
+        />
       </div>
     </Panel>
   )

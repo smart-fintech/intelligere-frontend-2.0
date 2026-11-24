@@ -115,6 +115,9 @@ export const PURCHASE_PROFILES = {
     discount: false,
     other: [],
     gst: false,
+    // Its screen shows no prices, but each saved line carries them as a Purchase Invoice's does -
+    // the rate and GST slab the line already holds (buildBusinessDocumentPayload's `pricedLines`).
+    pricedLines: true,
   },
   [PURCHASE_DOCUMENT_TYPE_OUTBOUND_ORDER]: {
     label: 'Outbound Purchase Order',

@@ -11,6 +11,13 @@
  * as "Add Product Group Creation", which creates the group through the API
  * - the place the simple Product form's groups are added now.
  *
+ * Add Stock Creation (StockCreationModal) is the simple Product form itself,
+ * in a dialog - offered, to either ERP, only while the active company's plan
+ * lacks Inventory Management (hasInventoryManagement). Once a product is
+ * saved, the shared product list is read again at once for every screen
+ * showing it (markProductsChanged's `refetchActive`), as a saved ledger
+ * reloads the ledgers below.
+ *
  * Ledger groups are a Tally idea - Intelligere's come as a fixed list from
  * the API - so that option is simply not offered to an Intelligere user. The
  * ERP is the store's answer (selectIsTallyErp), the same one the Ledger Form
@@ -52,7 +59,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { FolderPlus, Layers, Plus, UserPlus } from 'lucide-react'
+import { FolderPlus, Layers, PackagePlus, Plus, UserPlus } from 'lucide-react'
 
 import { ActionDropdown } from '@/Components/Common/ActionDropdown'
 import { Modal } from '@/Components/Common/Modal'
@@ -66,16 +73,20 @@ import { fetchBankOptions, selectBankNames } from '@/Store/Slices/bankSlice'
 import useInventoryAccess from '@/Hooks/useInventoryAccess'
 import useSectionAccess from '@/Hooks/useSectionAccess'
 import { ACCESS_SECTIONS } from '@/Services/Auth/accessService'
+import { hasInventoryManagement } from '@/Services/Inventory/inventoryService'
+import { markProductsChanged } from '@/Services/Product/productCache'
 import { selectIsTallyErp } from '@/Store/Slices/profileSlice'
 import { fetchLedgerGroups, fetchLedgers, selectLedgerGroups } from '@/Store/Slices/ledgerSlice'
 import LedgerForm from './LedgerForm'
 import LedgerGroupModal from './LedgerGroupModal'
+import StockCreationModal from './StockCreationModal'
 import StockGroupModal from './StockGroupModal'
 
 /** What the dropdown reports back - see onSelect below. */
 const ADD_LEDGER = 'ledger_creation'
 const ADD_LEDGER_GROUP = 'ledger_group'
 const ADD_STOCK_GROUP = 'stock_group'
+const ADD_STOCK = 'stock_creation'
 
 /**
  * How long a save waits before the ledgers are read back.
@@ -103,8 +114,21 @@ export default function LedgerActions() {
   // Tally always; Intelligere when its products are the simple ones.
   const offersGroupCreation = canCreateProduct && (isTally || (inventory.known && !inventory.full))
 
+  // Only for a company (once it is known) whose plan lacks Inventory
+  // Management - read again whenever the header moves to another company.
+  const offersStockCreation = canCreateProduct && Boolean(company) && !hasInventoryManagement(company)
+
   // Which modal is open, or null. One at a time, by definition.
   const [openModal, setOpenModal] = useState(null)
+
+  /* A product is filed under the company it was started for: when the
+     header moves to another company, an open Add Stock Creation closes
+     rather than carry on under the new one (adjusted during render). */
+  const [stockCompanyId, setStockCompanyId] = useState(companyId)
+  if (stockCompanyId !== companyId) {
+    setStockCompanyId(companyId)
+    if (openModal === ADD_STOCK) setOpenModal(null)
+  }
 
   /* The pending read-back, and the company it is for. Both refs: the timer
      below fires long after the render that started it, and has to know
@@ -143,6 +167,8 @@ export default function LedgerActions() {
           },
         ]
       : []),
+    // See the note at the top - not with Inventory Management.
+    ...(offersStockCreation ? [{ label: 'Add Stock Creation', value: ADD_STOCK, icon: PackagePlus }] : []),
   ]
 
   /** Reloads the ledger list - the same thunk the page's Refresh uses. */
@@ -173,8 +199,8 @@ export default function LedgerActions() {
        button is on every page, and only the Ledger page loads them by
        itself; both thunks refuse a duplicate request (see their
        `condition`), so from the Ledger page these are no-ops. */
-    // (The stock group modal reads its own list - product groups - as it opens.)
-    if (value !== ADD_STOCK_GROUP) dispatch(fetchLedgerGroups())
+    // (The stock group and stock modals read their own lists as they open.)
+    if (value !== ADD_STOCK_GROUP && value !== ADD_STOCK) dispatch(fetchLedgerGroups())
     // Only the ledger form needs the banks - the group modal has no such field.
     if (value === ADD_LEDGER) dispatch(fetchBankOptions())
 
@@ -216,6 +242,19 @@ export default function LedgerActions() {
       dispatch(fetchLedgers({ companyId: savedFor, force: true }))
     }, 0)
     // }, RELOAD_AFTER_SAVE_MS)
+  }
+
+  /**
+   * A product was saved from Add Stock Creation: close the dialog and read
+   * the shared product list again - at once for every screen showing it
+   * (the Product page, the Sales Invoice form ...), on next use for the
+   * rest. The same one cache every product screen reads (useProducts), so
+   * no second list and no extra request of this dialog's own. The form has
+   * already said it was saved.
+   */
+  const handleStockCreated = () => {
+    setOpenModal(null)
+    markProductsChanged({ refetchActive: true })
   }
 
   return (
@@ -280,6 +319,15 @@ export default function LedgerActions() {
           onOpenChange={(next) => setOpenModal(next ? ADD_STOCK_GROUP : null)}
           companyName={activeCompanyName}
           isTally={isTally}
+        />
+      ) : null}
+
+      {/* ---------------- Add Stock Creation (no Inventory Management) ---------------- */}
+      {offersStockCreation ? (
+        <StockCreationModal
+          open={openModal === ADD_STOCK}
+          onOpenChange={(next) => setOpenModal(next ? ADD_STOCK : null)}
+          onCreated={handleStockCreated}
         />
       ) : null}
     </>
