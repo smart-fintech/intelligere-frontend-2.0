@@ -47,40 +47,81 @@ function VendorCurrencyTag({ saved }) {
 
 const asList = (value) => (Array.isArray(value) ? value : [])
 
+/** An opened row's content: no wider than the table's visible box (100cqw), pinned to its left edge. */
+const OPENED_ROW = 'sticky left-0 max-w-[100cqw]'
+
+/** Bid History cells: tighter on a phone, so the three columns fit its width. */
+const HISTORY_CELL = 'px-2 sm:px-3'
+
 /**
  * A vendor's bid history, delivery day changes and notes. `currency` is its
  * { code, rate } on this auction (bidCurrencyOf) - each bid then shows its own
  * figure too, `lead` saying which comes first ('base' company side, 'own' in
  * the vendor portal); `baseCode` the company's currency where it is known.
+ *
+ * The bids are a table - Date & Time, Bid Amount, Bid Days - in the order they
+ * were saved. A bid_history entry carries no note (the note is the vendor's
+ * own field - plain text, or a list from before - not tied to a bid, and can
+ * come without one), so it is listed under the table.
  */
 export function VendorHistory({ vendor, showAmounts, currency = null, baseCode = '', lead = 'base' }) {
   const bids = asList(vendor.bid_history)
   const deliveries = asList(vendor.delivery_days_history)
-  const notes = asList(vendor.notes).filter((note) => String(note ?? '').trim())
+  // A note is sent as plain text now; vendors who added notes earlier still have a list.
+  const notes = (Array.isArray(vendor.notes) ? vendor.notes : [vendor.notes]).filter((note) => String(note ?? '').trim())
 
   return (
     <div className="grid grid-cols-1 gap-4 bg-muted/30 p-3 text-xs md:grid-cols-3">
-      <div>
-        <p className="mb-1 font-semibold text-brand">Bid History</p>
-        {bids.length === 0 ? (
-          <p className="text-muted-foreground">No bid yet.</p>
-        ) : (
-          <ol className="space-y-1">
-            {bids.map((bid, index) => (
-              <li key={index} className="flex flex-wrap justify-between gap-2 border-b border-border/60 pb-1">
-                <span className="tabular-nums">
-                  {showAmounts ? <BidAmount value={bid?.bid_amount} currency={currency} baseCode={baseCode} lead={lead} /> : 'Hidden'}
-                </span>
-                <span className="text-muted-foreground">
-                  {showSentAt(bid?.bid_time)}
-                  {bid?.delivery_days ? ` · ${bid.delivery_days} days` : ''}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
+      <div className="min-w-0 space-y-4 md:col-span-2">
+        <div>
+          <p className="mb-1 font-semibold text-brand">Bid History</p>
+          {bids.length === 0 ? (
+            <p className="rounded-md border border-dashed border-border bg-card px-3 py-2 text-muted-foreground">No bid yet.</p>
+          ) : (
+            <Table containerClassName="rounded-md border border-border bg-card" className="text-xs" aria-label="Bid History">
+              <TableHeader className="bg-muted">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className={cn(HISTORY_CELL, 'h-8')}>Date &amp; Time</TableHead>
+                  <TableHead className={cn(HISTORY_CELL, 'h-8 text-right')}>Bid Amount</TableHead>
+                  <TableHead className={cn(HISTORY_CELL, 'h-8 text-right')}>Bid Days</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bids.map((bid, index) => (
+                  <TableRow key={index}>
+                    <TableCell className={cn(HISTORY_CELL, 'py-2 text-muted-foreground tabular-nums sm:whitespace-nowrap')}>
+                      {orDash(showSentAt(bid?.bid_time))}
+                    </TableCell>
+                    <TableCell className={cn(HISTORY_CELL, 'py-2 text-right tabular-nums')}>
+                      {showAmounts ? (
+                        <BidAmount value={bid?.bid_amount} currency={currency} baseCode={baseCode} lead={lead} />
+                      ) : (
+                        'Hidden'
+                      )}
+                    </TableCell>
+                    <TableCell className={cn(HISTORY_CELL, 'py-2 text-right tabular-nums')}>{orDash(bid?.delivery_days)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+        <div>
+          <p className="mb-1 font-semibold text-brand">Notes</p>
+          {notes.length === 0 ? (
+            <p className="text-muted-foreground">No notes.</p>
+          ) : (
+            <ul className="list-disc space-y-1 pl-4">
+              {notes.map((note, index) => (
+                <li key={index} className="break-words whitespace-pre-line [overflow-wrap:anywhere]">
+                  {note}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
-      <div>
+      <div className="min-w-0">
         <p className="mb-1 font-semibold text-brand">Delivery Days Changes</p>
         {deliveries.length === 0 ? (
           <p className="text-muted-foreground">No change.</p>
@@ -95,20 +136,6 @@ export function VendorHistory({ vendor, showAmounts, currency = null, baseCode =
               </li>
             ))}
           </ol>
-        )}
-      </div>
-      <div>
-        <p className="mb-1 font-semibold text-brand">Notes</p>
-        {notes.length === 0 ? (
-          <p className="text-muted-foreground">No notes.</p>
-        ) : (
-          <ul className="list-disc space-y-1 pl-4">
-            {notes.map((note, index) => (
-              <li key={index} className="break-words">
-                {note}
-              </li>
-            ))}
-          </ul>
         )}
       </div>
     </div>
@@ -141,7 +168,9 @@ export default function ProductVendors({ event, product, onProfile, onCertificat
   }
 
   return (
-    <Table containerClassName="rounded-md border border-border">
+    // The scroll box is a size container: an opened row (documents, history) is
+    // kept to its visible width and stays in view while the wide table scrolls sideways.
+    <Table containerClassName="@container rounded-md border border-border">
       <TableHeader className="bg-muted">
         <TableRow className="hover:bg-transparent">
           <TableHead width={40}>#</TableHead>
@@ -237,23 +266,27 @@ export default function ProductVendors({ event, product, onProfile, onCertificat
               {documentsShown ? (
                 <TableRow className="hover:bg-transparent">
                   <TableCell colSpan={columns} className="p-0 whitespace-normal">
-                    <VendorDocumentsPanel
-                      vendor={vendor}
-                      event={event}
-                      onVerified={(certificateName) => onCertificateVerified?.(vendor, certificateName)}
-                    />
+                    <div className={OPENED_ROW}>
+                      <VendorDocumentsPanel
+                        vendor={vendor}
+                        event={event}
+                        onVerified={(certificateName) => onCertificateVerified?.(vendor, certificateName)}
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : null}
               {isOpen ? (
                 <TableRow className="hover:bg-transparent">
                   <TableCell colSpan={columns} className="p-0 whitespace-normal">
-                    <VendorHistory
-                      vendor={vendor}
-                      showAmounts={showAmounts}
-                      currency={bidCurrencyOf(vendor)}
-                      baseCode={baseCode}
-                    />
+                    <div className={OPENED_ROW}>
+                      <VendorHistory
+                        vendor={vendor}
+                        showAmounts={showAmounts}
+                        currency={bidCurrencyOf(vendor)}
+                        baseCode={baseCode}
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : null}

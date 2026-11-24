@@ -21,6 +21,11 @@
  *                              Semi-Finished References  (semi_finished_reference)
  *                              Version History           (past_version)
  *
+ * A COMPANY THAT DOES NOT MANAGE SKUs ("Enable SKU" off in Master Details -
+ * useSkuManagement) sees no SKU wording: the second tab is Product Details,
+ * its figures Total Quantity and Total Amount, no SKU Code, and a product
+ * with several stock records heads each "Stock 2", not "SKU 2".
+ *
  * A tab says how many things it holds, so an empty one is known to be empty
  * before it is opened - and says so plainly when it is.
  *
@@ -83,7 +88,7 @@ function VariantHeading({ variant, index, count }) {
   const code = showSku ? variant.skuCode : ''
   if (count <= 1 && !code) return null
 
-  return <h4 className="text-xs font-semibold text-brand">{code || `SKU ${index + 1}`}</h4>
+  return <h4 className="text-xs font-semibold text-brand">{code || `${showSku ? 'SKU' : 'Stock'} ${index + 1}`}</h4>
 }
 
 /** The company's own fields as detail rows - those with a value, less any in `skip`. */
@@ -171,7 +176,7 @@ function GeneralTab({ product }) {
 
 function VariantsTab({ product }) {
   const showSku = useSkuManagement()
-  if (product.variants.length === 0) return <Empty>This product has no SKU variants.</Empty>
+  if (product.variants.length === 0) return <Empty>{showSku ? 'This product has no SKU variants.' : 'This product has no product details.'}</Empty>
 
   return (
     <div className="space-y-4">
@@ -189,8 +194,8 @@ function VariantsTab({ product }) {
 
             <DetailList>
               {showSku ? <DetailItem label="SKU Code">{variant.skuCode}</DetailItem> : null}
-              <DetailItem label="SKU Quantity">{displayValue(variant.totalQty)}</DetailItem>
-              <DetailItem label="SKU Amount">{displayValue(variant.totalAmount)}</DetailItem>
+              <DetailItem label={showSku ? 'SKU Quantity' : 'Total Quantity'}>{displayValue(variant.totalQty)}</DetailItem>
+              <DetailItem label={showSku ? 'SKU Amount' : 'Total Amount'}>{displayValue(variant.totalAmount)}</DetailItem>
               <DetailItem label="Selling Rate">{displayValue(variant.source['Selling Rate'])}</DetailItem>
               {skuFields
                 .filter(([, value]) => isFilled(value))
@@ -356,7 +361,7 @@ function VersionHistory({ product, sections }) {
         variant.pastVersions.map((version) => (
           <section key={`${index}-${version.key}`} className="space-y-2 rounded-md border border-border p-3">
             <h4 className="text-xs font-semibold text-brand">
-              {product.variants.length > 1 ? `${(showSku && variant.skuCode) || `SKU ${index + 1}`} - ` : ''}
+              {product.variants.length > 1 ? `${(showSku && variant.skuCode) || `${showSku ? 'SKU' : 'Stock'} ${index + 1}`} - ` : ''}
               {version.label}
             </h4>
             {sections.map(({ key, title }) => {
@@ -415,7 +420,8 @@ const TABS = [
   { key: 'general', label: 'General', render: (product) => <GeneralTab product={product} /> },
   {
     key: 'variants',
-    label: 'SKU Variants',
+    // Product Details for a company that does not manage SKUs - see the note at the top.
+    label: (showSku) => (showSku ? 'SKU Variants' : 'Product Details'),
     count: (product) => product.variants.length,
     render: (product) => <VariantsTab product={product} />,
   },
@@ -452,6 +458,7 @@ const TABS = [
 
 export default function ProductDetailsModal({ open, onOpenChange, product, description }) {
   const [tabKey, setTabKey] = useState(TABS[0].key)
+  const showSku = useSkuManagement()
 
   // Kept mounted through the closing animation, with nothing to draw.
   if (!product) return null
@@ -492,7 +499,7 @@ export default function ProductDetailsModal({ open, onOpenChange, product, descr
                     : 'text-muted-foreground hover:bg-brand-soft hover:text-brand dark:hover:bg-brand/15',
                 )}
               >
-                {label}
+                {typeof label === 'function' ? label(showSku) : label}
                 {total !== undefined ? <span className="font-normal opacity-70">({total})</span> : null}
               </button>
             )

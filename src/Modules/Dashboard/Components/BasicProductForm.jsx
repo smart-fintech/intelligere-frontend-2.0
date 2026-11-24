@@ -93,6 +93,7 @@ import { Panel } from '@/Components/Common/Panel'
 import { Button } from '@/Components/ui/button'
 import { GST_RATES, gstBreakdown } from '@/Constants/gst'
 import { toOptions } from '@/Constants/inventory'
+import { NO_VERIFIED_VENDORS } from '@/Hooks/useVendorOptions'
 import { useWebSocket } from '@/Hooks/useWebSocket'
 import { toast } from '@/Library/toast'
 import {
@@ -471,7 +472,8 @@ export default function BasicProductForm({
         className={key === 'product_name' ? 'sm:col-span-2' : undefined}
         value={form[key]}
         error={errors[key]}
-        disabled={submitting}
+        // A saved product keeps its name - only a new one is named here.
+        disabled={submitting || (editing && key === 'product_name')}
         onChange={(event) => {
           // A keystroke that would stop it being a number is not taken.
           if (!numeric || NUMBER_IN_PROGRESS.test(event.target.value)) setField(key, event.target.value)
@@ -480,8 +482,10 @@ export default function BasicProductForm({
     )
   }
 
-  /* The company's vendors, plus any the product was saved with that the list
-     no longer has - so those still show by name, and can be removed. */
+  /* The company's VERIFIED vendors (useVendorOptions), plus any the product
+     was saved with that the list does not offer - deleted since, or not
+     verified (yet) - so those still show by name, are sent back as saved
+     (saveToIntelligere), and can be removed. */
   const vendorChoices = [
     ...vendors.options,
     ...(product?.vendors ?? [])
@@ -526,7 +530,7 @@ export default function BasicProductForm({
                 label="Vendor"
                 className="sm:col-span-2"
                 placeholder={
-                  loadingVendors ? 'Loading...' : vendorChoices.length === 0 ? 'No vendors found' : 'Select vendors'
+                  loadingVendors ? 'Loading...' : vendors.options.length === 0 ? NO_VERIFIED_VENDORS : 'Select vendors'
                 }
                 searchPlaceholder="Search vendor..."
                 options={vendorChoices}

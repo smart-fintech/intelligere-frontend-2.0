@@ -49,6 +49,8 @@ import {
   PRODUCT_FIELD_VENDOR_SELECT,
   PRODUCT_FIELDS_PER_STEP,
   PRODUCT_MAIN_FIELD_COUNT,
+  isCustomFieldHidden,
+  isCustomFieldRequired,
   isProductQuantityField,
   perSkuFieldRank,
 } from '@/Constants/inventory'
@@ -183,7 +185,8 @@ const orderOf = (field) => toNumber(field?.field_order)
 
 /**
  * The fields a product has: every customised field that has a name and is
- * not hidden (`hide_field: true`, strictly), in `field_order`. A second
+ * not hidden (`hide_field: true`, strictly - and never a mandatory one,
+ * PRODUCT_MANDATORY_FIELDS: see isCustomFieldHidden), in `field_order`. A second
  * field with a name already taken is left out - two values cannot be kept,
  * or sent, under one name.
  */
@@ -192,7 +195,7 @@ export const productFields = (rows) => {
 
   const usable = (Array.isArray(rows) ? rows : []).filter((field) => {
     const name = productFieldName(field)
-    if (!field || !name || field.hide_field === true || names.has(name)) return false
+    if (!field || !name || isCustomFieldHidden(field) || names.has(name)) return false
 
     names.add(name)
     return true
@@ -438,7 +441,9 @@ const isRealDate = (value) => {
 /**
  * What is wrong with one field's value, or undefined when nothing is.
  *
- * Required comes from the field (`is_required`), never from its name. A
+ * Required comes from the field (`is_required`) - and a mandatory field
+ * (PRODUCT_MANDATORY_FIELDS: Product Name, HSN Code, Quantity ...) is
+ * required whatever its settings say (isCustomFieldRequired). A
  * field that is not required may be left empty whatever its type; one that
  * holds something is checked against its type. An `unsupported` field
  * cannot be filled in, so it is never held against the user.
@@ -448,7 +453,7 @@ export const validateProductField = (field, value) => {
   if (kind === PRODUCT_INPUT.UNSUPPORTED) return undefined
 
   // A required reference field wants at least one reference added (OK).
-  if (isBlank(value)) return field.is_required === true ? `${productFieldName(field)} is required` : undefined
+  if (isBlank(value)) return isCustomFieldRequired(field) ? `${productFieldName(field)} is required` : undefined
   if (isReferenceInput(kind)) return undefined
 
   if (kind === PRODUCT_INPUT.NUMBER && !NUMBER_PATTERN.test(String(value).trim())) return 'Enter a valid number'

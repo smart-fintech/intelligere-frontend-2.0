@@ -402,8 +402,9 @@ export default function LedgerForm({
       // What was searched for, tidied to the canonical form.
       ledger_gstin: details.gstNumber || previous.ledger_gstin.trim().toUpperCase(),
       // A ledger names the party as registered, so the legal name leads and
-      // the trade name stands in when there is no legal name.
-      ledger_name: details.legalName || details.name || previous.ledger_name,
+      // the trade name stands in when there is no legal name. Not while
+      // editing: a saved ledger's name is locked (see the Name field).
+      ledger_name: editing ? previous.ledger_name : details.legalName || details.name || previous.ledger_name,
       // The ledger has no city field, so the district goes on the end of the
       // address - where it would be written on an envelope anyway.
       ledger_address:
@@ -637,7 +638,8 @@ export default function LedgerForm({
                 required
                 value={form.ledger_name}
                 error={errors.ledger_name}
-                disabled={submitting}
+                // A saved ledger keeps its name - only a new one is named here.
+                disabled={submitting || editing}
                 onChange={(e) => setField('ledger_name', e.target.value)}
               />
 

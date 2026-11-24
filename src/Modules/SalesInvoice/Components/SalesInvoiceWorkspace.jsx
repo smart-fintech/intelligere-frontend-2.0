@@ -50,7 +50,7 @@ import useCompanyCurrency from '@/Modules/Procurement/useCompanyCurrency'
 import { allocateStock, buildStockSummaryRequest, needsChallanStock, readSavedStockSummary, readStockSummary, withSavedStock } from '@/Modules/SalesInvoice/challanStock'
 import InventoryDetailsModal from '@/Modules/SalesInvoice/Components/InventoryDetailsModal'
 import { buildBookingBody } from '@/Modules/SalesInvoice/inventoryBooking'
-import { keptLineId, needsStockBooking, needsStockRebooking, savedLinesAfterSave, savedLinesOf, savedSourceOf, stockBookingItems, stockLinesUnchanged } from '@/Modules/SalesInvoice/stockBooking'
+import { keptLineId, needsStockBooking, needsStockRebooking, productLinesChanged, savedLinesAfterSave, savedLinesOf, savedSourceOf, stockBookingItems, stockLinesUnchanged } from '@/Modules/SalesInvoice/stockBooking'
 import { PROCUREMENT_STATE, QUOTATION_STATES } from '@/Modules/SalesInvoice/procurement'
 import useProcurement from '@/Modules/SalesInvoice/useProcurement'
 import useTallyLedgerAlter from '@/Modules/SalesInvoice/useTallyLedgerAlter'
@@ -279,7 +279,10 @@ const STEP_OF_PARTY = { seller: INVOICE_STEP.SELLER, buyer: INVOICE_STEP.BUYER }
  * Closed, nothing is created. A booking the server refuses leaves the order
  * saved and waiting: Book Inventory opens the modal again (with the quantities
  * chosen) and sends only the booking, Skip booking goes on to the PDF - nothing
- * is ever created twice, and a booking done is never asked for again. Every
+ * is ever created twice, and a booking done is never asked for again. One
+ * being edited does the same on Update, but only when its product lines changed
+ * (stockBooking's productLinesChanged) - updated (PUT) instead of created, then
+ * booked again (the backend replaces the order's booking). Every
  * Sales Order's PDF save answers with its `stock`, kept for Inventory Details
  * (InventoryDetailsModal) - offered once the order is saved.
  *
@@ -640,8 +643,9 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
      chosen, for a booking that was refused. `inventoryDetails` - { documentId,
      documentNo, stock } from the last Sales Order's PDF save, for Inventory Details. */
   const inventoryAccess = useInventoryAccess()
-  // A NEW Sales Order of a company with Inventory Management books its stock - an update never does.
-  const booksInventory = documentTypeValue === SALES_ORDER && inventoryAccess.full && !editing
+  // A NEW Sales Order of a company with Inventory Management books its stock - an update only when its product
+  // lines changed (productLinesChanged), booked again the same way (the backend replaces the order's booking).
+  const booksInventory = documentTypeValue === SALES_ORDER && inventoryAccess.full && (!editing || productLinesChanged(applicable.lines, editing.savedLines))
   // { documentId, documentNo, items } while its lines are being booked; stockAnswer settles the save's step 2b.
   const [stockAsk, setStockAsk] = useState(null)
   const stockAnswer = useRef(null)
@@ -1282,7 +1286,8 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
         invoiceNo,
         // Editing: the saved document is updated (PUT, its document_id) - never a new one made.
         createDocument: () => (editing ? updateBusinessDocument(editing.documentId, request) : createBusinessDocument(request)),
-        // A new Sales Order with Inventory Management: booked with the quantities chosen, before the PDF (or skipped, as asked).
+        // A new Sales Order with Inventory Management (or one edited with changed product lines): booked with the
+        // quantities chosen, before the PDF (or skipped, as asked).
         book: booksInventory
           ? (documentId) => {
               procurement.orderSaved(orderSnapshot(documentId, invoiceNo))
@@ -1325,7 +1330,12 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
         after = {
           prefillFrom,
           // Its lines' ids now - what the next Update keeps a line (and its stock) under.
-          savedLines: rebooks || challanStock ? savedLinesAfterSave(record?.product_data, applicable.lines, keptIds) : {},
+          // A Sales Order: its lines as saved (no read needed) - the next Update books again only when they change.
+          savedLines: rebooks || challanStock
+            ? savedLinesAfterSave(record?.product_data, applicable.lines, keptIds)
+            : documentTypeValue === SALES_ORDER
+              ? savedLinesOf(null, applicable.lines)
+              : {},
           stockSummary: record ? readSavedStockSummary(record.skuWarehouseSummary) : readSavedStockSummary(stockBody),
         }
       }

@@ -317,6 +317,8 @@ const ProductRow = memo(function ProductRow({
   onClosed,
 }) {
   const label = product.name || 'product'
+  // "SKU" only for a company that manages SKUs - otherwise it is the product's details.
+  const opens = useSkuManagement() ? 'SKU and warehouse details' : 'product and warehouse details'
   const targetCount = rowEdit && !pageEdit ? editTargets(product, detailed).length : 0
 
   /** On the opened details: their height, kept up to date as they open and close. */
@@ -359,8 +361,8 @@ const ProductRow = memo(function ProductRow({
                   size="icon-sm"
                   icon={ChevronRight}
                   className={cn('[&_svg]:transition-transform [&_svg]:duration-200', open && '[&_svg]:rotate-90')}
-                  tooltip={open ? 'Hide SKU and warehouse details' : 'Show SKU and warehouse details'}
-                  aria-label={`${open ? 'Hide' : 'Show'} SKU and warehouse details of ${label}`}
+                  tooltip={`${open ? 'Hide' : 'Show'} ${opens}`}
+                  aria-label={`${open ? 'Hide' : 'Show'} ${opens} of ${label}`}
                   aria-expanded={open}
                   onClick={() => onToggle(product.key, open)}
                 />
@@ -614,7 +616,7 @@ export default function ProductTable({
         searchPlaceholder="Product name & HSN code"
         moreFilters={moreFilters}
         moreLayout="grid"
-        moreTitle="SKU Details"
+        moreTitle={showSku ? 'SKU Details' : 'Product Details'}
         extra={expiryFilter}
         actions={actions}
       />
@@ -697,7 +699,17 @@ export default function ProductTable({
           product={viewed}
           description={
             viewedSku
-              ? `SKU: ${showSku ? viewedSku.skuCode || `${viewing.sku + 1} (no code)` : viewing.sku + 1}${viewedDetail && viewedDetail.srNo !== null ? ` · Sr No. ${viewedDetail.srNo}` : ''}`
+              ? [
+                  // No SKU wording for a company that does not manage SKUs - only which stock, when it has several.
+                  showSku
+                    ? `SKU: ${viewedSku.skuCode || `${viewing.sku + 1} (no code)`}`
+                    : (viewedProduct?.variants.length ?? 0) > 1
+                      ? `Stock ${viewing.sku + 1}`
+                      : '',
+                  viewedDetail && viewedDetail.srNo !== null ? `Sr No. ${viewedDetail.srNo}` : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ') || undefined
               : undefined
           }
         />

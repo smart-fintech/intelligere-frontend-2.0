@@ -184,8 +184,8 @@ export const buildBidBody = ({ event, product, mine, form }) => {
   const entry = { id: mine.id }
   if (amount !== '') entry.last_vender_bid = String(currency ? toBaseAmount(amount, currency.rate) : Number(amount))
   if (days !== '' && days !== asText(mine.delivery_days)) entry.delivery_days = days
-  // The backend replaces the notes with what is sent, so the earlier ones go too.
-  if (note !== '') entry.notes = [...asList(mine.notes).filter((item) => asText(item) !== ''), note]
+  // The note as plain text ("notes": "hello world"); the backend stores it in place of the earlier one.
+  if (note !== '') entry.notes = note
 
   return {
     auction_id: event.id,

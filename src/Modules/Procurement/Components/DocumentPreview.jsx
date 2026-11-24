@@ -14,7 +14,8 @@ import { PdfFrame } from '@/Modules/SalesInvoice/History/HistoryPdfModal'
  *
  *   <DocumentButton url={url} title="GST Certificate" />
  *
- * With no `url` it says `emptyText` instead.
+ * With no `url` it says `emptyText` instead. `size` and `className` go to the
+ * button (a table's Actions column uses `size="sm"`).
  */
 
 const kindOf = (url) => {
@@ -24,7 +25,7 @@ const kindOf = (url) => {
   return 'other'
 }
 
-export function DocumentButton({ url, title, emptyText = 'Not uploaded' }) {
+export function DocumentButton({ url, title, emptyText = 'Not uploaded', size = 'xs', className }) {
   const [open, setOpen] = useState(false)
 
   if (!url) return <span className="text-xs text-muted-foreground italic">{emptyText}</span>
@@ -34,7 +35,7 @@ export function DocumentButton({ url, title, emptyText = 'Not uploaded' }) {
 
   if (kind === 'other') {
     return (
-      <Button asChild variant="outline" size="xs" title={name}>
+      <Button asChild variant="outline" size={size} title={name} className={className}>
         <a href={url} target="_blank" rel="noopener noreferrer">
           <ExternalLink />
           Open
@@ -45,7 +46,7 @@ export function DocumentButton({ url, title, emptyText = 'Not uploaded' }) {
 
   return (
     <>
-      <Button type="button" variant="outline" size="xs" icon={Eye} title={name} onClick={() => setOpen(true)}>
+      <Button type="button" variant="outline" size={size} icon={Eye} title={name} className={className} onClick={() => setOpen(true)}>
         View
       </Button>
       {kind === 'image' ? (

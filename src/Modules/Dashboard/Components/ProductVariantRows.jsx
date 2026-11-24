@@ -10,6 +10,13 @@
  *
  *   SKU Code PRI-002   ...
  *
+ * A COMPANY THAT DOES NOT MANAGE SKUs ("Enable SKU" off in Master Details -
+ * useSkuManagement; not the same thing as Inventory Management) sees no SKU
+ * wording at all: no SKU Code, and the same two figures called Total
+ * Quantity and Total Amount, worked out the same way:
+ *
+ *   Total Quantity 300   Total Amount 36000
+ *
  * THE SUMMARY is the SKU's own: its code, and its Qty and Amount as the
  * product row worked them out - the backend's totals, or, with warehouses
  * chosen in the filter, those warehouses' alone (narrowToWarehouses in
@@ -116,8 +123,10 @@ const linesOf = (variant) => {
  * line is the first of - the same two for both, so they always open the
  * same record. `variant` null is a product with no SKU: a View only.
  */
-function RowActions({ product, variant, detail, name, onViewSku, onEditSku, editDisabled }) {
+function RowActions({ product, variant, detail, name, showSku, onViewSku, onEditSku, editDisabled }) {
   const record = detail?.srNo !== null && detail?.srNo !== undefined ? ` ${detail.srNo}` : ''
+  // Which SKU, in the buttons' names - only for a company that manages SKUs.
+  const ofSku = showSku ? ` of SKU ${name}` : ''
 
   return (
     <div className="flex justify-end gap-1">
@@ -127,9 +136,13 @@ function RowActions({ product, variant, detail, name, onViewSku, onEditSku, edit
           variant="iconEdit"
           size="icon-sm"
           icon={Eye}
-          tooltip="View SKU details"
+          tooltip={showSku ? 'View SKU details' : 'View details'}
           aria-label={
-            !variant ? `View details of ${product.name || 'product'}` : detail ? `View record${record} of SKU ${name}` : `View details of SKU ${name}`
+            !variant || (!showSku && !detail)
+              ? `View details of ${product.name || 'product'}`
+              : detail
+                ? `View record${record}${ofSku}`
+                : `View details${ofSku}`
           }
           onClick={() => onViewSku(variant, detail)}
         />
@@ -140,8 +153,8 @@ function RowActions({ product, variant, detail, name, onViewSku, onEditSku, edit
           variant="iconEdit"
           size="icon-sm"
           icon={Pencil}
-          tooltip={detail ? 'Edit this record' : 'Edit this SKU'}
-          aria-label={detail ? `Edit record${record} of SKU ${name}` : `Edit SKU ${name}`}
+          tooltip={detail ? 'Edit this record' : showSku ? 'Edit this SKU' : 'Edit'}
+          aria-label={detail ? `Edit record${record}${ofSku}` : showSku ? `Edit SKU ${name}` : `Edit ${product.name || 'product'}`}
           disabled={editDisabled}
           onClick={() => onEditSku(variant, detail)}
         />
@@ -154,10 +167,11 @@ export default function ProductVariantRows({ product, onViewSku, onEditSku, edit
   const withActions = Boolean(onViewSku || onEditSku)
   const showSku = useSkuManagement()
   const grid = withActions ? GRID_WITH_ACTIONS : GRID
-  const actions = { product, onViewSku, onEditSku, editDisabled }
+  const actions = { product, showSku, onViewSku, onEditSku, editDisabled }
+  const nothing = showSku ? 'No SKU or warehouse details for this product.' : 'No stock or warehouse details for this product.'
 
   if (product.variants.length === 0 && !onViewSku) {
-    return <p className="px-3 py-4 text-center text-xs text-muted-foreground">No SKU or warehouse details for this product.</p>
+    return <p className="px-3 py-4 text-center text-xs text-muted-foreground">{nothing}</p>
   }
 
   // No SKU at all: one line saying so, its View where every line's is.
@@ -165,7 +179,7 @@ export default function ProductVariantRows({ product, onViewSku, onEditSku, edit
     return (
       <div className="px-3 py-3">
         <div className="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-card px-3 py-2 text-xs">
-          <span className="text-muted-foreground">No SKU or warehouse details for this product.</span>
+          <span className="text-muted-foreground">{nothing}</span>
           <RowActions {...actions} variant={null} detail={null} name="" />
         </div>
       </div>
@@ -198,8 +212,9 @@ export default function ProductVariantRows({ product, onViewSku, onEditSku, edit
                   </SkuDetailsTooltip>
                 </SummaryItem>
               ) : null}
-              <SummaryItem label="SKU Qty">{orDash(variant.totalQty)}</SummaryItem>
-              <SummaryItem label="SKU Amount">{orDash(variant.totalAmount)}</SummaryItem>
+              {/* The same figures either way - only their names follow the SKU setting. */}
+              <SummaryItem label={showSku ? 'SKU Qty' : 'Total Quantity'}>{orDash(variant.totalQty)}</SummaryItem>
+              <SummaryItem label={showSku ? 'SKU Amount' : 'Total Amount'}>{orDash(variant.totalAmount)}</SummaryItem>
             </div>
 
             {/* Where it is kept: its own table, sideways-scrolling only inside itself. */}

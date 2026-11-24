@@ -13,6 +13,8 @@ import { useDeferredValue, useMemo, useState } from 'react'
  *   })
  *
  *   view.rows          the rows to draw for the current page
+ *   view.allRows       every row that survived the search and filters, in
+ *                      the current sort - all pages (an export's rows)
  *   view.total         how many rows survived the filters
  *   view.search        / view.setSearch
  *   view.filters       / view.setFilter(field, value)
@@ -171,6 +173,7 @@ export function useListView(
 
   return {
     rows: paged,
+    allRows: sorted,
     total: sorted.length,
     search,
     setSearch: changeSearch,

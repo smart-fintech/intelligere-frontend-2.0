@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BadgeCheck, CheckCircle2, File, FileImage, FileText, FileX, ShieldCheck, XCircle } from 'lucide-react'
+import { BadgeCheck, CheckCircle2, Eye, File, FileImage, FileText, FileX, ShieldCheck, XCircle } from 'lucide-react'
 
 import { Button } from '@/Components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table'
@@ -97,11 +97,8 @@ function DocumentItem({ field, url, number }) {
 const orDash = (value) => (isBlank(value) ? <span className="text-muted-foreground">--</span> : String(value))
 const showDate = (value) => (isBlank(value) ? orDash('') : formatDate(value))
 
-/**
- * The verification cell: Verified (the reply's flag, or verified here just
- * now), a compact Verify button where it can be done, or the status alone.
- */
-function VerifyCell({ certificate, verifiedNow, canVerify, pending, onVerify }) {
+/** The status cell: Verified (the reply's flag, or verified here just now) or Not verified. */
+function StatusCell({ certificate, verifiedNow }) {
   if (isVerified(certificate) || verifiedNow) {
     return (
       <Badge tone="success" icon={BadgeCheck}>
@@ -109,20 +106,47 @@ function VerifyCell({ certificate, verifiedNow, canVerify, pending, onVerify }) 
       </Badge>
     )
   }
-  if (!canVerify) return <Badge>Not verified</Badge>
+  return <Badge>Not verified</Badge>
+}
+
+// Fixed widths, so View and Verify line up from row to row.
+const VIEW_WIDTH = 'w-[4.75rem]'
+const VERIFY_WIDTH = 'w-[5.25rem]'
+
+/**
+ * The actions cell: View opens the certificate's file (a greyed View when there
+ * is none), and Verify - where it can be done - verifies it. Where Verify could
+ * be done but is not needed (already verified), its place is kept empty so the
+ * buttons stay aligned.
+ */
+function ActionsCell({ certificate, name, verifyColumn, verifiedNow, canVerify, pending, onVerify }) {
+  const showVerify = canVerify && !isVerified(certificate) && !verifiedNow
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="xs"
-      icon={ShieldCheck}
-      loading={pending}
-      disabled={pending}
-      aria-label={`Verify ${certificate.certificate_name}`}
-      onClick={onVerify}
-    >
-      Verify
-    </Button>
+    <div className="flex items-center justify-end gap-1.5">
+      {certificate.certificate_image ? (
+        <DocumentButton url={certificate.certificate_image} title={name} size="sm" className={VIEW_WIDTH} />
+      ) : (
+        <Button type="button" variant="outline" size="sm" icon={Eye} disabled aria-label={`View ${name} (no file)`} className={VIEW_WIDTH}>
+          View
+        </Button>
+      )}
+      {showVerify ? (
+        <Button
+          type="button"
+          size="sm"
+          icon={ShieldCheck}
+          loading={pending}
+          disabled={pending}
+          aria-label={`Verify ${certificate.certificate_name}`}
+          className={VERIFY_WIDTH}
+          onClick={onVerify}
+        >
+          Verify
+        </Button>
+      ) : verifyColumn ? (
+        <span aria-hidden="true" className={cn('shrink-0', VERIFY_WIDTH)} />
+      ) : null}
+    </div>
   )
 }
 
@@ -131,8 +155,10 @@ const COLUMNS = 8
 /**
  * Certificates in a table. `rows` are { name, certificate } - a null
  * certificate is a required one the vendor does not have (one merged cell).
+ * `canVerify` says whether Verify can be done on this event at all (a
+ * Technical Bid), so the Actions column keeps room for it.
  */
-function CertificateTable({ label, rows, verify }) {
+function CertificateTable({ label, rows, verify, canVerify }) {
   return (
     <Table containerClassName="rounded-md border border-border bg-card" aria-label={label}>
       <TableHeader className="bg-muted">
@@ -143,8 +169,8 @@ function CertificateTable({ label, rows, verify }) {
           <TableHead>Scope</TableHead>
           <TableHead>Issued On</TableHead>
           <TableHead>Expires On</TableHead>
-          <TableHead>File</TableHead>
-          <TableHead className="text-right">Verification</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -162,10 +188,10 @@ function CertificateTable({ label, rows, verify }) {
                 <ExpiryDate value={certificate.expiry_date} />
               </TableCell>
               <TableCell>
-                <DocumentButton url={certificate.certificate_image} title={name} emptyText="No file" />
+                <StatusCell certificate={certificate} verifiedNow={verify(certificate).verifiedNow} />
               </TableCell>
               <TableCell className="text-right">
-                <VerifyCell certificate={certificate} {...verify(certificate)} />
+                <ActionsCell certificate={certificate} name={name} verifyColumn={canVerify} {...verify(certificate)} />
               </TableCell>
             </TableRow>
           ) : (
@@ -298,7 +324,7 @@ export default function VendorDocumentsPanel({ vendor, event, onVerified }) {
       {preBid ? (
         <Part title="Required Certifications" meta={required.length ? `${held} of ${required.length} held` : null}>
           {required.length ? (
-            <CertificateTable label="Required Certifications" rows={required} verify={verifyProps} />
+            <CertificateTable label="Required Certifications" rows={required} verify={verifyProps} canVerify={canVerify} />
           ) : (
             <Empty>
               {asksForCertifications
@@ -312,7 +338,12 @@ export default function VendorDocumentsPanel({ vendor, event, onVerified }) {
       {others.length || !required.length ? (
         <Part title={required.length ? 'Other Certifications' : 'Vendor Certifications'} meta={others.length ? `${others.length}` : null}>
           {others.length ? (
-            <CertificateTable label={required.length ? 'Other Certifications' : 'Vendor Certifications'} rows={others} verify={verifyProps} />
+            <CertificateTable
+              label={required.length ? 'Other Certifications' : 'Vendor Certifications'}
+              rows={others}
+              verify={verifyProps}
+              canVerify={canVerify}
+            />
           ) : (
             <Empty>No certifications on the profile.</Empty>
           )}

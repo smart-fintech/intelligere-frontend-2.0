@@ -234,7 +234,9 @@ function ProductTable({ event, opened, onToggle, onProfile, onCertificateVerifie
   const lowestOf = (value) => (hasForeign && base ? moneyIn(value, base.code) : showAmount(value))
 
   return (
-    <Table containerClassName="rounded-md border border-border">
+    // A size container: a product's opened vendors are kept to the visible width
+    // (100cqw) and stay in view while this table scrolls sideways on a narrow screen.
+    <Table containerClassName="@container rounded-md border border-border">
       <TableHeader className="bg-muted">
         <TableRow className="hover:bg-transparent">
           <TableHead width={40}>#</TableHead>
@@ -305,17 +307,19 @@ function ProductTable({ event, opened, onToggle, onProfile, onCertificateVerifie
               </TableRow>
               {isOpen ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={columns} className="bg-muted/30 p-2 whitespace-normal">
-                    {vendorBidsHidden(event) ? (
-                      <VendorsHidden />
-                    ) : (
-                      <ProductVendors
-                        event={event}
-                        product={product}
-                        onProfile={onProfile}
-                        onCertificateVerified={onCertificateVerified}
-                      />
-                    )}
+                  <TableCell colSpan={columns} className="bg-muted/30 p-0 whitespace-normal">
+                    <div className="sticky left-0 max-w-[100cqw] p-2">
+                      {vendorBidsHidden(event) ? (
+                        <VendorsHidden />
+                      ) : (
+                        <ProductVendors
+                          event={event}
+                          product={product}
+                          onProfile={onProfile}
+                          onCertificateVerified={onCertificateVerified}
+                        />
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : null}

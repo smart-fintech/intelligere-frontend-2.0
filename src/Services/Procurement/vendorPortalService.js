@@ -18,6 +18,7 @@
  *   POST  procurement/vendor_pre_bid_list/     { email } -> { "Ongoing Pre Bid": [...], "Completed Pre Bid": [...] }
  *   POST  procurement/vendor_bid/              { auction_id, product: [{ sr_no, vendor: [{ id,
  *                                               last_vender_bid?, delivery_days?, notes? }] }] }
+ *                                              notes is the vendor's note as plain text ("hello world")
  *
  *   POST  procurement/pre_bid_chat/            { pre_bid_id, email } -> { "<email>": [message] }
  *   POST  procurement/pre_bid_chat/            { pre_bid_id, vendor_email, send_by: "vendor", send_to: "user", message }

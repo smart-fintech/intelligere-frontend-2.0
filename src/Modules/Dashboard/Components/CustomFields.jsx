@@ -48,7 +48,7 @@ import {
 import { Button } from '@/Components/ui/button'
 import { TableCell, TableRow } from '@/Components/ui/table'
 import { Tooltip } from '@/Components/ui/tooltip'
-import { customFieldTypeLabel } from '@/Constants/inventory'
+import { customFieldTypeLabel, isCustomFieldHidden, isCustomFieldRequired } from '@/Constants/inventory'
 import { useActiveCompany } from '@/Hooks/useActiveCompany'
 import useCustomFields from '@/Hooks/useCustomFields'
 import { useListView } from '@/Hooks/useListView'
@@ -115,8 +115,11 @@ export default function CustomFields() {
         options_count: optionsOf(field).length,
         sku_no: field.sku_field ? field.sku_no : null,
         type_label: customFieldTypeLabel(field.field_type),
-        required_label: field.is_required ? 'Required' : 'Not Required',
-        hidden_label: field.hide_field ? 'Hidden' : 'Visible',
+        // As the product form treats it: a mandatory field is required and shown, whatever was saved.
+        required: isCustomFieldRequired(field),
+        hidden: isCustomFieldHidden(field),
+        required_label: isCustomFieldRequired(field) ? 'Required' : 'Not Required',
+        hidden_label: isCustomFieldHidden(field) ? 'Hidden' : 'Visible',
         sku_label: field.sku_field ? 'SKU Field' : 'Non-SKU Field',
         report_label: field.customizedReport ? 'Included' : 'Not Included',
         invoice_label: field.invoice_description ? 'Included' : 'Not Included',
@@ -277,10 +280,10 @@ export default function CustomFields() {
                 <TableCell>{orDash(row.type_label)}</TableCell>
                 <TableCell>{orDash(row.field_size)}</TableCell>
                 <TableCell>
-                  <YesNo value={row.source.is_required} />
+                  <YesNo value={row.required} />
                 </TableCell>
                 <TableCell>
-                  <YesNo value={row.source.hide_field} />
+                  <YesNo value={row.hidden} />
                 </TableCell>
                 <TableCell>
                   <OptionsCount options={row.options} />

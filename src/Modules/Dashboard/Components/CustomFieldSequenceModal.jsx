@@ -40,7 +40,7 @@ import { ArrowDown, ArrowUp, GripVertical } from 'lucide-react'
 
 import { Modal } from '@/Components/Common/Modal'
 import { Button } from '@/Components/ui/button'
-import { customFieldTypeLabel } from '@/Constants/inventory'
+import { customFieldTypeLabel, isCustomFieldHidden } from '@/Constants/inventory'
 import { toast } from '@/Library/toast'
 import { cn } from '@/Library/utils'
 import { saveCustomField } from '@/Services/Inventory/customFieldService'
@@ -154,7 +154,7 @@ export default function CustomFieldSequenceModal({ open, onOpenChange, fields, c
             const notes = [
               customFieldTypeLabel(field.field_type),
               field.sku_field ? 'SKU field' : null,
-              field.hide_field ? 'Hidden' : null,
+              isCustomFieldHidden(field) ? 'Hidden' : null,
             ].filter(Boolean)
 
             return (

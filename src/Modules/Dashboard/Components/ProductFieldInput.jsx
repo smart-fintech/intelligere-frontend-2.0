@@ -6,7 +6,8 @@
  *
  * The definition decides everything: its `field_name` is the label, its
  * type picks the control (productInputKind), `options` fill a dropdown and
- * `is_required` puts the asterisk on. Every control is one the app's other
+ * `is_required` puts the asterisk on (as does being a mandatory field -
+ * isCustomFieldRequired). Every control is one the app's other
  * forms already use (Components/Common/FormFields) - this file only chooses
  * between them.
  *
@@ -51,6 +52,8 @@ import { formatBytes } from '@/Components/Common/Loader'
 import { MultiSelectField } from '@/Components/Common/MultiSelectField'
 import { Button } from '@/Components/ui/button'
 import { Input } from '@/Components/ui/input'
+import { isCustomFieldRequired } from '@/Constants/inventory'
+import { NO_VERIFIED_VENDORS } from '@/Hooks/useVendorOptions'
 import { cn } from '@/Library/utils'
 import { PRODUCT_CATEGORY, PRODUCT_FIELD } from '../productList'
 import {
@@ -144,7 +147,8 @@ export default function ProductFieldInput({
   const id = useId()
   const label = productFieldName(field)
   const kind = productInputKind(field)
-  const required = field.is_required === true
+  // Its own setting, or one of the fields a product can never be without.
+  const required = isCustomFieldRequired(field)
   const className = spanClass(field, kind)
 
   const common = { id, label, required, error, disabled, className }
@@ -175,24 +179,29 @@ export default function ProductFieldInput({
     const loading = vendors.status === 'loading'
     const failed = vendors.status === 'failed'
 
-    /* Only the chosen vendors the list offers can be shown - by their name -
-       and only they are sent (collectProductValues). So none is shown while
-       the list loads, and one deleted since it was chosen drops out, as it
-       always did. */
-    const chosen = loading
-      ? []
-      : productVendorIds(value).filter((id) => vendors.options.some((option) => option.value === id))
+    /* Only the chosen vendors the company still has can be shown - by their
+       name - and only they are sent (collectProductValues). So none is shown
+       while the list loads, and one deleted since it was chosen drops out, as
+       it always did. Only VERIFIED vendors are offered (useVendorOptions);
+       one the product was saved with before it was verified stays chosen,
+       and listed so it can still be unticked - never quietly unlinked. */
+    const known = vendors.known ?? vendors.options
+    const chosen = loading ? [] : productVendorIds(value).filter((id) => known.some((option) => option.value === id))
+    const choices = [
+      ...vendors.options,
+      ...known.filter((option) => chosen.includes(option.value) && !vendors.options.some((offered) => offered.value === option.value)),
+    ]
 
     return (
       <MultiSelectField
         {...common}
         // The form shows the reason, and Retry, above the fields.
         error={error || (failed ? 'Vendors could not be loaded' : undefined)}
-        placeholder={loading ? 'Loading...' : vendors.options.length === 0 ? 'No vendors found' : 'Select vendors'}
+        placeholder={loading ? 'Loading...' : vendors.options.length === 0 ? NO_VERIFIED_VENDORS : 'Select vendors'}
         searchPlaceholder="Search vendor..."
-        options={vendors.options}
+        options={choices}
         value={chosen}
-        disabled={disabled || loading || vendors.options.length === 0}
+        disabled={disabled || loading || choices.length === 0}
         onChange={onChange}
       />
     )

@@ -711,7 +711,10 @@ export default function ProductFormModal({
       const { fields, details, vendors: chosenVendors, files, references } = collectProductValues(
         steps,
         { values, skuSets, allocations },
-        { vendorOptions: vendors.options },
+        // Every vendor the company has, not only the verified ones offered:
+        // one the product was saved with before it was verified is sent
+        // back, not dropped (see useVendorOptions).
+        { vendorOptions: vendors.known ?? vendors.options },
       )
       const product = { companyName, fields, details, vendors: chosenVendors, references }
 

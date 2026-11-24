@@ -22,6 +22,21 @@
  * (`customizedReport`, `hide_field`) and are never renamed.
  *
  * ------------------------------------------------------------------
+ * A SAVED FIELD KEEPS ITS NAME
+ * ------------------------------------------------------------------
+ * Field Name is typed only when a field is added. Editing shows it locked,
+ * and sends the name back exactly as it was saved - every product holds its
+ * values under that name, so it is never changed here.
+ *
+ * ------------------------------------------------------------------
+ * A MANDATORY FIELD STAYS REQUIRED AND VISIBLE
+ * ------------------------------------------------------------------
+ * For a field of PRODUCT_MANDATORY_FIELDS (Product Name, HSN Code,
+ * Quantity, Unit Rate, GST Rate, Group, Selling Rate) Required is shown on
+ * and Hide Field off, both locked, and it is always sent so - even when it
+ * was saved otherwise, which is then the one change an Update makes.
+ *
+ * ------------------------------------------------------------------
  * THE FORM SHOWS ONLY WHAT THE TYPE NEEDS
  * ------------------------------------------------------------------
  * Options and Option Type appear for a dropdown field and for nothing else;
@@ -40,7 +55,7 @@
  */
 
 import { useRef, useState } from 'react'
-import { Plus, X } from 'lucide-react'
+import { Lock, Plus, X } from 'lucide-react'
 
 import {
   Field,
@@ -58,6 +73,7 @@ import {
   CUSTOM_FIELD_SIZES,
   CUSTOM_FIELD_TYPE_DROPDOWN,
   CUSTOM_FIELD_TYPES,
+  isMandatoryProductField,
   toOptions,
 } from '@/Constants/inventory'
 import { toast } from '@/Library/toast'
@@ -141,6 +157,15 @@ export default function CustomFieldFormModal({ open, onOpenChange, field, fields
 
   const isDropdown = form.field_type === CUSTOM_FIELD_TYPE_DROPDOWN
 
+  // See the notes at the top: a saved name is the one it keeps, and a
+  // mandatory field is required and visible whatever was saved.
+  const name = editing ? textOf(field.field_name) : form.field_name
+  const mandatory = isMandatoryProductField(name)
+  const required = mandatory || form.is_required
+  const hidden = !mandatory && form.hide_field
+  // A mandatory field saved as not required, or hidden: Update puts it right.
+  const needsFix = editing && mandatory && (field.is_required !== true || field.hide_field === true)
+
   // One handler for every field; editing a field clears its error.
   const setField = (name, value) => {
     setForm((previous) => ({ ...previous, [name]: value }))
@@ -197,14 +222,16 @@ export default function CustomFieldFormModal({ open, onOpenChange, field, fields
 
   const validate = () => {
     const found = {}
-    const name = form.field_name.trim()
+    const typed = form.field_name.trim()
 
-    if (!name) found.field_name = 'Field name is required'
+    // A saved field's name is not the user's to change, so not theirs to put right either.
+    if (!editing && !typed) found.field_name = 'Field name is required'
     else if (
+      !editing &&
       // Two fields answering to one name cannot be told apart anywhere the
       // fields are used. The field being edited is, of course, allowed its own.
       fields.some(
-        (entry) => !isSameField(entry, field) && textOf(entry?.field_name).trim().toLowerCase() === name.toLowerCase(),
+        (entry) => !isSameField(entry, field) && textOf(entry?.field_name).trim().toLowerCase() === typed.toLowerCase(),
       )
     ) {
       found.field_name = 'A field with this name already exists'
@@ -248,13 +275,14 @@ export default function CustomFieldFormModal({ open, onOpenChange, field, fields
     const built = {
       // Everything the field came with first - see the note at the top.
       ...(editing ? field : {}),
-      field_name: form.field_name.trim(),
+      // A saved field goes back under the very name it was saved with.
+      field_name: editing ? field.field_name : form.field_name.trim(),
       field_size: form.field_size,
       field_type: form.field_type,
       options: isDropdown ? cleanOptions() : keepOptions ? (field.options ?? []) : [],
-      hide_field: form.hide_field,
+      hide_field: hidden,
       field_order: Number(form.field_order),
-      is_required: form.is_required,
+      is_required: required,
       option_type: isDropdown ? form.option_type : keepOptions ? (field.option_type ?? '') : '',
       sku_field: form.sku_field,
       customizedReport: form.customizedReport,
@@ -276,7 +304,7 @@ export default function CustomFieldFormModal({ open, onOpenChange, field, fields
     setErrors(found)
     if (Object.keys(found).length > 0) return
 
-    if (editing && snapshot(form) === snapshot(initial)) {
+    if (editing && !needsFix && snapshot(form) === snapshot(initial)) {
       toast.info('Nothing has been changed.')
       return
     }
@@ -333,14 +361,18 @@ export default function CustomFieldFormModal({ open, onOpenChange, field, fields
       {/* `p-1`: room for the focus ring, inside the dialog's scroll box. */}
       <form id={FORM_ID} onSubmit={handleSubmit} noValidate className="space-y-3 p-1">
         <FormGrid>
+          {/* Typed when adding; locked once saved - see A SAVED FIELD KEEPS ITS NAME. */}
           <Field
             id="field_name"
             label="Field Name"
             required
             className="sm:col-span-2"
-            value={form.field_name}
+            icon={editing ? Lock : undefined}
+            value={editing ? name : form.field_name}
             error={errors.field_name}
-            disabled={submitting}
+            disabled={submitting || editing}
+            readOnly={editing}
+            title={editing ? "A field's name cannot be changed once it is saved" : undefined}
             onChange={(event) => setField('field_name', event.target.value)}
           />
           <SelectField
@@ -443,18 +475,21 @@ export default function CustomFieldFormModal({ open, onOpenChange, field, fields
 
         {/* ---------------- Settings ---------------- */}
         <FormGrid>
+          {/* Locked for a mandatory field - see A MANDATORY FIELD STAYS REQUIRED AND VISIBLE. */}
           <ToggleField
             id="is_required"
             label="Required"
-            checked={form.is_required}
-            disabled={submitting}
+            description={mandatory ? 'Always required for this field' : undefined}
+            checked={required}
+            disabled={submitting || mandatory}
             onCheckedChange={(on) => setField('is_required', on)}
           />
           <ToggleField
             id="hide_field"
             label="Hide Field"
-            checked={form.hide_field}
-            disabled={submitting}
+            description={mandatory ? 'A mandatory field is always shown' : undefined}
+            checked={hidden}
+            disabled={submitting || mandatory}
             onCheckedChange={(on) => setField('hide_field', on)}
           />
           <ToggleField

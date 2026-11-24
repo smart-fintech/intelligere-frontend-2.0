@@ -41,6 +41,9 @@
  *   stockLinesUnchanged(lines, savedLines)
  *       every product line is kept as saved (keptLineId) and none was removed - an
  *       edited Challan / Sales Invoice then takes no stock out again (challanStock).
+ *   productLinesChanged(lines, savedLines)
+ *       a product line added, removed or changed (product, SKU, quantity) - an edited
+ *       Sales Order is then booked again (InventoryBookingModal), as a new one is.
  */
 
 import { PURCHASE_DOCUMENT_TYPE_INBOUND_CHALLAN, PURCHASE_DOCUMENT_TYPE_INVOICE } from '@/Constants/purchaseInvoice'
@@ -124,4 +127,14 @@ export const stockLinesUnchanged = (lines, savedLines) => {
   const products = listOf(lines).filter((line) => !isServiceLine(line))
   const saved = Object.values(savedLines ?? {}).filter((entry) => entry?.product)
   return products.length === saved.length && products.every((line) => keptLineId(line, savedLines) !== null)
+}
+
+/**
+ * A product line added or removed, or one with another product, SKU or quantity than as saved
+ * (savedLines' `stock` - its product_id aside) - an edited Sales Order is then booked again.
+ */
+export const productLinesChanged = (lines, savedLines) => {
+  const products = listOf(lines).filter((line) => !isServiceLine(line))
+  const saved = Object.values(savedLines ?? {}).filter((entry) => entry?.product)
+  return products.length !== saved.length || products.some((line) => savedLines?.[line.id]?.stock !== stockOf(line))
 }

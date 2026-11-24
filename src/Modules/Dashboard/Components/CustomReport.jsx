@@ -25,10 +25,15 @@
  *
  * The opened row's Created At is the entry's `created_at` - a dash until the
  * report sends one (see ../customReport).
+ *
+ * EXCEL (beside the filters) saves Inventory_Custom_Report.xlsx: every row
+ * the search and filters leave - all pages, in the table's sort, narrowed to
+ * the chosen warehouses - with each product's warehouse lines under it
+ * (../customReportExport). No request; one download at a time.
  */
 
-import { Fragment, useMemo, useState } from 'react'
-import { AlertCircle, ChevronDown, ChevronRight, FileSpreadsheet, RefreshCw } from 'lucide-react'
+import { Fragment, useMemo, useRef, useState } from 'react'
+import { AlertCircle, ChevronDown, ChevronRight, Download, FileSpreadsheet, RefreshCw } from 'lucide-react'
 
 import { InlineAlert, ListSkeleton, RetryButton, StateMessage } from '@/Components/Common/DataList'
 import { Panel } from '@/Components/Common/Panel'
@@ -45,11 +50,13 @@ import { TableCell, TableRow } from '@/Components/ui/table'
 import { useActiveCompany } from '@/Hooks/useActiveCompany'
 import useCompanyReport from '@/Hooks/useCompanyReport'
 import { useListView } from '@/Hooks/useListView'
+import { toast } from '@/Library/toast'
 import { cn } from '@/Library/utils'
 import { getProductCustomReport } from '@/Services/Inventory/inventoryProductService'
 import { hasSingleWarehouseLimit } from '@/Services/Inventory/inventoryService'
 import { orDash } from '@/Utils/display'
 import { filterCustomReport, narrowCustomReport, readCustomReport, reportWarehouses } from '../customReport'
+import { downloadCustomReport } from '../customReportExport'
 import { displayValue } from '../productList'
 
 const WAREHOUSE_FILTER = 'warehouse'
@@ -153,6 +160,48 @@ export default function CustomReport({ enabled = true }) {
     },
   }
 
+  /* ---------------- Excel ----------------
+     The rows as the table has them - every page, sorted, filtered and
+     narrowed (view.allRows). `busy` stops a second click starting a second
+     file before the state that disables the button has been drawn. */
+  const [downloading, setDownloading] = useState(false)
+  const busy = useRef(false)
+
+  const downloadExcel = async () => {
+    if (busy.current || view.total === 0) return
+    busy.current = true
+    setDownloading(true)
+
+    try {
+      await downloadCustomReport({
+        rows: view.allRows,
+        columns: read.columns,
+        nameKey: read.nameKey,
+        quantityKey: read.quantityKey,
+      })
+    } catch (failure) {
+      toast.error(failure?.message || 'The Excel file could not be made.')
+    } finally {
+      busy.current = false
+      setDownloading(false)
+    }
+  }
+
+  const excelButton = (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      icon={Download}
+      loading={downloading}
+      disabled={downloading || view.total === 0}
+      tooltip={view.total === 0 ? 'Nothing to download' : 'Download the products shown, with their warehouses, in Excel'}
+      onClick={downloadExcel}
+    >
+      {downloading ? 'Downloading...' : 'Excel'}
+    </Button>
+  )
+
   /* ---------------- Opened rows ---------------- */
   const [expanded, setExpanded] = useState([])
   const toggle = (key) =>
@@ -210,6 +259,7 @@ export default function CustomReport({ enabled = true }) {
               />
             ) : null
           }
+          actions={excelButton}
         />
 
         {view.total === 0 ? (

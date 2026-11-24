@@ -464,5 +464,27 @@ export const perSkuFieldRank = (fieldName) =>
 /** Whether a field is the quantity an entry's warehouse stock is held to. */
 export const isProductQuantityField = (fieldName) => comparable(fieldName) === comparable(PRODUCT_QUANTITY_FIELD)
 
+/**
+ * THE FIELDS A PRODUCT CAN NEVER BE WITHOUT - by their `field_name`, as the
+ * Customised Fields list sends them. Whatever a field's saved settings say,
+ * one of these is always required and never hidden: the Customised Fields
+ * dialog shows Required on and Hide Field off for it, both locked (and sends
+ * them so), and the Product form asks for it and checks it on Add and Edit
+ * alike. Matched without regard to case or outer spaces, like the per-SKU
+ * fields above. Field names cannot be changed once saved, so a field cannot
+ * be renamed out of this list either.
+ */
+export const PRODUCT_MANDATORY_FIELDS = ['Product Name', 'HSN Code', 'Quantity', 'Unit Rate', 'GST Rate', 'Group', 'Selling Rate']
+
+/** Whether a field is one of PRODUCT_MANDATORY_FIELDS. */
+export const isMandatoryProductField = (fieldName) =>
+  PRODUCT_MANDATORY_FIELDS.some((name) => comparable(name) === comparable(fieldName))
+
+/** Whether a customised field must be filled in: its own `is_required`, or being mandatory. */
+export const isCustomFieldRequired = (field) => field?.is_required === true || isMandatoryProductField(field?.field_name)
+
+/** Whether a customised field is hidden: its own `hide_field` - never for a mandatory one. */
+export const isCustomFieldHidden = (field) => field?.hide_field === true && !isMandatoryProductField(field?.field_name)
+
 /** A list of strings as the `{ value, label }` options SelectField takes. */
 export const toOptions = (values) => values.map((value) => ({ value, label: value }))
