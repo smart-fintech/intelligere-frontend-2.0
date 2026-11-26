@@ -6,6 +6,7 @@ import Footer from '@/Components/Layout/Footer'
 import Header from '@/Components/Layout/Header'
 import HelpTab from '@/Components/Layout/HelpTab'
 import Sidebar from '@/Components/Layout/Sidebar'
+import { CopilotLauncher } from '@/copilot'
 import { useActiveCompanyStorageSync } from '@/Hooks/useActiveCompany'
 import { toast } from '@/Library/toast'
 import { fetchCompanies, selectCompanyError, selectCompanyStatus } from '@/Store/Slices/companySlice'
@@ -133,6 +134,10 @@ export default function AppLayout() {
       {/* Pinned to the right edge of the window, outside the scrolling area,
           so it stays put on every page. */}
       <HelpTab />
+
+      {/* Floating Intelligere Copilot button + its full-screen window
+          (everything Copilot lives in src/copilot). */}
+      <CopilotLauncher />
     </div>
   )
 }

@@ -1,0 +1,625 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  max-width: 100vw;
+  max-height: 100dvh;
+  overflow: hidden !important;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
+/* Chat bubble flex container clipping */
+.msg.bot .bubble {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Header title flex shrinking & ellipsis */
+.chat-title-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.chat-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Scroll indicator cues for scrollable cards */
+.result-card,
+.record-card,
+.sku-table-wrap {
+  position: relative;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+@media (min-width: 1920px) {
+  .sidebar {
+    width: 290px;
+    padding: 24px 20px;
+  }
+  .chat-header {
+    padding: 20px 40px;
+  }
+  .chat-body {
+    padding: 32px 64px;
+    align-items: center;
+  }
+  .msg {
+    width: 100%;
+    max-width: 1100px;
+  }
+  .chat-input-stack {
+    max-width: 1100px;
+  }
+  .bubble {
+    font-size: 16px;
+    padding: 20px 26px;
+  }
+  table {
+    font-size: 14.5px;
+  }
+}
+
+@media (min-width: 1440px) and (max-width: 1919px) {
+  .sidebar {
+    width: 275px;
+    padding: 24px 20px;
+  }
+  .chat-header {
+    padding: 20px 32px;
+  }
+  .chat-body {
+    padding: 28px 48px;
+  }
+  .chat-input-stack {
+    max-width: 1000px;
+  }
+  .msg {
+    max-width: 85%;
+  }
+  .bubble {
+    font-size: 15.5px;
+    padding: 18px 24px;
+  }
+  table {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1439px) {
+  .sidebar {
+    width: 250px;
+  }
+  .chat-input-stack {
+    max-width: 900px;
+  }
+  .msg {
+    max-width: 88%;
+  }
+  .chat-body {
+    padding: 24px 28px;
+  }
+}
+
+@media (max-width: 1024px) {
+  /* Sidebar Off-Canvas Drawer */
+  .sidebar {
+    position: fixed !important;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 280px !important;
+    padding-top: max(20px, env(safe-area-inset-top));
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    padding-left: max(16px, env(safe-area-inset-left));
+    box-shadow: var(--shadow);
+    transform: translateX(-100%);
+    z-index: 1000 !important;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: var(--bg-sidebar);
+  }
+  .sidebar.open {
+    transform: translateX(0) !important;
+  }
+  .sidebar-overlay.show {
+    display: block !important;
+    opacity: 1 !important;
+  }
+  .collapse-btn {
+    display: none !important;
+  }
+
+  /* Hamburger Menu Toggle */
+  .menu-toggle {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    font-size: 18px;
+    color: var(--text-primary);
+  }
+
+  /* Header Layout */
+  .chat-header {
+    padding: max(10px, env(safe-area-inset-top))
+      max(14px, env(safe-area-inset-right)) 10px
+      max(14px, env(safe-area-inset-left));
+    gap: 10px;
+  }
+  .company-select {
+    max-width: 140px;
+    font-size: 12.5px;
+    padding: 5px 22px 5px 8px;
+    height: 36px;
+  }
+  .header-actions {
+    gap: 6px;
+  }
+
+  /* Message Layout */
+  .msg.bot {
+    max-width: 100%;
+    align-self: stretch;
+  }
+  .msg.user {
+    max-width: 88%;
+  }
+  .bubble {
+    padding: 14px 16px;
+    font-size: 14px;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  /* Chat Body */
+  .chat-body {
+    padding: 18px 16px !important;
+    gap: 16px;
+  }
+
+  /* Input Bar & Wrapper */
+  .chat-input-wrapper {
+    padding: 10px max(14px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom))
+      max(14px, env(safe-area-inset-left));
+  }
+  .chat-input-stack {
+    max-width: 100%;
+    gap: 8px;
+  }
+  .chat-input-bar {
+    padding: 5px 5px 5px 14px;
+  }
+  .chat-input-bar textarea,
+  .chat-input-bar input {
+    font-size: 14.5px;
+  }
+  .send-btn {
+    width: 38px;
+    height: 38px;
+    font-size: 15px;
+  }
+
+  /* Pebble Dock */
+  .pebble-dock {
+    max-height: 84px;
+    overflow-y: auto;
+    justify-content: flex-start;
+    padding: 2px 0;
+  }
+  .pebble {
+    font-size: 12.5px;
+    padding: 7px 14px;
+    white-space: nowrap;
+  }
+
+  /* Tables & Result Cards */
+  .result-card,
+  .record-card {
+    margin: 10px 0;
+    border-radius: 10px;
+    width: 100%;
+    max-width: 100%;
+  }
+  .table-controls {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .date-filter-controls {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding: 8px 12px !important;
+    font-size: 12px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .date-filter-controls label {
+    font-size: 12px;
+  }
+  .custom-range-fields {
+    width: 100% !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  .page-size-select,
+  .date-filter-controls input[type="date"],
+  .date-filter-controls select {
+    padding: 4px 8px;
+    font-size: 12px;
+    max-width: 100%;
+  }
+  table {
+    font-size: 12.5px;
+    min-width: 480px;
+  }
+  th,
+  td {
+    padding: 8px 10px;
+  }
+  .status-pill {
+    font-size: 10.5px;
+    padding: 2px 7px;
+  }
+  .party-link {
+    display: inline-block;
+    max-width: 160px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+  }
+}
+
+@media (max-width: 899px) {
+  .chat-header {
+    padding: max(10px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right)) 10px
+      max(12px, env(safe-area-inset-left));
+    gap: 8px;
+  }
+  .company-select {
+    max-width: 130px;
+    font-size: 12px;
+  }
+  .chat-body {
+    padding: 16px 12px !important;
+  }
+  .msg.user {
+    max-width: 90%;
+  }
+
+  /* Pebbles horizontal swipe row */
+  .pebble-dock {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    max-height: none !important;
+    justify-content: flex-start !important;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+    scroll-snap-type: x mandatory;
+  }
+  .pebble-dock::-webkit-scrollbar {
+    display: none;
+  }
+  .pebble {
+    font-size: 12px;
+    padding: 6px 12px;
+    flex-shrink: 0;
+    scroll-snap-align: start;
+  }
+
+  /* SKU hover popover protection */
+  .sku-cell .sku-hover-card,
+  .wh-badge-wrap .sku-hover-card {
+    left: auto;
+    right: 0;
+    min-width: 220px;
+    max-width: calc(100vw - 32px);
+  }
+}
+
+@media (max-width: 600px) {
+  .sidebar {
+    width: 85vw !important;
+    max-width: 310px;
+  }
+  .chat-header {
+    padding: max(8px, env(safe-area-inset-top))
+      max(10px, env(safe-area-inset-right)) 8px
+      max(10px, env(safe-area-inset-left));
+    gap: 6px;
+  }
+  /* Hide duplicate logo avatar in mobile header to give full room to title */
+  .chat-header .avatar {
+    display: none;
+  }
+  .chat-title {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .company-select {
+    max-width: 115px;
+    font-size: 11.5px;
+    padding: 4px 20px 4px 8px;
+    height: 34px;
+  }
+  .header-actions {
+    gap: 6px;
+  }
+  .header-btn {
+    padding: 6px;
+    width: 34px;
+    height: 34px;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .clear-chat-btn .btn-label {
+    display: none;
+  }
+
+  /* Message styling */
+  .msg {
+    gap: 10px;
+  }
+  .msg.user {
+    max-width: 92%;
+  }
+  .bubble {
+    padding: 12px 14px;
+    font-size: 13.5px;
+    border-radius: 14px;
+  }
+
+  /* Chat Body */
+  .chat-body {
+    padding: 14px 10px !important;
+    gap: 14px;
+  }
+
+  /* Input bar */
+  .chat-input-wrapper {
+    padding: 8px max(10px, env(safe-area-inset-right))
+      max(10px, env(safe-area-inset-bottom))
+      max(10px, env(safe-area-inset-left));
+  }
+  .chat-input-bar {
+    padding: 4px 4px 4px 12px;
+  }
+  .chat-input-bar textarea {
+    font-size: 14px;
+  }
+
+  /* Tables */
+  table {
+    font-size: 12px;
+    min-width: 440px;
+  }
+  th,
+  td {
+    padding: 7px 9px;
+  }
+  .party-link {
+    max-width: 120px;
+  }
+
+  /* Mini Actions */
+  .msg-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .mini-action {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 413px) {
+  .sidebar {
+    width: 85vw !important;
+    max-width: 290px;
+  }
+  .chat-header {
+    padding: max(6px, env(safe-area-inset-top))
+      max(8px, env(safe-area-inset-right)) 6px
+      max(8px, env(safe-area-inset-left));
+    gap: 5px;
+  }
+  .chat-title {
+    font-size: 13.5px;
+  }
+  .company-select {
+    max-width: 100px;
+    font-size: 11px;
+    padding: 4px 18px 4px 6px;
+    height: 32px;
+  }
+  .header-btn {
+    width: 32px;
+    height: 32px;
+    padding: 4px;
+  }
+
+  /* Hide bot avatar on tight mobile rows to give bubble full horizontal space */
+  .msg.bot > .avatar {
+    display: none;
+  }
+  .msg.user {
+    max-width: 95%;
+  }
+  .bubble {
+    padding: 10px 12px;
+    font-size: 13.5px;
+    border-radius: 12px;
+  }
+
+  .chat-body {
+    padding: 12px 8px !important;
+  }
+
+  /* Input bar */
+  .chat-input-wrapper {
+    padding: 8px max(8px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  }
+  .chat-input-bar {
+    padding: 4px 4px 4px 12px;
+  }
+  .chat-input-bar textarea {
+    font-size: 14px;
+    min-height: 36px;
+  }
+  .send-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+  }
+
+  /* Table styling */
+  table {
+    font-size: 11.5px;
+    min-width: 400px;
+  }
+  th,
+  td {
+    padding: 6px 8px;
+  }
+  .party-link {
+    max-width: 100px;
+  }
+  .status-pill {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+
+  /* Filters stack vertically */
+  .date-filter-controls {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+    padding: 6px 10px !important;
+  }
+  .custom-range-fields {
+    flex-direction: column !important;
+    gap: 6px !important;
+  }
+  .custom-range-fields label {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* Record card details */
+  .record-card th {
+    width: 110px;
+    font-size: 11.5px;
+  }
+  .record-card td {
+    font-size: 11.5px;
+  }
+  .mini-action {
+    padding: 5px 10px;
+    font-size: 11.5px;
+  }
+}
+
+@media (max-width: 360px) {
+  .chat-header {
+    padding: max(4px, env(safe-area-inset-top))
+      max(6px, env(safe-area-inset-right)) 4px
+      max(6px, env(safe-area-inset-left));
+    gap: 4px;
+  }
+  .chat-title {
+    font-size: 13px;
+  }
+  .company-select {
+    max-width: 85px;
+    font-size: 10.5px;
+    padding: 3px 16px 3px 4px;
+    height: 30px;
+  }
+  .header-btn {
+    width: 30px;
+    height: 30px;
+    padding: 3px;
+  }
+  .chat-body {
+    padding: 10px 6px !important;
+  }
+  .bubble {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+  table {
+    font-size: 11px;
+    min-width: 340px;
+  }
+  th,
+  td {
+    padding: 5px 6px;
+  }
+  .pebble {
+    font-size: 11px;
+    padding: 5px 10px;
+  }
+  .status-pill {
+    font-size: 9.5px;
+    padding: 1px 5px;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .chat-header {
+    padding: 4px 12px;
+  }
+  .chat-header .avatar {
+    width: 28px;
+    height: 28px;
+  }
+  .chat-body {
+    padding-top: 10px !important;
+    gap: 12px;
+  }
+  .chat-input-bar textarea {
+    max-height: 60px;
+  }
+  .pebble-dock {
+    max-height: 46px;
+  }
+}
+
+@media (pointer: coarse) {
+  .module,
+  .pebble,
+  .mini-action,
+  .theme-toggle,
+  .menu-toggle,
+  .send-btn,
+  .company-select {
+  /* Touch optimization for table headers */
+  th[data-sort-col] {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+}

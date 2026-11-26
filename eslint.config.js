@@ -5,7 +5,9 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // src/copilot/legacy is the original Copilot page script, kept as it was
+  // (a plain browser script whose *_URL globals come from its page).
+  globalIgnores(['dist', 'src/copilot/legacy']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
