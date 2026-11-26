@@ -11,6 +11,9 @@
  *   const ledgers = useCompanyLedgers(companyId)
  *     options, names (a Set), status, error, reload   every ledger of the company -
  *     the same list (ledgerSlice) the Ledger page and Amount Distribution read
+ *
+ * Both take { enabled } (default true): false asks nothing yet - Sales Entries
+ * reads them only once there are entries to post.
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -26,9 +29,10 @@ const NONE = Object.freeze([])
 const toOptions = (names) =>
   [...new Set(names.filter(Boolean))].sort((a, b) => a.localeCompare(b)).map((name) => ({ value: name, label: name }))
 
-export function useSalesLedgerChoice(companyId) {
+export function useSalesLedgerChoice(companyId, { enabled = true } = {}) {
   const query = useQuery({
     key: [QUERY.SALES_LEDGERS, companyId],
+    enabled,
     fetch: () => getSalesLedgers(companyId),
     staleTime: MASTER_DATA_STALE_MS,
   })
@@ -59,7 +63,7 @@ export function useSalesLedgerChoice(companyId) {
   }
 }
 
-export function useCompanyLedgers(companyId) {
+export function useCompanyLedgers(companyId, { enabled = true } = {}) {
   const dispatch = useDispatch()
   const items = useSelector(selectLedgers)
   const forCompany = useSelector(selectLedgersCompanyId)
@@ -68,8 +72,8 @@ export function useCompanyLedgers(companyId) {
   const ledgers = forCompany === companyId ? items : NONE
 
   useEffect(() => {
-    dispatch(fetchLedgers({ companyId }))
-  }, [dispatch, companyId])
+    if (enabled) dispatch(fetchLedgers({ companyId }))
+  }, [dispatch, companyId, enabled])
 
   const names = useMemo(() => ledgers.map((ledger) => String(ledger.ledger_name ?? '').trim()).filter(Boolean), [ledgers])
 

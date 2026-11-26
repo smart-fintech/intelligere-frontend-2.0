@@ -4,8 +4,12 @@
  *
  *   const batch = useEntryBatches(companyId, getMultiLedgerEntries)
  *
- *   status     'loading' | 'ready' | 'failed' - 'loading' keeps the last batch
- *              on screen, so a reload does not empty the table
+ *   status     'idle' | 'loading' | 'ready' | 'failed' - 'idle' until something
+ *              asks (NOTHING is read when the view opens: only after an upload,
+ *              a fetch, or Refresh); 'loading' keeps the last batch on screen,
+ *              so a reload does not empty the table
+ *   hasData    an answer has brought entries - the view then hides its upload /
+ *              fetch cards and shows them
  *   rows       the API's rows of this batch, as they came (readBatch)
  *   total, notInTally, error
  *   info       batchInfo: number, count, hasPrevious, hasNext, ...
@@ -27,7 +31,7 @@ const EMPTY = Object.freeze({ start: 0, rows: [], total: 0, notInTally: 0 })
 
 export default function useEntryBatches(companyId, fetchBatch, { onLoaded } = {}) {
   const [batch, setBatch] = useState(EMPTY)
-  const [status, setStatus] = useState('loading')
+  const [status, setStatus] = useState('idle')
   const [error, setError] = useState(null)
   const requestRef = useRef(0)
   const onLoadedRef = useRef(onLoaded)
@@ -61,12 +65,8 @@ export default function useEntryBatches(companyId, fetchBatch, { onLoaded } = {}
     return request(start)
   }
 
-  // The state starts as 'loading', so the first batch needs only the request.
-  useEffect(() => {
-    request(0)
-    // A view is mounted per company (keyed by the page), so this runs once for it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId])
+  // Nothing is asked when the view opens: the first batch is read after an
+  // upload or a fetch (restart), or when the user asks (reload).
 
   // An answer still on its way when the view goes is not wanted.
   useEffect(() => () => void (requestRef.current += 1), [])
@@ -74,6 +74,8 @@ export default function useEntryBatches(companyId, fetchBatch, { onLoaded } = {}
   return {
     status,
     error,
+    // Entries are in: an answer brought some (a batch emptied by sending still counts).
+    hasData: batch.total > 0 || batch.rows.length > 0,
     rows: batch.rows,
     total: batch.total,
     notInTally: batch.notInTally,

@@ -14,6 +14,7 @@ import {
   isActiveCompanyConnected,
   isFinalReply,
   readTallyConnectionReply,
+  recordTallyConnection,
   resolveGoldTallyConnection,
   resolveTallyConnection,
   tallySocket,
@@ -123,7 +124,12 @@ export default function Footer() {
 
   const [checking, setChecking] = useState(false)
   // null until the first check has finished.
-  const [result, setResult] = useState(null)
+  const [result, setShownResult] = useState(null)
+  // Every result shown is also recorded for other screens (isTallyConnectedFor).
+  const setResult = (outcome) => {
+    recordTallyConnection(outcome, companyNameRef.current)
+    setShownResult(outcome)
+  }
 
   // Refs, not state: they are read inside the socket callback, which was
   // registered once, on mount.

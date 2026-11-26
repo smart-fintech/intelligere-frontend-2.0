@@ -12,14 +12,26 @@ import { plural } from '@/Modules/SalesEntries/shared/ledgerLists'
  *   tally     useTallySendAndMark;  guard  useGuardedSend
  *   onMapping      optional - no mapping button without it (B2B / CNDN put theirs in the card's header)
  *   mappingLabel   optional - the mapping button's text (default Keyword Mapping)
+ *   mappingActive  optional - the button is a toggle (Sales Entries' Show / Hide
+ *                  Mapping): true while the mapping is shown
+ *   showCount      optional, default true - false leaves out "N entries selected"
+ *                  (Sales Entries sends the whole batch, as the old screen)
  *   blocked        optional - why nothing may be sent now (B2B / CNDN's GST ledger
  *                  check): Send is disabled and the reason shown beside it
  */
-export default function SendActions({ isTally, count, tally, guard, busy, onMapping, mappingLabel = 'Keyword Mapping', blocked }) {
+export default function SendActions({ isTally, count, tally, guard, busy, onMapping, mappingLabel = 'Keyword Mapping', mappingActive, blocked, showCount = true }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {onMapping ? (
-        <Button type="button" variant="outline" size="sm" icon={Waypoints} disabled={busy} onClick={onMapping}>
+        <Button
+          type="button"
+          variant={mappingActive ? 'secondary' : 'outline'}
+          size="sm"
+          icon={Waypoints}
+          aria-pressed={mappingActive === undefined ? undefined : mappingActive}
+          disabled={busy}
+          onClick={onMapping}
+        >
           {mappingLabel}
         </Button>
       ) : null}
@@ -29,9 +41,9 @@ export default function SendActions({ isTally, count, tally, guard, busy, onMapp
             <span role="status" className="text-xs font-medium text-destructive">
               {blocked}
             </span>
-          ) : (
+          ) : showCount ? (
             <span className="text-xs text-muted-foreground">{plural(count, 'entry', 'entries')} selected</span>
-          )}
+          ) : null}
           <Button type="button" size="sm" icon={Send} loading={tally.busy} disabled={count === 0 || busy || Boolean(blocked)} onClick={guard.send}>
             {tally.marking ? 'Marking as sent...' : tally.busy ? 'Sending...' : `Send ${count || ''} to Tally`}
           </Button>

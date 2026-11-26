@@ -12,6 +12,9 @@
  *   error     the message when the request failed
  *   reload()  asks again - Refresh, Retry, and after a save or a sync.
  *
+ *   useProducts({ enabled: false }) asks nothing yet (Sales Entries' With
+ *   Inventory, until it has invoices); left out, it is true.
+ *
  * ONE CALL FOR EVERYONE: getProducts in Services/Inventory/inventoryService - POST
  * inventory/product/ with the company's name. Tally or Intelligere, MSME or
  * Accounting Professional, with Inventory Management or without, the list
@@ -50,17 +53,18 @@ const loadProducts = (companyName) =>
     throw failure
   })
 
-export default function useProducts() {
+export default function useProducts({ enabled = true } = {}) {
   const { activeCompanyName: companyName } = useActiveCompany()
 
   const query = useQuery({
     key: companyName ? [QUERY.PRODUCTS, companyName] : null,
     fetch: () => loadProducts(companyName),
     staleTime: MASTER_DATA_STALE_MS,
+    enabled,
   })
 
   return {
-    status: !companyName ? 'idle' : query.status,
+    status: !companyName || !enabled ? 'idle' : query.status,
     rows: query.data ?? NO_ROWS,
     error: query.status === 'failed' ? query.error : null,
     reload: query.reload,

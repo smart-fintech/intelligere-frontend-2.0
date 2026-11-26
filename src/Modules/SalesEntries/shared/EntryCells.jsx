@@ -9,7 +9,9 @@ import { formatIndianCurrency } from '@/Utils/currency'
  * The pieces every view's table is made of, so the three tables read alike:
  *
  *   <Amount value />                  rupees, tabular figures
- *   <Lines lines empty />             name ... amount, one per line
+ *   <Lines lines empty missing />     name ... amount, one per line - `missing(line)`
+ *                                     optional: true tints that line light red (a
+ *                                     ledger the company does not have)
  *   <PartyCell entry ... />           the party ledger with its GSTIN and state,
  *                                     "Not in Tally" (Create, or "Creating..."),
  *                                     "Sent to Tally" when locked, and why it
@@ -20,12 +22,19 @@ import { formatIndianCurrency } from '@/Utils/currency'
 
 export const Amount = ({ value, className }) => <span className={cn('tabular-nums', className)}>{formatIndianCurrency(value)}</span>
 
-export function Lines({ lines, empty = '--' }) {
+export function Lines({ lines, empty = '--', missing }) {
   if (lines.length === 0) return <span className="text-muted-foreground">{empty}</span>
   return (
     <ul className="space-y-0.5 text-xs">
       {lines.map((line, index) => (
-        <li key={`${line.name}-${index}`} className="flex items-baseline justify-between gap-2">
+        <li
+          key={`${line.name}-${index}`}
+          title={missing?.(line) ? `${line.name} is not a ledger of the company - map it or create it` : undefined}
+          className={cn(
+            'flex items-baseline justify-between gap-2',
+            missing?.(line) && '-mx-1 rounded border border-destructive/30 bg-destructive/10 px-1 text-destructive',
+          )}
+        >
           <span className="min-w-0 truncate" title={line.name}>
             {line.name}
           </span>

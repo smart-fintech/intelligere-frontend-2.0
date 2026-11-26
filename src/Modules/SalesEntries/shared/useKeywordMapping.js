@@ -10,6 +10,8 @@
  *   remove(keyword)        DELETE, then read again
  *   saving                 true while either runs
  *
+ * { enabled } (default true): false asks nothing yet (Sales Entries, until it has entries).
+ *
  * Kept in the shared cache per company and source, so reopening the dialog,
  * or another view of the same source, asks no second time.
  */
@@ -22,9 +24,10 @@ import { toast } from '@/Library/toast'
 import { NO_MAPPING, readMapping } from '@/Modules/SalesEntries/shared/keywordMapping'
 import { deleteKeywordMapping, getKeywordMapping, saveKeywordMapping } from '@/Services/Accounting/keywordMappingService'
 
-export default function useKeywordMapping(companyId, source) {
+export default function useKeywordMapping(companyId, source, { enabled = true } = {}) {
   const query = useQuery({
     key: [QUERY.KEYWORD_MAPPING, companyId, source],
+    enabled,
     fetch: async () => readMapping(await getKeywordMapping(companyId, source)),
     staleTime: MASTER_DATA_STALE_MS,
   })

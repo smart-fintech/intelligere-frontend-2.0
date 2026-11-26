@@ -54,6 +54,7 @@ import { keptLineId, needsStockBooking, needsStockRebooking, productLinesChanged
 import { PROCUREMENT_STATE, QUOTATION_STATES } from '@/Modules/SalesInvoice/procurement'
 import useProcurement from '@/Modules/SalesInvoice/useProcurement'
 import useTallyLedgerAlter from '@/Modules/SalesInvoice/useTallyLedgerAlter'
+import { isTallyConnectedFor } from '@/Services/Tally/tallyConnectionService'
 import useInventoryAccess from '@/Hooks/useInventoryAccess'
 import { useSkuManagement } from '@/Hooks/useMasterDetails'
 import { buildPrefillFrom, getPrefillDocumentDetails, readPrefillFrom } from '@/Services/Invoice/documentPrefillService'
@@ -977,7 +978,9 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
         // A Tally user's ledger is changed in Tally, as the Ledger Form does -
         // the API update would have the backend send Tally India for the
         // country (see useTallyLedgerAlter). The EXE finds it by its GUID.
-        if (isTallyErp && textOf(ledger.ledger_guid)) {
+        // Only while the footer's Tally check found this company connected -
+        // otherwise nothing is sent to Tally, and the API update alone saves it.
+        if (isTallyErp && textOf(ledger.ledger_guid) && isTallyConnectedFor(company.comp_name)) {
           if (!(await alterTallyLedger(company.comp_name, { ...payload, ledger_guid: ledger.ledger_guid }))) return false
         } else {
           await saveBuyerLedger(payload)
@@ -1368,12 +1371,14 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
 
   /**
    * Leaves a saved document whose PDF did not go up (or the one being
-   * edited), and starts a fresh one. `keepPurchasing` - New Document after a
-   * finished save: that order's PDF is up, so its purchasing goes on.
+   * edited, or one finished - New Document), and starts a fresh one: the
+   * whole module as it opens, with nothing of the last order kept - its
+   * purchasing, and its Inventory Details notice.
    */
-  const startNew = ({ keepPurchasing = false } = {}) => {
-    // That order's purchasing ends with it - its PDF (and so its stock) is not coming.
-    if (!keepPurchasing) procurement.reset()
+  const startNew = () => {
+    procurement.reset()
+    setInventoryOpen(false)
+    setInventoryDetails(null)
     bookedRef.current = null
     challanStockFor.current = null
     setSaved(null)
@@ -1458,30 +1463,6 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
             </InlineAlert>
           ) : null}
 
-          {inventoryDetails && !saved ? (
-            // Not a problem - a notice, in the brand's colour (InlineAlert is for what went wrong).
-            <div className="flex flex-wrap items-center gap-2 rounded-md border border-brand/30 bg-brand-soft px-2.5 py-2 text-xs text-brand" role="status" data-testid="inventory-details-notice">
-              <Boxes className="size-3.5 shrink-0" aria-hidden="true" />
-              <span className="min-w-0 flex-1">
-                {inventoryDetails.documentNo} is saved - see its products&apos; stock.{purchaseNote ? ` ${purchaseNote}` : ''}
-              </span>
-              <Button type="button" size="sm" onClick={() => setInventoryOpen(true)}>
-                Inventory Details
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                aria-label="Dismiss inventory details"
-                onClick={() => {
-                  setInventoryDetails(null)
-                  procurement.reset()
-                }}
-              >
-                Dismiss
-              </Button>
-            </div>
-          ) : null}
           {step.key === INVOICE_STEP.SELLER ? (
             <>
               <DocumentTypeCard {...stepProps} documentTypes={documentTypes} locked={Boolean(saved) || Boolean(editing)} prefill={prefill} orderSource={orders} />
@@ -1550,6 +1531,32 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
             />
           ) : null}
 
+          {/* A saved Sales Order's stock - just above Download PDF. */}
+          {inventoryDetails && !saved ? (
+            // Not a problem - a notice, in the brand's colour (InlineAlert is for what went wrong).
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-brand/30 bg-brand-soft px-2.5 py-2 text-xs text-brand" role="status" data-testid="inventory-details-notice">
+              <Boxes className="size-3.5 shrink-0" aria-hidden="true" />
+              <span className="min-w-0 flex-1">
+                {inventoryDetails.documentNo} is saved - see its products&apos; stock.{purchaseNote ? ` ${purchaseNote}` : ''}
+              </span>
+              <Button type="button" size="sm" onClick={() => setInventoryOpen(true)}>
+                Inventory Details
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-label="Dismiss inventory details"
+                onClick={() => {
+                  setInventoryDetails(null)
+                  procurement.reset()
+                }}
+              >
+                Dismiss
+              </Button>
+            </div>
+          ) : null}
+
           {/* ---------------- Previous / Next / Save ---------------- */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -1559,7 +1566,7 @@ export default function SalesInvoiceWorkspace({ company, flow = SALES_FLOW, edit
               {/* Leaves the document being edited, unsaved, for a new one - or, saved here, for the next one. */}
               {editing && !saved ? (
                 editing.afterSave ? (
-                  <Button type="button" variant="outline" icon={FilePlus} disabled={busy} onClick={() => startNew({ keepPurchasing: true })}>
+                  <Button type="button" variant="outline" icon={FilePlus} disabled={busy} onClick={() => startNew()}>
                     New Document
                   </Button>
                 ) : (

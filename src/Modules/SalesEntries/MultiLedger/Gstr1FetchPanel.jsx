@@ -1,27 +1,30 @@
 import { useState } from 'react'
-import { AlertTriangle, CloudDownload, Info } from 'lucide-react'
+import { AlertTriangle, CloudDownload, Info, Landmark } from 'lucide-react'
 
 import { SelectField } from '@/Components/Common/FormFields'
 import { GstPortalAuthDialogs } from '@/Components/Common/GstPortalAuthDialogs'
-import { Modal } from '@/Components/Common/Modal'
 import { Button } from '@/Components/ui/button'
 import { GSTR_1_FETCH_SECTIONS } from '@/Constants/salesEntries'
 import { cn } from '@/Library/utils'
 import { GSTR_1_OUTCOME } from '@/Modules/SalesEntries/MultiLedger/gstr1Reply'
+import { EntrySource } from '@/Modules/SalesEntries/shared/GetEntriesPanel'
 import { plural } from '@/Modules/SalesEntries/shared/ledgerLists'
 import { MONTH_OPTIONS } from '@/Modules/SalesInvoice/History/historyHelpers'
 
 /**
- * FETCH FROM GSTR-1 - as the old screen, only the month and year: the month's
- * B2B invoices (GSTR_1_FETCH_SECTIONS) are read and become the entries of this
- * view, REPLACING the ones there now, which is said before Fetch is pressed.
+ * FETCH FROM GSTR-1 - as the old screen, in the selection card itself: the
+ * month, the year and Fetch. The month's B2B invoices (GSTR_1_FETCH_SECTIONS)
+ * are read and become the entries of this view, REPLACING the ones there now,
+ * which is said before Fetch is pressed.
  *
- * The username / OTP dialogs open over it when the portal asks
+ * The username / OTP dialogs open over the screen when the portal asks
  * (GstPortalAuthDialogs). The answer stays here when part of it failed - which
- * sections, and why - and a full success closes it (the view's onSaved).
+ * sections, and why; a full success is told by a toast and shows in the list.
  *
  *   gstr1   useGstr1Fetch
  *   total   the entries there now
+ *   className  the view keeps it mounted, hidden, while the source is a file -
+ *              a sign-in under way is not cut short by switching
  */
 
 /** The month GSTR-1 is usually fetched for: the one before this. */
@@ -34,7 +37,8 @@ const lastMonth = (today = new Date()) => {
 const yearOptions = (today = new Date()) =>
   [0, 1, 2].map((back) => String(today.getFullYear() - back)).map((value) => ({ value, label: value }))
 
-function FetchResult({ result }) {
+/** What the last fetch left out or why it failed - nothing after a full success. */
+export function Gstr1FetchResult({ result }) {
   if (!result || result.outcome === GSTR_1_OUTCOME.SAVED || result.outcome === GSTR_1_OUTCOME.SECTIONS_SAVED) return null
   const partial = result.outcome === GSTR_1_OUTCOME.PARTIAL
   const quiet = result.outcome === GSTR_1_OUTCOME.NO_INVOICES
@@ -74,48 +78,39 @@ function FetchResult({ result }) {
   )
 }
 
-export default function Gstr1FetchModal({ open, onOpenChange, gstr1, total, companyName }) {
+export default function Gstr1FetchPanel({ gstr1, total, companyName, disabled, className }) {
   const [period, setPeriod] = useState(lastMonth)
   const years = yearOptions()
-  // While the portal is read, or asks for the username / OTP, this stays open.
+  // While the portal is read, or asks for the username / OTP, the period stays as it is.
   const locked = gstr1.fetching || gstr1.portal.step !== null
 
   const setPart = (field) => (value) => value && setPeriod((previous) => ({ ...previous, [field]: value }))
 
   const fetchNow = () => gstr1.start({ ...period, sections: GSTR_1_FETCH_SECTIONS, invoicesAsked: true })
 
-  const close = (next) => {
-    if (next || locked) return
-    gstr1.clearResult()
-    onOpenChange(false)
-  }
-
   return (
-    <Modal
-      open={open}
-      onOpenChange={close}
-      title="Fetch from GSTR-1"
-      description={`Read a month's B2B invoices from the GST portal${companyName ? ` for ${companyName}` : ''}.`}
-      closeOnBackdropClick={!locked}
-      closeOnEsc={!locked}
-      showCloseButton={!locked}
-      footer={
-        <>
-          <Button type="button" variant="ghost" disabled={locked} onClick={() => close(false)}>
-            {gstr1.result ? 'Close' : 'Cancel'}
-          </Button>
-          <Button type="button" icon={CloudDownload} loading={gstr1.fetching} disabled={locked || !period.month || !period.year} onClick={fetchNow}>
-            {gstr1.fetching ? 'Fetching from the GST portal...' : total > 0 ? 'Fetch and replace' : 'Fetch'}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <div className={className}>
+      <EntrySource
+        icon={Landmark}
+        title="From the GST portal (GSTR-1)"
+        description={`A month's B2B invoices${companyName ? ` of ${companyName}` : ''}, straight in as entries.`}
+      >
+        <div className="grid w-full grid-cols-1 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_auto]">
           <SelectField id="gstr1-month" label="Month" required options={MONTH_OPTIONS} value={period.month} disabled={locked} onValueChange={setPart('month')} />
           <SelectField id="gstr1-year" label="Year" required options={years} value={period.year} disabled={locked} onValueChange={setPart('year')} />
+          <Button
+            type="button"
+            icon={CloudDownload}
+            loading={gstr1.fetching}
+            disabled={locked || disabled || !period.month || !period.year}
+            onClick={fetchNow}
+          >
+            {gstr1.fetching ? 'Fetching...' : total > 0 ? 'Fetch and replace' : 'Fetch'}
+          </Button>
         </div>
+      </EntrySource>
 
+      <div className="mt-3 space-y-3">
         {total > 0 ? (
           <p className="flex gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
@@ -126,10 +121,10 @@ export default function Gstr1FetchModal({ open, onOpenChange, gstr1, total, comp
           A month fetched before is read from the saved copy, not from the portal again. The GST portal may ask for its username and an OTP first.
         </p>
 
-        <FetchResult result={gstr1.result} />
+        <Gstr1FetchResult result={gstr1.result} />
       </div>
 
       <GstPortalAuthDialogs portal={gstr1.portal} />
-    </Modal>
+    </div>
   )
 }

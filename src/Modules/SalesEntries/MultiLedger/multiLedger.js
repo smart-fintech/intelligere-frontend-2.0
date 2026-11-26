@@ -110,9 +110,9 @@ export const fillB2cEntry = (entry, { party, summaryDate }) => {
 
 export const checkMultiEntry = (entry, salesLedger) => {
   if (!entry.invoiceNo && !entry.isSummary) return 'It has no invoice number.'
-  if (!entry.invoiceDate) return entry.isSummary ? 'Choose the B2C summary date above.' : 'It has no invoice date.'
-  if (!entry.partyLedger) return entry.buyer === SALES_BUYER_KIND.B2C ? 'Choose the B2C Party Ledger above.' : 'It has no party ledger.'
-  if (entry.needsSalesLedger && !text(salesLedger)) return 'It has no ledger lines, so it needs a sales ledger.'
+  if (!entry.invoiceDate) return 'It has no invoice date.'
+  if (!entry.partyLedger) return 'It has no party ledger.'
+  if (entry.needsSalesLedger && !text(salesLedger)) return 'It has no ledger lines - choose the Sales Ledger above.'
   return null
 }
 

@@ -166,6 +166,22 @@ export const resolveTallyConnection = (replies, activeCompanyName) => {
 }
 
 /**
+ * The footer's last answer, kept for other screens to read - nothing here
+ * sends a check or opens a connection. The footer records every result it
+ * shows (null while there is none: not checked yet, or the check timed out),
+ * with the company it was checked against.
+ */
+let lastConnection = { state: null, companyName: '' }
+
+export const recordTallyConnection = (outcome, companyName) => {
+  lastConnection = { state: outcome?.state ?? null, companyName: companyName ?? '' }
+}
+
+/** True only when the footer's last check found `companyName` open and connected in Tally. */
+export const isTallyConnectedFor = (companyName) =>
+  lastConnection.state === 'connected' && sameName(lastConnection.companyName, companyName)
+
+/**
  * The footer's answer for Tally Gold. Connected ONLY when
  *
  *   1. tally/user-companies-list/ has at least one company,

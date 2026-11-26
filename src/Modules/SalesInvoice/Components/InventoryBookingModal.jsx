@@ -97,8 +97,8 @@ export default function InventoryBookingModal({ open, lines, productsByKey, comp
                   {showSku && item.skuCode ? <span className="ml-2 text-xs font-normal text-muted-foreground">{item.skuCode}</span> : null}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Required Quantity <span className="font-semibold text-foreground tabular-nums" data-testid="booking-order-qty">{quantity(item.orderQty)}</span>
-                  {' '}
+                  Ordered Quantity <span className="font-semibold text-foreground tabular-nums" data-testid="booking-order-qty">{quantity(item.orderQty)}</span>
+                  {/* {' '}
                   - Available <span className="font-semibold text-foreground tabular-nums" data-testid="booking-available">{quantity(available)}</span>
                   {shortfall > 0 ? (
                     <>
@@ -107,7 +107,7 @@ export default function InventoryBookingModal({ open, lines, productsByKey, comp
                     </>
                   ) : null}
                   {' '}
-                  - Booked <span className={cn('font-semibold tabular-nums', error ? 'text-destructive' : 'text-foreground')} data-testid="booking-total">{quantity(total)}</span>
+                  - Booked <span className={cn('font-semibold tabular-nums', error ? 'text-destructive' : 'text-foreground')} data-testid="booking-total">{quantity(total)}</span> */}
                 </p>
               </div>
               {/* The same table for every product - one no warehouse holds lists the company's warehouses at 0. */}

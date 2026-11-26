@@ -1,18 +1,19 @@
 import { useState } from 'react'
-import { Download, FileSpreadsheet } from 'lucide-react'
+import { Download, FileSpreadsheet, X } from 'lucide-react'
 
 import { ConfirmDialog } from '@/Components/Common/ConfirmDialog'
 import { CsvUploadButton } from '@/Components/Common/CsvUploadButton'
 import { Panel } from '@/Components/Common/Panel'
 import { Button } from '@/Components/ui/button'
-import { SALES_ENTRIES_UPLOAD_MAX_MB } from '@/Constants/salesEntries'
+import { SALES_ENTRIES_UPLOAD_ACCEPT, SALES_ENTRIES_UPLOAD_MAX_MB } from '@/Constants/salesEntries'
 import { toast } from '@/Library/toast'
+import { cn } from '@/Library/utils'
 import { plural } from '@/Modules/SalesEntries/shared/ledgerLists'
 import { downloadTextFile } from '@/Utils/fileDownload'
 
 /**
  * "Get Entries" - the same card in every view: one tile per place the
- * entries can come from. "From a file" (Download Format, Upload CSV, a line on
+ * entries can come from. "From a file" (Download Format, Upload File - CSV or Excel, a line on
  * the format) is always there; a view adds its own tiles as `children`, each
  * an <EntrySource> - Multi Ledger's Tally and GST portal.
  *
@@ -21,6 +22,17 @@ import { downloadTextFile } from '@/Utils/fileDownload'
  * view's `onUploaded()` starts it on batch 1 again.
  *
  * Props: format { file, content }, upload, onUploaded, total, disabled, hint, replaces
+ *
+ * Sales Entries' selection card (optional, B2B / CNDN leave them out):
+ *   picker      the workflow choices (WorkflowPicker): with it the card is laid
+ *               out as the old screen - the choices on the left, the ways to
+ *               get entries stacked on the right
+ *   showFile    false leaves the "From a file" tile out (Fetch from GSTR-1 is
+ *               the source); default true
+ *   hidden      the whole card steps aside once entries are in (useGetEntriesCard) -
+ *               kept mounted, so a GST portal sign-in under way goes on
+ *   onClose     given while the card was brought back over entries already
+ *               shown: "Back to the entries" in its header
  */
 
 /** One place entries come from: a heading, a line on what it gives, its buttons. */
@@ -39,7 +51,20 @@ export function EntrySource({ icon: Icon, title, description, children }) {
   )
 }
 
-export default function GetEntriesPanel({ format, upload, onUploaded, total, disabled, hint, replaces, children }) {
+export default function GetEntriesPanel({
+  format,
+  upload,
+  onUploaded,
+  total,
+  disabled,
+  hint,
+  replaces,
+  picker,
+  showFile = true,
+  hidden = false,
+  onClose,
+  children,
+}) {
   const [uploading, setUploading] = useState(false)
   const [pendingFile, setPendingFile] = useState(null)
 
@@ -59,19 +84,51 @@ export default function GetEntriesPanel({ format, upload, onUploaded, total, dis
 
   const choose = (file) => (total > 0 ? setPendingFile(file) : run(file))
 
+  const fileSource = showFile ? (
+    <EntrySource icon={FileSpreadsheet} title={picker ? 'Intelligere Format' : 'From a file'} description={hint}>
+      <Button type="button" variant="outline" size="sm" icon={Download} onClick={() => downloadTextFile(format.file, format.content)}>
+        Download Format
+      </Button>
+      <CsvUploadButton
+        size="sm"
+        accept={SALES_ENTRIES_UPLOAD_ACCEPT}
+        maxSizeMb={SALES_ENTRIES_UPLOAD_MAX_MB}
+        loading={uploading}
+        disabled={uploading || disabled}
+        onInvalid={(why) => toast.error(why.startsWith('Please choose') ? 'Unsupported file format. Please upload a CSV, XLSX or XLS file.' : why)}
+        onFileSelect={choose}
+      >
+        Upload File
+      </CsvUploadButton>
+    </EntrySource>
+  ) : null
+
   return (
-    <Panel title="Get Entries">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(auto-fit,minmax(16rem,1fr))]">
-        <EntrySource icon={FileSpreadsheet} title="From a file" description={hint}>
-          <Button type="button" variant="outline" size="sm" icon={Download} onClick={() => downloadTextFile(format.file, format.content)}>
-            Download Format
+    <Panel
+      title="Get Entries"
+      className={cn(picker && 'mx-auto w-full max-w-5xl', hidden && 'hidden')}
+      actions={
+        onClose ? (
+          <Button type="button" variant="ghost" size="sm" icon={X} onClick={onClose}>
+            Back to the entries
           </Button>
-          <CsvUploadButton size="sm" maxSizeMb={SALES_ENTRIES_UPLOAD_MAX_MB} loading={uploading} disabled={uploading || disabled} onFileSelect={choose}>
-            Upload CSV
-          </CsvUploadButton>
-        </EntrySource>
-        {children}
-      </div>
+        ) : null
+      }
+    >
+      {picker ? (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+          {picker}
+          <div className="flex flex-col gap-3 lg:border-l lg:border-border lg:pl-4">
+            {fileSource}
+            {children}
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(auto-fit,minmax(16rem,1fr))]">
+          {fileSource}
+          {children}
+        </div>
+      )}
 
       <ConfirmDialog
         open={Boolean(pendingFile)}

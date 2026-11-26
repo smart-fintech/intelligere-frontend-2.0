@@ -19,7 +19,7 @@ import { Amount } from '@/Modules/SalesEntries/shared/EntryCells'
  *   onChoose(product, name | null), onCreate(product) - absent: no Create
  */
 
-const ROW = 'grid min-w-[56rem] grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)_5rem_4rem_4.5rem_6rem_6.5rem_minmax(0,1fr)] items-start gap-2 px-2 py-1.5'
+const ROW = 'grid min-w-[40rem] grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_4.5rem_3.5rem_3.5rem_5.5rem_6rem_minmax(0,1.1fr)] items-start gap-2 px-2 py-1.5'
 
 export default function InvoiceProducts({ invoice, matchOf, stockNameOf, stockOptions, overrideOf, onChoose, onCreate, disabled }) {
   return (

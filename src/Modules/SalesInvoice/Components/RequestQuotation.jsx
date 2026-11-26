@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, CheckCircle2, ChevronRight, Download } from 'lucide-react'
 
 import { InlineAlert } from '@/Components/Common/DataList'
@@ -341,6 +341,27 @@ function ReviewStep({ procurement }) {
   const nameOf = (vendorKey) => parts.find((part) => part.vendor.key === vendorKey)?.vendor.name ?? 'The vendor'
   // Chosen, but with no vendor to ask - in no request below.
   const vendorless = lines.filter((line) => line.vendorless)
+
+  // Each product's Order Qty - its order_qty added up where it is needed in several places.
+  const orderQtyOf = new Map(lines.map((line) => [line.key, mergedOrderQty(line.nodes)]))
+  // Each seller's Quantity starts with the product's Order Qty, in place of the required quantity it
+  // is first filled with - once per box, so a quantity typed afterwards is never changed. A product
+  // with no Order Qty keeps the required quantity.
+  const seededRef = useRef(new Set())
+  const { allocate } = procurement
+  useEffect(() => {
+    lines.forEach(({ key, qty, selected }) => {
+      const orderQty = orderQtyOf.get(key)
+      selected.forEach((vendor) => {
+        const cellKey = `${key}|${vendor.key}`
+        const text = choices.allocations[key]?.[vendor.key]
+        if (seededRef.current.has(cellKey) || text === undefined || text === '') return
+        seededRef.current.add(cellKey)
+        if (orderQty === null || Math.abs(Number(text) - qty) > 1e-9) return
+        allocate(key, vendor.key, String(orderQty))
+      })
+    })
+  })
   return (
     <div className="space-y-3">
       {state === STATE.QUOTATION_ERROR ? (
@@ -374,7 +395,7 @@ function ReviewStep({ procurement }) {
         </div>
       ) : null}
       <p className="text-xs text-muted-foreground">
-        Each seller is asked for the product’s required quantity to start with. Change any seller’s quantity as needed - more than required too; 0 leaves the product out of that seller’s request.
+        Each seller is asked for the product’s order quantity to start with. Change any seller’s quantity as needed - more than ordered too; 0 leaves the product out of that seller’s request.
       </p>
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full min-w-[560px] text-sm">
@@ -445,13 +466,14 @@ function ReviewStep({ procurement }) {
                             </tr>
                           </thead>
                           <tbody>
-                            {items.map(({ key, node, qty, cell: cellKey }) => {
+                            {items.map(({ key, node, cell: cellKey }) => {
+                              const orderQty = orderQtyOf.get(key) ?? null
                               const cellError = problems.allocations.cells[cellKey]
                               return (
                                 <tr key={key} className="border-t border-border align-top" data-testid="rfq-review-row">
                                   <td className={cn(cell, 'break-words')}>
                                     {node.name}
-                                    <span className="block text-[11px] text-muted-foreground">Required {quantityText(qty)}</span>
+                                    <span className="block text-[11px] text-muted-foreground">Order Qty {quantityText(orderQty)}</span>
                                   </td>
                                   {showSku ? (
                                     <td className={cn(cell, 'text-xs')}>
