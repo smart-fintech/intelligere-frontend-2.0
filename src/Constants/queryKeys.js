@@ -14,6 +14,9 @@
  *                       company's voucher types, for every voucher of both modules
  *   APP_LEDGER_PRODUCTS POST invoice/app-ledger-product/  [APP_LEDGER_PRODUCTS, companyName, documentType] -
  *                       the ledgers and products the Voucher view's Mapping lists
+ *   APP_LEDGER_STOCK    POST invoice/app-ledger-product/    [APP_LEDGER_STOCK, companyId, documentType] - the ledgers and
+ *                       stock items to create before the vouchers (PendingMasters), read again
+ *                       each time the Voucher view is chosen and after every create
  *   WAREHOUSES          POST inventory/warehouse_create/  [WAREHOUSES, companyId] - the list, read
  *                       again after a warehouse is created, changed or deleted (useWarehouses)
  *   QUOTATION_REQUESTS  POST inventory/AllRequestSO/      [QUOTATION_REQUESTS, companyName] - read
@@ -81,6 +84,7 @@ export const QUERY = Object.freeze({
   TALLY_VOUCHERS: 'tallyVouchers',
   TALLY_VOUCHER_TYPES: 'tallyVoucherTypes',
   APP_LEDGER_PRODUCTS: 'appLedgerProducts',
+  APP_LEDGER_STOCK: 'appLedgerStock',
   WAREHOUSES: 'warehouses',
   QUOTATION_REQUESTS: 'quotationRequests',
   TRANSFER_NOTES: 'transferNotes',

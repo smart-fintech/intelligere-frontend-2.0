@@ -13,7 +13,9 @@ import { Label } from '@/Components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/Components/ui/radio-group'
 import { toast } from '@/Library/toast'
 import useInvoiceReferenceData from '@/Modules/SalesInvoice/useInvoiceReferenceData'
+import PendingMasters from '@/Modules/SalesInvoice/Voucher/PendingMasters'
 import VoucherCard from '@/Modules/SalesInvoice/Voucher/VoucherCard'
+import useAppLedgerStock from '@/Modules/SalesInvoice/Voucher/useAppLedgerStock'
 import useTallyVouchers from '@/Modules/SalesInvoice/Voucher/useTallyVouchers'
 import useVoucherTallySend from '@/Modules/SalesInvoice/Voucher/useVoucherTallySend'
 import useVoucherTypes from '@/Modules/SalesInvoice/Voucher/useVoucherTypes'
@@ -90,6 +92,13 @@ import { selectIsErpKnown, selectIsTallyErp } from '@/Store/Slices/profileSlice'
  * asks first, then POSTs the voucher to invoice/tally-vouchers/ and - only
  * once that succeeds - reads the vouchers again.
  *
+ * LEDGERS AND STOCK ITEMS TO CREATE FIRST (the old ERP's step): while
+ * invoice/app-ledger-product/ lists any (useAppLedgerStock - read on open and
+ * each time Voucher is chosen), PendingMasters is shown in place of the
+ * vouchers, to create them in Tally or Intelligere; once both lists are empty
+ * the vouchers are back. A check that failed never hides the vouchers - it is
+ * said above them, with Retry.
+ *
  *   company   the active company's record
  *   types     the document types offered, in order
  *   parties   the flow's { company, ledger } sides - which side the ledger is
@@ -151,6 +160,10 @@ export default function TallyVouchers({ company, types = SALES_VOUCHER_TYPES, pa
   const companyId = company.company_id
   // `selection`: the times the screen's Voucher view was chosen - each asks for the latest (useTallyVouchers).
   const vouchers = useTallyVouchers(companyId, true, selection)
+  // The ledgers and stock items the vouchers need created first - Purchase Invoice for the purchase
+  // screen, Sales Invoice for the sales one (whatever voucher type is shown).
+  const pendingDocumentType = types.includes('Purchase Invoice') ? 'Purchase Invoice' : 'Sales Invoice'
+  const pendingMasters = useAppLedgerStock({ companyId, companyName: company.comp_name, documentType: pendingDocumentType, selection })
   const { ledgers, products } = useInvoiceReferenceData(companyId)
   const voucherTypeList = useVoucherTypes(company.comp_name)
   const tally = useVoucherTallySend(companyId)
@@ -378,6 +391,22 @@ export default function TallyVouchers({ company, types = SALES_VOUCHER_TYPES, pa
 
   const problems = problemsFor ? mappingOf(problemsFor).problems : NO_ROWS
 
+  // The old ERP's step: ledgers and stock items to create before any voucher is shown.
+  if (pendingMasters.any) {
+    return (
+      <PendingMasters
+        side={types.includes('Purchase Invoice') ? 'purchase' : 'sales'}
+        pending={pendingMasters}
+        companyId={companyId}
+        companyName={company.comp_name}
+        isTally={isTally}
+        erpKnown={erp.known}
+        onLedgersCreated={ledgers.retry}
+        onStockCreated={products.retry}
+      />
+    )
+  }
+
   return (
     <Card className="border-border/70 py-3 shadow-sm">
       <CardContent className="space-y-3 px-3">
@@ -413,6 +442,12 @@ export default function TallyVouchers({ company, types = SALES_VOUCHER_TYPES, pa
             Refresh
           </Button>
         </div>
+
+        {pendingMasters.status === 'failed' ? (
+          <InlineAlert action={<RetryButton onClick={pendingMasters.reload} />}>
+            Could not check for ledgers and stock items to create: {pendingMasters.error}
+          </InlineAlert>
+        ) : null}
 
         {vouchers.status === 'failed' && Object.keys(vouchers.groups).length === 0 ? (
           <StateMessage icon={AlertCircle} tone="error" title="Could not load the vouchers" action={<RetryButton onClick={vouchers.reload} />}>
