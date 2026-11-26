@@ -80,7 +80,7 @@ function OptionModule({ module, checked, choice, owned, usage = [], onChoose, on
 
             {/* Typical Procurement Categories */}
             <div className="w-full lg:w-3/5">
-              <h4 className="mb-2 text-sm font-semibold text-gray-800">
+              <h4 className="mb-2 text-sm font-semibold text-foreground">
                 Typical Procurement Categories
               </h4>
 
@@ -97,7 +97,7 @@ function OptionModule({ module, checked, choice, owned, usage = [], onChoose, on
                 ].map((category, index) => (
                   <div
                     key={index}
-                    className="w-1/2 flex items-start gap-2 text-sm text-gray-700 mb-2"
+                    className="w-1/2 flex items-start gap-2 text-sm text-foreground/80 mb-2"
                   >
                     <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand" />
                     <span>{category}</span>

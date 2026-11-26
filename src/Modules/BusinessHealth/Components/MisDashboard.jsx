@@ -48,12 +48,12 @@ const pinnedReports = (saved) => saved.map(findDashboardReport).filter(Boolean)
 
 /** The old Dashboard's six card colours, in turn. */
 const CARD_THEMES = [
-  'border-[#2563EB] bg-[#DBEAFE] text-[#2563EB]',
-  'border-[#059669] bg-[#D1FAE5] text-[#059669]',
-  'border-[#DC2626] bg-[#FEE2E2] text-[#DC2626]',
-  'border-[#D97706] bg-[#FEF3C7] text-[#D97706]',
-  'border-[#7C3AED] bg-[#EDE9FE] text-[#7C3AED]',
-  'border-[#0891B2] bg-[#CFFAFE] text-[#0891B2]',
+  'border-[#2563EB] bg-[#DBEAFE] text-[#2563EB] dark:border-blue-500 dark:bg-blue-950 dark:text-blue-300',
+  'border-[#059669] bg-[#D1FAE5] text-[#059669] dark:border-emerald-500 dark:bg-emerald-950 dark:text-emerald-300',
+  'border-[#DC2626] bg-[#FEE2E2] text-[#DC2626] dark:border-red-500 dark:bg-red-950 dark:text-red-300',
+  'border-[#D97706] bg-[#FEF3C7] text-[#D97706] dark:border-amber-500 dark:bg-amber-950 dark:text-amber-300',
+  'border-[#7C3AED] bg-[#EDE9FE] text-[#7C3AED] dark:border-violet-500 dark:bg-violet-950 dark:text-violet-300',
+  'border-[#0891B2] bg-[#CFFAFE] text-[#0891B2] dark:border-cyan-500 dark:bg-cyan-950 dark:text-cyan-300',
 ]
 
 /** One pinned report: its own request, and its own loading, failure and answer. */

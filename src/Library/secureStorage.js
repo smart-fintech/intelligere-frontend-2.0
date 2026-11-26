@@ -18,6 +18,7 @@ import AES from 'crypto-js/aes'
 import Utf8 from 'crypto-js/enc-utf8'
 
 import { ENV } from '@/Config/env'
+import { THEME_STORAGE_KEY } from '@/Library/theme'
 
 /**
  * Names of everything the app keeps in localStorage.
@@ -158,11 +159,16 @@ export const removeItem = (key) => {
   }
 }
 
-/** Wipes everything - used on logout. */
+/**
+ * Wipes everything - used on logout. The light / dark choice is the one
+ * thing kept: it belongs to the browser, not the session (see Library/theme.js).
+ */
 export const clearAll = () => {
   if (!canUseStorage()) return
   try {
+    const theme = window.localStorage.getItem(THEME_STORAGE_KEY)
     window.localStorage.clear()
+    if (theme) window.localStorage.setItem(THEME_STORAGE_KEY, theme)
   } catch (error) {
     console.error('[secureStorage] could not clear storage', error)
   }

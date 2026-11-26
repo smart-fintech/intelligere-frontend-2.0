@@ -17,23 +17,23 @@ import { cn } from '@/Library/utils'
 
 const STYLES = {
   success: {
-    box: 'bg-green-50 border-green-200 border-l-green-700',
-    icon: 'fill-green-700',
+    box: 'bg-green-50 border-green-200 border-l-green-700 dark:bg-green-950 dark:border-green-900 dark:border-l-green-500',
+    icon: 'fill-green-700 dark:fill-green-400',
     bar: 'bg-green-700',
   },
   warning: {
-    box: 'bg-yellow-50 border-yellow-200 border-l-yellow-700',
-    icon: 'fill-yellow-700',
+    box: 'bg-yellow-50 border-yellow-200 border-l-yellow-700 dark:bg-yellow-950 dark:border-yellow-900 dark:border-l-yellow-500',
+    icon: 'fill-yellow-700 dark:fill-yellow-400',
     bar: 'bg-yellow-700',
   },
   error: {
-    box: 'bg-red-50 border-red-200 border-l-red-400',
-    icon: 'fill-red-400',
+    box: 'bg-red-50 border-red-200 border-l-red-400 dark:bg-red-950 dark:border-red-900 dark:border-l-red-500',
+    icon: 'fill-red-400 dark:fill-red-400',
     bar: 'bg-red-400',
   },
   info: {
-    box: 'bg-blue-50 border-blue-200 border-l-blue-700',
-    icon: 'fill-blue-700',
+    box: 'bg-blue-50 border-blue-200 border-l-blue-700 dark:bg-blue-950 dark:border-blue-900 dark:border-l-blue-500',
+    icon: 'fill-blue-700 dark:fill-blue-400',
     bar: 'bg-blue-700',
   },
 }
@@ -118,10 +118,10 @@ export function Toast({
         </svg>
 
         <div>
-          <p className="text-sm leading-tight font-medium text-slate-900">{title}</p>
+          <p className="text-sm leading-tight font-medium text-slate-900 dark:text-slate-100">{title}</p>
           {/* The second line only appears when a description was passed. */}
           {description ? (
-            <p className="mt-1 text-xs text-slate-600">{description}</p>
+            <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{description}</p>
           ) : null}
         </div>
 
@@ -133,7 +133,7 @@ export function Toast({
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="size-2.5 cursor-pointer fill-slate-500"
+            className="size-2.5 cursor-pointer fill-slate-500 dark:fill-slate-400"
             aria-hidden="true"
             viewBox="0 0 329.269 329"
           >

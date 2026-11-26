@@ -28,4 +28,4 @@ export const outlineButton =
 
 /** Its red twin, for Delete. */
 export const outlineDanger =
-  'inline-flex h-9 cursor-pointer items-center justify-center rounded-md border border-[#dc3545] bg-transparent px-3 text-[#dc3545] transition-colors hover:bg-[#dc3545] hover:text-white disabled:cursor-not-allowed disabled:opacity-60'
+  'inline-flex h-9 cursor-pointer items-center justify-center rounded-md border border-[#dc3545] bg-transparent px-3 text-[#dc3545] dark:text-red-400 transition-colors hover:bg-[#dc3545] hover:text-white disabled:cursor-not-allowed disabled:opacity-60'

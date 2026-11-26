@@ -128,7 +128,7 @@ export default function CopilotLauncher() {
           disabled={!hasCompanies}
           title={launcherTitle}
           aria-label={launcherTitle}
-          className="fixed right-4 bottom-24 z-40 flex size-12 items-center justify-center rounded-full border border-border bg-white shadow-lg transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 sm:right-6 sm:bottom-16 sm:size-14"
+          className="fixed right-4 bottom-24 z-40 flex size-12 items-center justify-center rounded-full border border-border bg-card shadow-lg transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 sm:right-6 sm:bottom-16 sm:size-14"
         >
           <img src={copilotIconUrl} alt="" className="size-7 object-contain sm:size-8" draggable={false} />
         </button>

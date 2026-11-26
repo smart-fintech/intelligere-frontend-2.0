@@ -17,7 +17,7 @@ export function TermsAndConditions() {
 
   return (
     <React.Fragment>
-      <div className=" bg-gray-50 py-6 px-4 sm:px-6 lg:px-8">
+      <div className=" bg-background py-6 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-6xl">
 
           {/* Terms Card */}
@@ -26,12 +26,12 @@ export function TermsAndConditions() {
             mb-6
             overflow-y-auto
             rounded-lg
-            bg-white
+            bg-card
             p-6
             shadow-[0_4px_20px_rgba(0,0,0,0.08)]
             text-sm
             leading-6
-            text-gray-700
+            text-card-foreground/80
           "
           >
             <p className="mb-4">
@@ -110,7 +110,7 @@ export function TermsAndConditions() {
               new products or services.
             </p>
 
-            <h5 className="mb-3 text-base font-semibold text-gray-800">
+            <h5 className="mb-3 text-base font-semibold text-foreground">
               (9) Termination
             </h5>
 
@@ -154,7 +154,7 @@ export function TermsAndConditions() {
               permission of Company and/or its licensors.
             </p>
 
-            <h5 className="mb-3 text-base font-semibold text-gray-800">
+            <h5 className="mb-3 text-base font-semibold text-foreground">
               (11) Privacy
             </h5>
 
@@ -256,7 +256,7 @@ export function TermsAndConditions() {
               standard comma separated format.
             </p>
 
-            <h5 className="mb-3 text-base font-semibold text-gray-800">
+            <h5 className="mb-3 text-base font-semibold text-foreground">
               (12) Disclaimer of Warranties and Limitation of Liability.
             </h5>
 

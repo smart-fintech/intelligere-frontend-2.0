@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/Components/ui/button'
 import IconAction from '@/Components/Layout/IconAction'
 import Logo from '@/Components/Layout/Logo'
+import ThemeToggle from '@/Components/Layout/ThemeToggle'
 import CompanySwitcher from '@/Modules/Company/Components/CompanySwitcher'
 import LedgerActions from '@/Modules/Dashboard/Components/LedgerActions'
 import { ENV } from '@/Config/env'
@@ -447,6 +448,10 @@ export default function Header({ onToggleSidebar }) {
             onClick={() => toast.info('Notifications are coming soon.')}
           />
         )}
+        {/* Light / dark mode, for everybody. The choice is saved in this
+            browser and survives logout - see Library/theme.js. */}
+        <ThemeToggle />
+
         {/* A thin divider so the account area reads as its own group. */}
         <span className="mx-1 hidden h-6 w-px bg-border sm:block" />
 

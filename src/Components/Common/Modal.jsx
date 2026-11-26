@@ -61,7 +61,7 @@ const SIZES = {
 const BACKDROPS = {
   dark: 'bg-black/50',
   blur: 'bg-black/40 backdrop-blur-sm',
-  light: 'bg-white/70',
+  light: 'bg-white/70 dark:bg-black/60',
   none: 'bg-transparent',
 }
 

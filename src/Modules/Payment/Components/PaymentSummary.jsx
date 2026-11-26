@@ -69,7 +69,7 @@ export function PaymentSummary({ quote, paying, waiting, onPay }) {
           loading={paying || Boolean(waiting)}
           disabled={blocked}
           onClick={onPay}
-          className="disabled:border-transparent disabled:bg-gray-300 disabled:text-white disabled:opacity-100"
+          className="disabled:border-transparent disabled:bg-gray-300 disabled:text-white dark:disabled:bg-muted dark:disabled:text-muted-foreground disabled:opacity-100"
         >
           {paying ? 'Processing...' : waiting ? 'Checking offers...' : 'Payment'}
         </Button>
