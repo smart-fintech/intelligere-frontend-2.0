@@ -15,7 +15,9 @@
  *   - it is not sensitive - it is only "light" or "dark".
  * secureStorage.clearAll() keeps this key, so logging out does not reset it.
  *
- * Nothing saved yet -> the operating system's preference is used.
+ * Nothing saved yet -> light (DEFAULT_THEME). The OS setting is ignored on
+ * purpose: Intelligere opens in light mode until the user switches it, from
+ * the header or the login page.
  *
  * Components should not import this directly - use the useTheme() hook.
  */
@@ -41,11 +43,11 @@ const readSaved = () => {
   }
 }
 
-const systemTheme = () =>
-  window.matchMedia?.('(prefers-color-scheme: dark)').matches ? THEMES.DARK : THEMES.LIGHT
+/** What a first-time visitor sees, whatever their OS is set to. */
+export const DEFAULT_THEME = THEMES.LIGHT
 
 /** The theme the app should be showing right now. */
-export const getTheme = () => readSaved() ?? systemTheme()
+export const getTheme = () => readSaved() ?? DEFAULT_THEME
 
 /** Puts the theme on <html>. Safe to call as often as you like. */
 export const applyTheme = (theme) => {
@@ -77,9 +79,9 @@ export const setTheme = (theme) => {
 export const toggleTheme = () => setTheme(getTheme() === THEMES.DARK ? THEMES.LIGHT : THEMES.DARK)
 
 /**
- * Subscribes to theme changes from this tab, other tabs (the `storage`
- * event), and the OS setting (only matters while nothing is saved).
- * Returns the unsubscribe function, as useSyncExternalStore expects.
+ * Subscribes to theme changes from this tab and from other tabs (the
+ * `storage` event). Returns the unsubscribe function, as
+ * useSyncExternalStore expects.
  */
 export const subscribeTheme = (listener) => {
   listeners.add(listener)
@@ -89,19 +91,11 @@ export const subscribeTheme = (listener) => {
     applyTheme(getTheme())
     listener()
   }
-  const media = window.matchMedia?.('(prefers-color-scheme: dark)')
-  const onSystemChange = () => {
-    if (readSaved()) return
-    applyTheme(getTheme())
-    listener()
-  }
 
   window.addEventListener('storage', onStorage)
-  media?.addEventListener?.('change', onSystemChange)
 
   return () => {
     listeners.delete(listener)
     window.removeEventListener('storage', onStorage)
-    media?.removeEventListener?.('change', onSystemChange)
   }
 }

@@ -43,7 +43,7 @@ export default function Sidebar({ open, onClose }) {
           type="button"
           aria-label="Close menu"
           onClick={onClose}
-          className="fixed inset-0 z-20 bg-foreground/40 lg:hidden"
+          className="fixed inset-0 z-20 bg-foreground/40 lg:hidden dark:bg-black/60"
         />
       ) : null}
       <aside

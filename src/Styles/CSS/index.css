@@ -102,45 +102,56 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* Dark mode uses the Copilot's dark navy palette (copilot/legacy/style.css,
+   [data-theme="dark"]) so the app and the Copilot look like one product:
+     --bg-main #0b101a -> background     --bg-panel #111a29    -> card, popover
+     --bg-sidebar #070b12 -> sidebar     --row-stripe #1a2740  -> muted, accent
+     --text-primary #ececec -> foreground
+     --text-secondary #8e9db0 -> muted-foreground
+     --border-color #1a2840 -> border
+   The Copilot's own accent (#17469e) is too dark to read as text on navy, so
+   the brand stays the lightened blue below. */
 .dark {
   /* Brand blue is lightened in dark mode so it stays readable. */
   --brand: #3f92c9;
   --brand-dark: #2f7cb0;
   --brand-light: #7fb6d9;
-  --brand-soft: #16242e;
+  --brand-soft: #0f1a2b; /* input backgrounds: a step above --background */
   --brand-muted: #9bbfd9;
   --brand-foreground: #06131c;
 
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  --background: #0b101a;
+  --foreground: #ececec;
+  --card: #111a29;
+  --card-foreground: #ececec;
+  --popover: #111a29;
+  --popover-foreground: #ececec;
   --primary: var(--brand);
   --primary-foreground: var(--brand-foreground);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --secondary: #1a2740;
+  --secondary-foreground: #ececec;
+  --muted: #1a2740;
+  --muted-foreground: #8e9db0;
+  --accent: #1a2740;
+  --accent-foreground: #ececec;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --border: #1a2840;
+  /* Form fields get a slightly lighter edge than --border so an empty input
+     is still visible on a #111a29 card. */
+  --input: #243552;
   --ring: var(--brand);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar: #070b12;
+  --sidebar-foreground: #ececec;
   --sidebar-primary: var(--brand);
   --sidebar-primary-foreground: var(--brand-foreground);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-accent: #1a2740;
+  --sidebar-accent-foreground: #ececec;
+  --sidebar-border: #1a2840;
   --sidebar-ring: oklch(0.556 0 0);
 }
 

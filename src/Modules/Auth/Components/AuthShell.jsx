@@ -1,4 +1,5 @@
 import { Card, CardContent } from '@/Components/ui/card'
+import ThemeToggle from '@/Components/Layout/ThemeToggle'
 import { cn } from '@/Library/utils'
 
 /**
@@ -19,7 +20,13 @@ import { cn } from '@/Library/utils'
  */
 export default function AuthShell({ width = 'max-w-md', footer, children }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-brand-soft/60 px-4 py-5">
+    <div className="relative flex min-h-screen items-center justify-center bg-brand-soft/60 px-4 py-5">
+      {/* Light / dark switch, top-right - the same one the header has, so the
+          choice made here carries on into the app after sign-in. */}
+      <div className="absolute top-3 right-3 sm:top-4 sm:right-4">
+        <ThemeToggle />
+      </div>
+
       <div className={cn('w-full space-y-4', width)}>
         <h1 className="text-center text-4xl font-light text-brand-light">
           Welcome to <span className="font-bold text-brand">Intelligere</span>

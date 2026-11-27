@@ -19,16 +19,14 @@
 
     <!-- Light / dark mode, applied BEFORE the first paint so a dark-mode
          user never sees a white flash while the app loads. Same rules as
-         src/Library/theme.js (key "theme"; nothing saved -> OS setting). -->
+         src/Library/theme.js (key "theme"; nothing saved -> light). -->
     <script>
       (function () {
         var theme
         try {
           theme = localStorage.getItem('theme')
         } catch (e) {}
-        if (theme !== 'light' && theme !== 'dark') {
-          theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-        }
+        if (theme !== 'dark') theme = 'light'
         if (theme === 'dark') document.documentElement.classList.add('dark')
         document.documentElement.style.colorScheme = theme
       })()
