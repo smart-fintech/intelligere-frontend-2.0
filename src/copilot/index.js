@@ -14,6 +14,8 @@
  *                       added in the header (same .header-btn style)
  *   legacy/main.js      loadCompanies() reads the signed-in user's companies
  *                       from the app instead of ai_companies
+ *   buildCopilotDocument.js hides the free-text input bar (hostOverridesCss);
+ *                       the Copilot is driven by its sidebar and option chips
  */
 
 export { default as CopilotLauncher } from './CopilotLauncher'

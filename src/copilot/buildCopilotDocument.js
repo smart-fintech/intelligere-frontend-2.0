@@ -12,7 +12,8 @@
  *   - window.COPILOT_HOST: the signed-in user's companies and the company
  *     active in the app, which main.js's loadCompanies() reads
  *
- * plus two small scripts of our own around main.js:
+ * plus a few lines of CSS that hide the free-text input bar (hostOverridesCss)
+ * and two small scripts of our own around main.js:
  *
  *   before it   a fetch() wrapper: every call to the Copilot APIs is handed to
  *               the app (window.parent), which sends it through the project's
@@ -70,6 +71,17 @@ window.COPILOT_HOST = ${toScriptLiteral(hostData)};
     return nativeFetch(input, init);
   };
 })();
+`
+
+// Added AFTER the original CSS. Intelligere 2.0 has no free-text input: the
+// Copilot is driven by its sidebar and option chips only. The input bar is
+// hidden, not removed - main.js binds #chatInput / #sendBtn when it loads.
+// The bottom panel then holds just the option chips, so with none on screen
+// it is hidden too rather than left as an empty strip. !important: main.js
+// shows/hides the panel through its inline style.
+const hostOverridesCss = `
+.chat-input-bar { display: none !important; }
+.chat-input-wrapper:not(:has(.pebble-dock:not(:empty))) { display: none !important; }
 `
 
 // Runs AFTER main.js, so main.js's top-level bindings (companies,
@@ -146,7 +158,9 @@ export const buildCopilotDocument = ({ companies, defaultCompanyId }) => {
     .map(([name, url]) => `const ${name} = ${toScriptLiteral(url)};`)
     .join('\n')
 
-  const styles = `<style>\n${styleCss}\n</style>\n  <style>\n${responsiveCss}\n</style>`
+  const styles = [styleCss, responsiveCss, hostOverridesCss]
+    .map((css) => `<style>\n${css}\n</style>`)
+    .join('\n  ')
 
   const scripts = [
     `<script>${hostBootstrapScript({ apiRoot, companies, defaultCompanyId })}</script>`,

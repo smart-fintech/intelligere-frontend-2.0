@@ -37,7 +37,7 @@ export default function Logo({ size = 'md', showText = true, className }) {
 
       {showText ? (
         <span className={cn('font-semibold tracking-tight', styles.text)}>
-          Intelligere
+          Intelligere 
         </span>
       ) : null}
     </span>
